@@ -208,7 +208,10 @@ Rbrun.configure do |c|
   }
   c.sandbox_provider = {
     default: :daytona,
-    daytona: { api_key: ENV["DAYTONA_API_KEY"], api_url: ENV["DAYTONA_API_URL"] },
+    # daytona builds a self-built, content-addressed snapshot from `dockerfile` (the HOST injects its
+    # own image; a minimal bun+shell default applies when omitted). `cpu`/`memory`/`disk` bake on it.
+    daytona: { api_key: ENV["DAYTONA_API_KEY"], api_url: ENV["DAYTONA_API_URL"],
+               dockerfile: ENV["RBRUN_SANDBOX_DOCKERFILE"], cpu: 2, memory: 4, disk: 3 },
     local:   {},
   }
   # future families — light up when their gem is required:

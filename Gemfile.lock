@@ -4,6 +4,16 @@ PATH
     rbrun (0.1.0)
       rails (>= 8.1.3)
 
+PATH
+  remote: gems/rbrun-sandbox
+  specs:
+    rbrun-sandbox (0.1.0)
+      async (>= 2.0)
+      async-http (>= 0.60)
+      async-http-faraday (>= 0.12)
+      faraday (~> 2.0)
+      faraday-multipart (~> 1.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -82,21 +92,63 @@ GEM
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
     ast (2.4.3)
+    async (2.42.0)
+      console (~> 1.29)
+      fiber-annotation
+      io-event (~> 1.11)
+      metrics (~> 0.12)
+      traces (~> 0.18)
+    async-http (0.95.1)
+      async (>= 2.10.2)
+      async-pool (~> 0.11)
+      io-endpoint (~> 0.14)
+      io-stream (~> 0.6)
+      metrics (~> 0.12)
+      protocol-http (~> 0.62)
+      protocol-http1 (~> 0.39)
+      protocol-http2 (~> 0.26)
+      protocol-url (~> 0.2)
+      traces (~> 0.10)
+    async-http-faraday (0.22.2)
+      async-http (~> 0.42)
+      faraday
+    async-pool (0.11.2)
+      async (>= 2.0)
     base64 (0.3.0)
     bigdecimal (4.1.2)
     builder (3.3.0)
     concurrent-ruby (1.3.7)
     connection_pool (3.0.2)
+    console (1.37.0)
+      fiber-annotation
+      fiber-local (~> 1.1)
+      json
     crass (1.0.7)
     date (3.5.1)
     drb (2.2.3)
     erb (6.0.5)
     erubi (1.13.1)
+    faraday (2.14.3)
+      faraday-net_http (>= 2.0, < 3.5)
+      json
+      logger
+    faraday-multipart (1.2.0)
+      multipart-post (~> 2.0)
+    faraday-net_http (3.4.4)
+      net-http (~> 0.5)
+    fiber-annotation (0.2.0)
+    fiber-local (1.1.0)
+      fiber-storage
+    fiber-storage (1.0.1)
     globalid (1.4.0)
       activesupport (>= 6.1)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
     io-console (0.8.2)
+    io-endpoint (0.17.2)
+    io-event (1.19.2)
+    io-stream (0.13.2)
+      openssl (>= 3.3)
     irb (1.18.0)
       pp (>= 0.6.0)
       prism (>= 1.3.0)
@@ -116,10 +168,14 @@ GEM
       net-pop
       net-smtp
     marcel (1.2.1)
+    metrics (0.15.0)
     mini_mime (1.1.5)
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
+    multipart-post (2.4.1)
+    net-http (0.9.1)
+      uri (>= 0.11.1)
     net-imap (0.6.4.1)
       date
       net-protocol
@@ -132,6 +188,7 @@ GEM
     nio4r (2.7.5)
     nokogiri (1.19.4-arm64-darwin)
       racc (~> 1.4)
+    openssl (4.0.2)
     parallel (2.1.0)
     parser (3.3.11.1)
       ast (~> 2.4.1)
@@ -144,6 +201,14 @@ GEM
       actionpack (>= 7.0.0)
       activesupport (>= 7.0.0)
       rack
+    protocol-hpack (1.5.1)
+    protocol-http (0.63.0)
+    protocol-http1 (0.39.0)
+      protocol-http (~> 0.62)
+    protocol-http2 (0.26.1)
+      protocol-hpack (~> 1.4)
+      protocol-http (~> 0.62)
+    protocol-url (0.4.0)
     puma (8.0.2)
       nio4r (~> 2.0)
     racc (1.8.1)
@@ -232,6 +297,7 @@ GEM
     sqlite3 (2.9.5-arm64-darwin)
     thor (1.5.0)
     timeout (0.6.1)
+    traces (0.18.2)
     tsort (0.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -253,6 +319,7 @@ DEPENDENCIES
   propshaft
   puma
   rbrun!
+  rbrun-sandbox!
   rubocop-rails-omakase
   sqlite3
 
