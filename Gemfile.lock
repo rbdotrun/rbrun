@@ -5,6 +5,12 @@ PATH
       rails (>= 8.1.3)
 
 PATH
+  remote: gems/rbrun-runtime
+  specs:
+    rbrun-runtime (0.1.0)
+      rbrun-sandbox
+
+PATH
   remote: gems/rbrun-sandbox
   specs:
     rbrun-sandbox (0.1.0)
@@ -319,6 +325,7 @@ DEPENDENCIES
   propshaft
   puma
   rbrun!
+  rbrun-runtime!
   rbrun-sandbox!
   rubocop-rails-omakase
   sqlite3
