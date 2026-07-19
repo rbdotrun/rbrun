@@ -4,7 +4,7 @@ module Rbrun
   class AgentTurnTest < ActiveSupport::TestCase
     # A scripted stand-in for a runtime adapter: plays events into on_event and round-trips the tool.
     class ToolCallingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
         on_event.call({ type: "session", session_id: "sess-1" })
         on_event.call({ type: "assistant", text: "on it" })
         resp = tool_handler.call({ type: "tool_request", id: "t1", name: "identity", args: {} })
@@ -15,7 +15,7 @@ module Rbrun
     end
 
     class GatingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
         on_event.call({ type: "session", session_id: "sess-2" })
         on_event.call({ type: "needs_approval", tool: "dangerous", arguments: { "x" => 1 }, tool_use_id: "g1" })
         { type: "result", stop_reason: "awaiting_approval" }
@@ -37,6 +37,30 @@ module Rbrun
       tr = @session.messages.find_by(event_type: "tool_result")
       refute tr.payload["is_error"]
       assert_equal "acme", JSON.parse(tr.content).dig("data", "tenant")
+    end
+
+    # Captures whatever skills dir the runtime is handed, and reads it back before the turn ends.
+    class SkillsCapturingRuntime
+      attr_reader :staged
+
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
+        @staged = skills && Rbrun::SkillArchive.read_dir(skills)
+        on_event.call({ type: "result", stop_reason: "end_turn" })
+        { type: "result", stop_reason: "end_turn" }
+      end
+    end
+
+    test "a turn materializes the tenant's current skill versions from the DB into the runtime" do
+      files = { "SKILL.md" => "# staged\n" }
+      skill = Rbrun::Skill.create!(tenant: "acme", slug: "pdf", name: "PDF")
+      skill.promote!(digest: Rbrun::SkillArchive.digest_files(files),
+                     archive: Rbrun::SkillArchive.pack_files(files), source: :inline)
+
+      runtime = SkillsCapturingRuntime.new
+      AgentTurn.new(session: @session, runtime: runtime).run("go")
+
+      assert_equal({ "pdf/SKILL.md" => "# staged\n" }, runtime.staged,
+                   "the current version's folder is staged under <slug>/")
     end
 
     test "a needs_approval event freezes a pending tool_use row and marks the turn gated" do

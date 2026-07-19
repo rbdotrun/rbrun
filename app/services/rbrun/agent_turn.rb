@@ -36,14 +36,30 @@ module Rbrun
 
     def call_client(prompt)
       runtime = @runtime || Rbrun.runtime(tenant: @session.tenant, sandbox: @session.sandbox)
+      skills_dir = materialize_skills
       runtime.run(
         prompt: prompt,
         system: Rbrun.config(@session.tenant).system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
+        skills: skills_dir,
         resume: @session.sdk_session_id,
         tool_handler: method(:run_tool),
         on_event: method(:ingest)
       )
+    ensure
+      FileUtils.remove_entry(skills_dir) if skills_dir && Dir.exist?(skills_dir)
+    end
+
+    # Materialize the acting tenant's current skill versions into a temp folder for the runtime to
+    # stage. The DB is the source — never files/config. nil when the tenant has no skills.
+    def materialize_skills
+      require "tmpdir"
+      skills = Rbrun::Skill.for_tenant(@session.tenant).where.not(current_version_id: nil).includes(:current_version)
+      return nil if skills.empty?
+
+      dir = Dir.mktmpdir("rbrun-skills-")
+      skills.each { |skill| Rbrun::SkillArchive.unpack(skill.current_version.archive, into: File.join(dir, skill.slug)) }
+      dir
     end
 
     def internal(text, kind)
