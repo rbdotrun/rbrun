@@ -16,5 +16,13 @@ module Rbrun
       require "rbrun/runtime"
       build(Rbrun::Runtime, config.runtime_provider, provider: provider, sandbox: sandbox, **opts)
     end
+
+    # The tool roster: engine built-ins + host-registered tools. ApplicationTool.manifest/find read it.
+    def tools = @tools ||= []
+
+    def register_tool(klass)
+      tools << klass unless tools.include?(klass)
+      klass
+    end
   end
 end

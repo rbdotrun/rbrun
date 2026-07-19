@@ -7,7 +7,7 @@ module Rbrun
     DEFAULT_TENANT = "rbrun"
     FAMILIES = %i[sandbox runtime dns server].freeze
 
-    attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key
+    attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt
     attr_reader :users
 
     def initialize
@@ -17,6 +17,11 @@ module Rbrun
       @tenancy_key         = "tenant"
       @users               = []
       @providers           = {}
+      @system_prompt       = <<~PROMPT
+        You are an assistant working inside a sandboxed workspace. Call the `identity` tool first to
+        learn who you are working for. Use your tools to fulfil the request; when asked for a
+        deliverable, build it. Never invent data — everything you present must come from your tools.
+      PROMPT
     end
 
     # Repeatable: append one login identity. Omitted tenant ⇒ DEFAULT_TENANT.
