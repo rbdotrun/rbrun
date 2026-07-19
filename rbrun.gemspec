@@ -32,4 +32,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "tailwind_merge"
   spec.add_dependency "dry-initializer"
   spec.add_dependency "lucide-rails"
+  spec.add_dependency "redcarpet"
 end
