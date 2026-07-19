@@ -333,9 +333,10 @@ behavior, and a phase is "valid" when its dogfood passes.
 
 ## 8. Phase contract
 
-Five phases. Scope + dogfood gate are **fixed now**. Each phase's detailed plan is written
+Seven phases. Scope + dogfood gate are **fixed now**. Each phase's detailed plan is written
 just-in-time (via the writing-plans skill), executed, validated by its dogfood, then the next phase's
-plan is written. Numbering is 1–5.
+plan is written. Numbering is 1–7. (The engine host was split from one oversized phase into three —
+Phases 4, 5, 6 — each independently testable; the UI is Phase 7.)
 
 ### Phase 1 — Skeleton + config kernel + dogfood spine
 
@@ -379,31 +380,52 @@ with a hardcoded prompt, ONE trivial in-memory tool, and a skill folder. ✓/✗
 assistant replied, the tool was requested and answered over the bridge, terminal `result`. Real LLM +
 real sandbox, **no engine**. This is the headline "dogfood runtime."
 
-### Phase 4 — Engine host (models + turn loop + tools + config + auth/tenancy)
+### Phase 4 — Engine host: persistence + config spine
 
-**Scope:** engine `app/` — `Session` (status enum, `sdk_session_id`, `#sandbox`), `SessionMessage`
-(one row per event, `payload` jsonb, approval columns, frozen-call replay), `Artifact` +
-`ArtifactVersion`, `Rbrun::Tenanted` (configurable `<tenancy_key>` slug), optional built-in auth (`User` + config-seeded
-users + `current_tenant` hook); `AgentTurn` (the `on_event`/`tool_handler` sink → persistence);
-`ApplicationTool < RubyLLM::Tool` base + `manifest`/`find` tool lookup + generic built-ins
-(SaveArtifactVersion, identity); full `Rbrun.configure` aggregator; `rbrun:install` generator +
-`database_connection` toggle + own-DB migrations. Depends on Phase 3.
-**Deliverables:** runnable engine mounted in `test/dummy`; model/tool tests (Runner stubbed);
-config-seeded dev user as the dogfood tenant.
-**Dogfood gates (insitix-style, through `Session#run_turn`):**
+**Scope:** the full `Rbrun.configure` aggregator (all `<family>_provider` hashes + flat knobs +
+repeatable `c.user`) and the config-aware constructors `Rbrun.sandbox` / `Rbrun.runtime` (thin
+wrappers over `Rbrun.build`, reading config, injecting an explicit hash into the pure gem);
+`database_connection` toggle on `Rbrun::ApplicationRecord` (`connects_to`); models `Session` (status
+enum, `sdk_session_id`, `#sandbox` via `Rbrun.sandbox`) + `SessionMessage` (one row per event,
+`payload` jsonb, approval columns, `tool_use_id`); `Rbrun::Tenanted` (configurable `<tenancy_key>`
+slug column — `NOT NULL`, indexed — + `for_tenant(slug)` scope, default slug `"rbrun"`);
+`rbrun:install` generator + own-DB migrations; engine mounted in `test/dummy`. Depends on Phase 3.
+**Deliverables:** model + config unit tests; migrations; the generator. No turn loop yet.
+**Dogfood gate — `dogfood/session_log.rake`:** create a `Session` as a tenant, append `SessionMessage`
+event rows, and confirm they persist, scope by tenant (`for_tenant`), and that `sdk_session_id` stores
+— plus `Rbrun.sandbox`/`Rbrun.runtime` resolve from config. (No real turn yet.)
+
+### Phase 5 — Engine host: tool base + turn loop
+
+**Scope:** `Rbrun::ApplicationTool < RubyLLM::Tool` base + `manifest`/`find` tool lookup + `in_chat`
+tenancy + generic built-ins (an identity tool + one simple demo tool); `Rbrun::AgentTurn` — the
+`ingest` event-sink (→ `SessionMessage` rows) + the `run_tool` stdio bridge; `Session#run_turn` wiring
+`Rbrun::Runtime.run` (`tools: ApplicationTool.manifest`, `tool_handler: run_tool`, `on_event: ingest`)
+→ persistence, with status transitions (`working`/`done`/`needs_approval`/`failed`) and gate freezing.
+Host apps register their own tools. Depends on Phase 4.
+**Deliverables:** tool + turn tests (Runtime stubbed for the Ruby half); config-seeded dev tenant.
+**Dogfood gates (insiti-style, through `Session#run_turn` — real turns):**
 
 - `dogfood/session_turn.rake` — a real turn; ✓/✗ on tools called + reply + no tool errored.
 - `dogfood/gate.rake` — a `needs_approval!` tool actually **parks** the run (`status=needs_approval`,
   a pending `tool_use` row frozen, nothing ran), and Bash confinement holds.
-- `dogfood/artifact.rake` — the agent builds an artifact in the sandbox and `SaveArtifactVersion`
-  lifts the bytes back into an `ArtifactVersion`.
 
-### Phase 5 — Engine UI (controllers, jobs, channels, Turbo, bun bundle, auth screen)
+### Phase 6 — Engine host: artifacts + auth
+
+**Scope:** `Artifact` + `ArtifactVersion` (+ `Artifact::Medium` value object) + the `SaveArtifactVersion`
+tool (lifts built bytes off the sandbox into an immutable version, never through the model); optional
+built-in auth — `User` model + config-seeded users (idempotent upsert on boot; extensible DB row) +
+the `current_tenant` hook (host override when auth is off). Depends on Phase 5.
+**Deliverables:** artifact + auth tests.
+**Dogfood gate — `dogfood/artifact.rake`:** the agent builds an artifact in the sandbox and
+`SaveArtifactVersion` lifts the bytes back into an `ArtifactVersion`.
+
+### Phase 7 — Engine UI (controllers, jobs, channels, Turbo, bun bundle, auth screen)
 
 **Scope:** `MessagesController` / `ApprovalsController`, `AgentTurnJob`, ActionCable channels, Turbo
 Stream views (session timeline, approval footer, artifact render), bun-built CSS/JS in
 `app/assets/builds/rbrun/`, login screen (when auth is on), engine mounted + navigable in
-`test/dummy`. Depends on Phase 4.
+`test/dummy`. Depends on Phase 6.
 **Deliverables:** working mounted UI; controller/system tests.
 **Dogfood gate — `dogfood/browser.rake`:** drive a real conversation in a headless browser: Turbo
 appends the turn, the working indicator shows, the approval footer appears and a decision resumes the
