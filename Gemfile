@@ -12,6 +12,11 @@ gem "propshaft"
 # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
 gem "rubocop-rails-omakase", require: false
 
+# Headless-browser driver for the Phase 8 browser dogfood (pure Chrome DevTools Protocol via ferrum —
+# no webdriver binary, no selenium). Dev-only: drives the real mounted UI, never shipped in the gem.
+gem "capybara", require: false
+gem "cuprite", require: false
+
 # Start debugger with binding.b [https://github.com/ruby/debug]
 # gem "debug", ">= 1.0.0"
 
