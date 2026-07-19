@@ -3,22 +3,25 @@
     <p class="mb-1 text-xs font-medium text-slate-500">Your answer</p>
     <ul class="flex flex-col gap-0.5 text-sm text-slate-700">
       <% answers.each do |key, vals| %>
-        <li><span class="text-slate-400"><%= key %>:</span> <%= Array(vals).join(", ") %></li>
+        <li>
+          <span class="text-slate-400"><%= spec.question(key)&.dig("label") || key %>:</span>
+          <%= Array(vals).map { |v| spec.label_for(key, v) }.join(", ") %>
+        </li>
       <% end %>
     </ul>
   <% else %>
     <%= form_with url: submit_path, method: :post, class: "flex flex-col gap-3" do %>
-      <% if title.present? %>
-        <p class="text-sm font-medium text-slate-800"><%= title %></p>
+      <% if spec.title.present? %>
+        <p class="text-sm font-medium text-slate-800"><%= spec.title %></p>
       <% end %>
-      <% steps.each do |step| %>
+      <% spec.steps.each do |step| %>
         <% Array(step["questions"]).each do |q| %>
           <fieldset class="flex flex-col gap-1.5">
             <legend class="text-xs font-medium text-slate-600"><%= q["label"] %></legend>
             <% Array(q["options"]).each do |opt| %>
               <label class="flex items-center gap-2 text-sm text-slate-700">
-                <input type="<%= multi?(q) ? "checkbox" : "radio" %>" name="<%= field_name(q) %>"
-                       value="<%= opt["value"] %>" <%= "required" if q["required"] && !multi?(q) %>
+                <input type="<%= spec.multiple?(q["key"]) ? "checkbox" : "radio" %>" name="<%= field_name(q) %>"
+                       value="<%= opt["value"] %>" <%= "required" if q["required"] && !spec.multiple?(q["key"]) %>
                        class="size-3.5 accent-default-600">
                 <%= opt["label"] %>
               </label>

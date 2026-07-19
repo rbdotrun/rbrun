@@ -34,19 +34,30 @@ namespace :dogfood do
       dog.ok "it carries a form_spec with options", form.is_a?(Hash) && form.to_json.downcase.include?("red")
       dog.info "form_spec", form.to_json.squish[0, 180]
 
-      dog.header "submit picks → they become the tool_result and resume the turn"
-      answers = { "color" => [ "red" ] }
+      dog.header "submit VALIDATED picks → recorded as the result, resume with a label recap"
+      # The real path (AskUserResponsesController without HTTP): validate the picks against the FROZEN
+      # spec (trust boundary), record them, resume with the label-resolved recap.
+      spec = Rbrun::AskUserFormSpec.new(form)
+      key = spec.keys.first
+      value = spec.option_values(key).first                         # a value the agent actually offered
+      answers = { key => [ value ] }
+      dog.ok "the picks validate against the frozen spec (in-options)", spec.errors(answers).empty?
+      dog.ok "an out-of-options value is rejected (the boundary)", spec.errors(key => [ "definitely-not-an-option" ]).any?
+
       frozen.update!(approval_status: "answered")
       session.messages.create!(role: "tool", event_type: "tool_result", tool_use_id: frozen.tool_use_id,
         content: { "answers" => answers }.to_json,
         payload: { "tool_use_id" => frozen.tool_use_id, "result" => { "answers" => answers }, "is_error" => false })
-      session.continue_turn!("The user answered: color=red. Continue with this choice.")
+      session.continue_turn!(spec.recap(answers))
       session.reload
 
+      label = spec.label_for(key, value)
       reply = session.messages.where(event_type: "text", role: "assistant").last&.content.to_s
       dog.ok "the ask_user gate is answered", frozen.reload.approval_answered?
       dog.ok "the turn resumed to done", session.done?
-      dog.ok "the agent continued KNOWING the pick (reply mentions red)", reply.downcase.include?("red")
+      dog.ok "the agent continued KNOWING the pick (reply reflects the chosen LABEL)",
+             reply.downcase.include?(label.to_s.downcase) || reply.downcase.include?(value.to_s.downcase)
+      dog.info "pick", "#{key}=#{value} (#{label})"
       dog.info "reply", reply.squish[0, 160]
     ensure
       session.sandbox.destroy!
