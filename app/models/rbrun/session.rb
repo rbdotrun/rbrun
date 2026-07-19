@@ -23,8 +23,10 @@ module Rbrun
     # an injection seam for tests (nil ⇒ the real config-resolved runtime).
     def run_turn(content, runtime: nil)
       working!
+      before = worktree.head_sha
       turn = Rbrun::AgentTurn.new(session: self, runtime: runtime)
       turn.run(content)
+      record_commits!(before)
       turn.gated? ? needs_approval! : done!
       turn
     rescue StandardError => e
@@ -36,5 +38,23 @@ module Rbrun
     private
 
     def inherit_tenant = self.tenant ||= worktree&.tenant
+
+    # Read the commits the agent pushed during the turn (HEAD before → after) and record them.
+    # Guarded: a non-git sandbox (unit tests, un-provisioned worktrees) records nothing.
+    def record_commits!(before)
+      after = worktree.head_sha
+      return if after.nil? || after == before
+
+      range = before ? "#{before}..#{after}" : after
+      out = worktree.sandbox.exec("cd #{worktree.sandbox.workspace} && git log --format='%H%x09%s' #{range} 2>/dev/null")
+      return unless out.success?
+
+      out.stdout.each_line do |line|
+        sha, message = line.strip.split("\t", 2)
+        next if sha.to_s.empty?
+
+        worktree.commits.find_or_create_by!(sha: sha) { |c| c.session = self; c.message = message }
+      end
+    end
   end
 end
