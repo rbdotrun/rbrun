@@ -38,6 +38,28 @@ class ConfigTest < ActiveSupport::TestCase
     )
   end
 
+  test "c.skill collects inline skills (shorthand + kwargs) and c.skills_path stores the dir" do
+    Rbrun.configure do |c|
+      c.skills_path = "/app/skills"
+      c.skill "pdf-report", "# PDF\n"
+      c.skill slug: "invoice", name: "Invoice", files: { "SKILL.md" => "# Inv\n", "t.tex" => "x" }
+      c.skill "multi", files: { "SKILL.md" => "m", "a.txt" => "b" }
+    end
+    assert_equal "/app/skills", Rbrun.config.skills_path
+    assert_equal(
+      [
+        { slug: "pdf-report", name: "pdf-report", files: { "SKILL.md" => "# PDF\n" } },
+        { slug: "invoice", name: "Invoice", files: { "SKILL.md" => "# Inv\n", "t.tex" => "x" } },
+        { slug: "multi", name: "multi", files: { "SKILL.md" => "m", "a.txt" => "b" } }
+      ],
+      Rbrun.config.skills
+    )
+  end
+
+  test "c.skill without a slug raises" do
+    assert_raises(ArgumentError) { Rbrun.config.skill(name: "no slug") }
+  end
+
   test "family provider hashes store and read; unset returns {}" do
     Rbrun.configure do |c|
       c.sandbox_provider = { default: :daytona, daytona: { api_key: "k" }, local: {} }

@@ -8,8 +8,8 @@ module Rbrun
     FAMILIES = %i[sandbox runtime dns server].freeze
 
     attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt,
-                  :auth_managed_at_runtime
-    attr_reader :users
+                  :auth_managed_at_runtime, :skills_path
+    attr_reader :users, :skills
 
     def initialize
       @database_connection     = :rbrun
@@ -17,7 +17,9 @@ module Rbrun
       @github_pat              = nil
       @tenancy_key             = "tenant"
       @auth_managed_at_runtime = false
+      @skills_path             = nil
       @users                   = []
+      @skills                  = []
       @providers               = {}
       @system_prompt       = <<~PROMPT
         You are an assistant working inside a sandboxed workspace. Call the `identity` tool first to
@@ -29,6 +31,21 @@ module Rbrun
     # Repeatable: append one login identity. Omitted tenant ⇒ DEFAULT_TENANT.
     def user(email:, password:, tenant: DEFAULT_TENANT)
       @users << { email: email, password: password, tenant: tenant }
+    end
+
+    # Repeatable: append an inline skill (a seed source — the DB is the runtime store). Two forms:
+    #   c.skill "pdf-report", <<~MD ... MD        # shorthand: slug + SKILL.md body
+    #   c.skill slug: "invoice", name: "Invoice", files: { "SKILL.md" => "…", "t.tex" => "…" }
+    # The shorthand may also carry files: for a multi-file inline skill. Collected here, read only by
+    # the seeder; skills_path folders are the other seed source.
+    def skill(shorthand_slug = nil, body = nil, slug: nil, name: nil, files: nil)
+      if shorthand_slug
+        slug  ||= shorthand_slug
+        files ||= { "SKILL.md" => body.to_s }
+      end
+      slug or raise ArgumentError, "c.skill needs a slug (positional shorthand or slug:)"
+      @skills << { slug: slug, name: name || slug, files: files || {} }
+      nil
     end
 
     FAMILIES.each do |family|
