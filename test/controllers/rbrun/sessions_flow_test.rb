@@ -9,6 +9,8 @@ module Rbrun
       post "/rbrun/login", params: { email: "dev@rbrun.test", password: "password" }
       @worktree = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
       @session = @worktree.sessions.create!
+      # Act inside repo a/b (the switcher sets this; conversations are scoped to it).
+      post "/rbrun/repos/switch", params: { repo: "a/b", base: "main" }
     end
 
     test "index and show render for a signed-in user" do
@@ -41,6 +43,25 @@ module Rbrun
     test "creating a conversation redirects to its show page" do
       assert_difference("Rbrun::Session.count", 1) { post "/rbrun/c" }
       assert_response :redirect
+    end
+
+    test "create finds-or-creates the worktree for the current repo (no duplicate)" do
+      assert_no_difference("Rbrun::Worktree.count") { post "/rbrun/c" }
+      assert_equal "a/b", Rbrun::Session.order(:id).last.worktree.repo
+    end
+
+    test "the index is scoped to the current repo" do
+      other = Rbrun::Worktree.create!(tenant: "rbrun", repo: "c/d")
+      other_session = other.sessions.create!
+      get "/rbrun/c"
+      assert_select "a[href$=?]", "/c/#{@session.id}"
+      assert_select "a[href$=?]", "/c/#{other_session.id}", count: 0
+    end
+
+    test "with no current repo, create makes nothing and redirects" do
+      post "/rbrun/repos/switch", params: { repo: "" }
+      assert_no_difference("Rbrun::Session.count") { post "/rbrun/c" }
+      assert_redirected_to "/rbrun/c"
     end
 
     test "posting a message enqueues the turn and resets the composer" do

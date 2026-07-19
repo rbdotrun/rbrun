@@ -1,9 +1,17 @@
 module Rbrun
-  # Conversation index/create/show/retry. A Session lives under a Worktree; for the built-in UI a
-  # default Worktree per tenant is used (real hosts create worktrees against their own repos).
+  # Conversation index/create/show/retry. A Session lives under a Worktree, and a Worktree belongs to
+  # the acting workspace (current_repo). The index is scoped to that repo; creating a conversation
+  # finds-or-creates the repo's Worktree. No repo chosen → nothing to show / create.
   class SessionsController < Rbrun::ApplicationController
     def index
-      @sessions = Rbrun::Session.for_tenant(current_tenant).order(created_at: :desc)
+      @sessions =
+        if current_repo
+          Rbrun::Session.for_tenant(current_tenant)
+                        .joins(:worktree).where(rbrun_worktrees: { repo: current_repo })
+                        .order(created_at: :desc)
+        else
+          Rbrun::Session.none
+        end
     end
 
     def show
@@ -11,7 +19,9 @@ module Rbrun
     end
 
     def create
-      session = default_worktree.sessions.create!
+      return redirect_to rbrun.sessions_path unless current_repo
+
+      session = worktree_for(current_repo).sessions.create!
       redirect_to rbrun.session_path(session)
     end
 
@@ -23,10 +33,12 @@ module Rbrun
 
     private
 
-    def default_worktree
-      Rbrun::Worktree.for_tenant(current_tenant).order(:id).first ||
-        Rbrun::Worktree.create!(tenant: current_tenant,
-                                repo: ENV["RBRUN_WORKTREE_REPO"].presence || "rbdotrun/scratch", base: "main")
+    # The Worktree for the acting repo, created on first use. Base is the repo's default branch,
+    # captured when the repo was picked (from the GitHub result); falls back to "main".
+    def worktree_for(repo)
+      Rbrun::Worktree.for_tenant(current_tenant)
+                     .create_with(base: current_repo_base || "main")
+                     .find_or_create_by!(repo:)
     end
   end
 end

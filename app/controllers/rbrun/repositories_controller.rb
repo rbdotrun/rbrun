@@ -9,10 +9,11 @@ module Rbrun
       @repos = Rbrun.github_repos.search(query: params[:q].to_s)
     end
 
-    # Set the acting workspace and return to its conversation index.
+    # Set the acting workspace (+ its default branch, for worktree base) and return to its index.
     def switch
       repo = params[:repo].to_s.strip
-      session[:rbrun_repo] = repo.presence
+      session[:rbrun_repo]      = repo.presence
+      session[:rbrun_repo_base] = (repo.present? ? params[:base].to_s.presence : nil)
       redirect_to rbrun.sessions_path
     end
   end
