@@ -25,4 +25,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rails", ">= 8.1.3"
   spec.add_dependency "rbrun-sandbox"
   spec.add_dependency "rbrun-runtime"
+  spec.add_dependency "ruby_llm"
 end
