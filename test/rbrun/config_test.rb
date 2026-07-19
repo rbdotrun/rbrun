@@ -60,6 +60,26 @@ class ConfigTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { Rbrun.config.skill(name: "no slug") }
   end
 
+  test "c.mcp_server collects stdio + http declarations" do
+    Rbrun.configure do |c|
+      c.mcp_server name: "stripe", transport: :stdio, auth: :api_key, command: "npx",
+                   args: [ "-y", "@stripe/mcp" ], env: { "K" => "v" }, tools: %w[a b],
+                   tool_permissions: { default: :needs_approval }
+      c.mcp_server name: "linear", transport: :http, auth: :oauth, url: "https://mcp.linear.app"
+    end
+    servers = Rbrun.config.mcp_servers
+    assert_equal %w[stripe linear], servers.map { |s| s[:name] }
+    assert_equal :stdio, servers.first[:transport]
+    assert_equal :api_key, servers.first[:auth]
+    assert_equal %w[a b], servers.first[:tools]
+    assert_equal "https://mcp.linear.app", servers.last[:url]
+  end
+
+  test "c.mcp_server fails fast on an unknown transport or auth" do
+    assert_raises(ArgumentError) { Rbrun.config.mcp_server(name: "x", transport: :grpc) }
+    assert_raises(ArgumentError) { Rbrun.config.mcp_server(name: "x", transport: :stdio, auth: :magic) }
+  end
+
   test "family provider hashes store and read; unset returns {}" do
     Rbrun.configure do |c|
       c.sandbox_provider = { default: :daytona, daytona: { api_key: "k" }, local: {} }

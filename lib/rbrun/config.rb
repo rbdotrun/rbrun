@@ -6,10 +6,12 @@ module Rbrun
   class Config
     DEFAULT_TENANT = "rbrun"
     FAMILIES = %i[sandbox runtime dns server].freeze
+    MCP_TRANSPORTS = %i[stdio http].freeze
+    MCP_AUTHS = %i[api_key bearer oauth].freeze
 
     attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt,
                   :auth_managed_at_runtime, :skills_path
-    attr_reader :users, :skills
+    attr_reader :users, :skills, :mcp_servers
 
     def initialize
       @database_connection     = :rbrun
@@ -20,6 +22,7 @@ module Rbrun
       @skills_path             = nil
       @users                   = []
       @skills                  = []
+      @mcp_servers             = []
       @providers               = {}
       @system_prompt       = <<~PROMPT
         You are an assistant working inside a sandboxed workspace. Call the `identity` tool first to
@@ -45,6 +48,22 @@ module Rbrun
       end
       slug or raise ArgumentError, "c.skill needs a slug (positional shorthand or slug:)"
       @skills << { slug: slug, name: name || slug, files: files || {} }
+      nil
+    end
+
+    # Repeatable: declare an external MCP server (a seed source — the DB is the runtime store; the
+    # SaaS path uses Rbrun.mcp_resolver instead). Fails fast on an unknown transport/auth.
+    #   c.mcp_server name: "stripe", transport: :stdio, auth: :api_key, command: "npx",
+    #                args: ["-y", "@stripe/mcp@latest"], env: { "STRIPE_SECRET_KEY" => "…" },
+    #                tools: %w[create_payment_link], tool_permissions: { default: :needs_approval }
+    #   c.mcp_server name: "linear", transport: :http, auth: :oauth, url: "https://mcp.linear.app"
+    def mcp_server(name:, transport:, auth: nil, command: nil, args: [], url: nil, env: {}, headers: {}, tools: nil, tool_permissions: {})
+      transport = transport.to_sym
+      MCP_TRANSPORTS.include?(transport) or raise ArgumentError, "c.mcp_server transport must be one of #{MCP_TRANSPORTS.join('/')}"
+      auth = auth&.to_sym
+      auth.nil? || MCP_AUTHS.include?(auth) or raise ArgumentError, "c.mcp_server auth must be one of #{MCP_AUTHS.join('/')}"
+      @mcp_servers << { name: name, transport: transport, auth: auth, command: command, args: args,
+                        url: url, env: env, headers: headers, tools: tools, tool_permissions: tool_permissions }
       nil
     end
 
