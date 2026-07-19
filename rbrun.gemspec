@@ -27,4 +27,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rbrun-runtime"
   spec.add_dependency "ruby_llm"
   spec.add_dependency "bcrypt"
+  spec.add_dependency "view_component", "~> 3.21"
+  spec.add_dependency "view_component-contrib"
+  spec.add_dependency "tailwind_merge"
+  spec.add_dependency "dry-initializer"
+  spec.add_dependency "lucide-rails"
 end
