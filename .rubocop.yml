@@ -3,6 +3,9 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
 AllCops:
   TargetRubyVersion: 3.4
+  Exclude:
+    - "test/dummy/db/schema.rb" # Rails-generated
+    - "test/dummy/db/migrate/**/*" # copied from the engine at install time
 
 # Overwrite or add rules to create your own house style
 #
