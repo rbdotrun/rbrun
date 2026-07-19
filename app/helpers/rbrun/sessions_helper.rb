@@ -29,10 +29,12 @@ module Rbrun
       render "rbrun/sessions/approval_actions", tool_use_id: tool_use_id
     end
 
-    # The validation card component for a tool. rbrun ships one fallback (Default); hosts add their
-    # own per-tool cards by defining Rbrun::Sessions::ToolsValidation::<Name>::Component.
-    def tools_validation_component(_name)
-      Rbrun::Sessions::ToolsValidation::Default::Component
+    # The validation card component for a tool — resolved by folder-per-unit convention from the tool
+    # name: Rbrun::Sessions::ToolsValidation::<Name>::Component (e.g. "ask_user" → AskUser::Component),
+    # falling back to the shared Default card. A custom_approval! tool's card is enforced at boot.
+    def tools_validation_component(name)
+      const = "Rbrun::Sessions::ToolsValidation::#{name.to_s.camelize}::Component"
+      const.safe_constantize || Rbrun::Sessions::ToolsValidation::Default::Component
     end
   end
 end

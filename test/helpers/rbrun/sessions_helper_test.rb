@@ -19,5 +19,17 @@ module Rbrun
     test "tool_body parses a JSON string then pretty-prints it" do
       assert_includes tool_body('{"a":1}'), "\"a\": 1"
     end
+
+    # A per-tool card defined by convention.
+    module ::Rbrun::Sessions::ToolsValidation::WidgetGate
+      class Component < ::Rbrun::Sessions::ToolsValidation::Base; end
+    end
+
+    test "tools_validation_component resolves a per-tool card by name, else Default" do
+      assert_equal Rbrun::Sessions::ToolsValidation::WidgetGate::Component,
+                   tools_validation_component("widget_gate")
+      assert_equal Rbrun::Sessions::ToolsValidation::Default::Component,
+                   tools_validation_component("nonexistent_tool")
+    end
   end
 end
