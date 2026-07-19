@@ -26,11 +26,11 @@ module Rbrun
             end
             disabled do
               yes { "opacity-50 pointer-events-none" }
-              no {}
+              no { }
             end
             full do
               yes { "w-full" }
-              no {}
+              no { }
             end
           end
         end
