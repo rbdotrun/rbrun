@@ -25,6 +25,22 @@ module Rbrun
       new(tenant: tenant, authored: authored)
     end
 
+    # Boot hook (engine after_initialize): seed the self-host tenant from config, WARN-only — a
+    # divergence or issue is logged, never applied. No-ops when nothing is configured or the table
+    # isn't there yet (pre-migrate / no DB during setup).
+    def self.seed_at_boot!
+      return unless Rbrun.config.skills_path.present? || Rbrun.config.skills.any?
+      return unless Rbrun::Skill.table_exists?
+
+      from_config(Rbrun.config, tenant: Rbrun::Config::DEFAULT_TENANT).call.each do |r|
+        next unless %i[diverged issue].include?(r.status)
+
+        Rails.logger.warn("[rbrun] skill '#{r.slug}' #{r.status}: #{r.message}")
+      end
+    rescue ActiveRecord::NoDatabaseError, ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => e
+      Rails.logger.debug { "[rbrun] skill seed skipped (#{e.class})" }
+    end
+
     def initialize(tenant:, authored:)
       @tenant = tenant
       @authored = authored

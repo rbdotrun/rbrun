@@ -15,7 +15,11 @@ module Rbrun
       end
     end
 
-    # Auth is mandatory — fail fast at boot if nothing provides it.
-    config.after_initialize { Rbrun.config.validate! }
+    # Auth is mandatory — fail fast at boot if nothing provides it. Then seed skills from config
+    # (warn-only; never clobbers the DB).
+    config.after_initialize do
+      Rbrun.config.validate!
+      Rbrun::SkillSeeder.seed_at_boot!
+    end
   end
 end
