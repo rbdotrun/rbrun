@@ -45,6 +45,13 @@ module Rbrun
       into
     end
 
+    # Read a blob straight into a { relative-path => bytes } map (in-memory unpack).
+    def files(blob)
+      Gem::Package::TarReader.new(StringIO.new(Zlib.gunzip(blob))).each_with_object({}) do |entry, map|
+        map[entry.full_name] = entry.read if entry.file?
+      end
+    end
+
     # Content digest of a folder / of an in-memory file map — stable across pack/unpack.
     def digest(dir) = digest_files(read_dir(dir))
 
