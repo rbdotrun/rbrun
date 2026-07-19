@@ -258,7 +258,7 @@ git commit -m "feat(ui): mandatory auth — Authentication concern + login contr
     def broadcast_finalized_event = session.broadcast_event(self, created: false)
 ```
 
-- [ ] **Step 2: `Session`** — add `broadcast_event`/`segment_locals_for`/`timeline`/`turns`/`open_turn_lead`, `continue_turn!`/`resume_turn!` (mirror `run_turn`), and the private `broadcast_status`/`broadcast_composer`/`broadcast_working` (no rating, no artifacts region). Add `after_update_commit :broadcast_status, if: :saved_change_to_status?`. The commit pane broadcast: after `record_commits!`, `broadcast_replace_to "rbrun_session_#{id}", target: "commits_#{id}", partial: "rbrun/conversations/commits"` (Task 6). Keep the Phase 6 `run_turn` (it also records commits); wrap the `working!…done!/failed!` body identically in `continue_turn!`/`resume_turn!` calling `turn.continue(nudge)` / `turn.resume`.
+- [ ] **Step 2: `Session`** — add `broadcast_event`/`segment_locals_for`/`timeline`/`turns`/`open_turn_lead`, `continue_turn!`/`resume_turn!` (mirror `run_turn`), and the private `broadcast_status`/`broadcast_composer`/`broadcast_working`. Add `after_update_commit :broadcast_status, if: :saved_change_to_status?`. The commit pane broadcast: after `record_commits!`, `broadcast_replace_to "rbrun_session_#{id}", target: "commits_#{id}", partial: "rbrun/sessions/commits"` (Task 6). Keep the Phase 6 `run_turn` (it also records commits); wrap the `working!…done!/failed!` body identically in `continue_turn!`/`resume_turn!` calling `turn.continue(nudge)` / `turn.resume`.
 
 - [ ] **Step 3: `AgentTurn`** — add `continue(nudge)` and `resume`: log an `internal` row, then `call_client(nudge)` / `call_client(resume_prompt)` without a user row; `resume_prompt` restates the last user message. `call_client` = the existing `run`'s runtime call factored so `run`/`continue`/`resume` share it.
 
@@ -284,7 +284,7 @@ git commit -am "feat(ui): conversation helpers — markdown, tool_body, approval
 
 Build `base`/`turn`/`timeline`/`segment` (+ erb) + `tools_validation/{base,default}` as `Rbrun::Conversation::*::Component < Rbrun::ApplicationViewComponent`, with these details:
 - Namespace `Rbrun::Conversation::`; the aggregate is `session`, driving `session.id`/`session.working?`/`session.turns`.
-- **turn component:** renders prose only — no `attachments`, `artifacts`, or `rating` renders; the header uses `<%= lucide_icon("sparkles", class: "size-5 text-default-600") %>`.
+- **turn component:** renders prose only; the header uses `<%= lucide_icon("sparkles", class: "size-5 text-default-600") %>`.
 - **base component:** `turbo_stream_from "rbrun_session_#{session.id}"`; keep the autoscroll viewport + `#conversation_<id>` + `#composer`; render `messages/form`. Append a `<div id="commits_<id>">` region (the commit pane, Task 6).
 - **segment/timeline:** the segment computation (`segments`/`results`/`open_at?`/`anchor?`/`segment_index_for`/`dom_id_for`/`steps`/`APPROVAL_BADGES`/`tool_hint`); `helpers.markdown`/`lucide_icon`/`class_names`/`pluralize`/`number_to_human_size`/`tool_body`/`tools_validation_component`/`approval_actions` resolve from Task 3 + lucide-rails + Rails.
 - Components use plain `def initialize(...)` + `attr_reader` (no `option`), subclassing the DSL base only for `component()` + `erb_template`/sidecar.
@@ -301,10 +301,10 @@ git commit -am "feat(ui): conversation components — base, turn, timeline, segm
 ### Task 5: controllers, jobs, routes, form, layout, pages
 
 - **Jobs** (3 thin): `AgentTurnJob#perform(session_id, content)` → `Session.find(session_id).run_turn(content)`; `ApprovalTurnJob#perform(session_id, nudge)` → `continue_turn!(nudge)`; `ResumeTurnJob#perform(session_id)` → `resume_turn!`.
-- **MessagesController#create** (port; drop attachments): `AgentTurnJob.perform_later(@session.id, content)`, `respond_to { turbo_stream / html redirect }`; `set_session` scopes `Rbrun::Session.for_tenant(current_tenant).find`.
-- **ApprovalsController#update** (port verbatim, `chat`→`session`, tenant scope on `current_tenant`).
+- **MessagesController#create** (no attachments): `AgentTurnJob.perform_later(@session.id, content)`, `respond_to { turbo_stream / html redirect }`; `set_session` scopes `Rbrun::Session.for_tenant(current_tenant).find`.
+- **ApprovalsController#update** (tenant scope on `current_tenant`).
 - **SessionsController** `index` (list `Session.for_tenant(current_tenant)`), `create` (needs a Worktree — for the dogfood/demo, create/find a default Worktree for the tenant, then `worktree.sessions.create!`; redirect to show), `show` (`@session`), `retry` (`ResumeTurnJob`).
-- **`messages/_form.html.erb`** (port, strip attachments/paperclip; keep the failed-turn banner + Réessayer → `session_retry_path`, textarea, send/spinner), **`messages/create.turbo_stream.erb`** (replace `new_message`).
+- **`messages/_form.html.erb`** (no attachments; keep the failed-turn banner + Retry → `session_retry_path`, textarea, send/spinner), **`messages/create.turbo_stream.erb`** (replace `new_message`).
 - **`layouts/rbrun/application.html.erb`** — loads `rbrun/rbrun` css + js (`javascript_include_tag "rbrun/rbrun", type: "module"`), a header with logout, `<%= yield %>`.
 - **`sessions/show.html.erb`** — `render Rbrun::Conversation::Default::Component.new(session: @session)` (or Base directly); **`sessions/index.html.erb`** — the session cards.
 
@@ -318,7 +318,7 @@ git commit -am "feat(ui): controllers + jobs + routes + composer form + layout +
 
 ### Task 6: Stimulus controllers, JS bundle, commit pane
 
-- Copy `autoscroll_controller.js`, `composer_controller.js` (strip the attachment/DataTransfer code — no uploads), `sticky_details_controller.js` verbatim into `app/javascript/rbrun/controllers/`.
+- Add `autoscroll_controller.js`, `composer_controller.js` (no attachment/DataTransfer code — no uploads), `sticky_details_controller.js` under `app/javascript/rbrun/controllers/`.
 - `app/javascript/rbrun/rbrun.js` registers them: `import Autoscroll from "./controllers/autoscroll_controller"; application.register("autoscroll", Autoscroll)` (and composer, sticky-details).
 - **Commit pane:** `Rbrun::Conversation::Commits::Component.new(session:)` + erb — lists `session.commits` (sha + message) in a card, rendered in the base component's `#commits_<id>` region; `Session` broadcasts a replace of it after `record_commits!`.
 - Rebuild: `bun run build`; commit the built `app/assets/builds/rbrun/rbrun.js`.
@@ -347,7 +347,7 @@ git commit -am "feat(dogfood): browser — a real conversation renders end to en
 
 **1. Spec coverage (Phase 8 contract):** MessagesController/ApprovalsController + atomic `decide_approval!` + job-resume (Tasks 2,5) ✓; 3 jobs (5) ✓; broadcast engine append/replace + `segment_locals_for` + `broadcast_status`/`composer`/`working` + coalesced tokens (2) ✓; timeline/segment/turn/base components on Phase 7 primitives (4) ✓; 3 Stimulus controllers (6) ✓; routes + login (mandatory auth) (1,5) ✓; Worktree commit pane (6) ✓; mounted in test/dummy (1) ✓; browser dogfood (7) ✓.
 
-**2. Placeholder scan:** Tasks specify concrete components and behaviours with named structural choices (the `Session` aggregate, the `Rbrun::Conversation::` namespace, no artifacts/rating/attachments) — not placeholders. New code (auth, helpers, commit pane, config validate) is given in full.
+**2. Placeholder scan:** Tasks specify concrete components and behaviours with named structural choices (the `Session` aggregate, the `Rbrun::Sessions::` component namespace, prose-only rendering) — not placeholders. New code (auth, helpers, commit pane, config validate) is given in full.
 
 **3. Type/name consistency:** `rbrun_session_<id>` stream everywhere; `Session#broadcast_event(msg, created:)`/`segment_locals_for`/`turns`; `SessionMessage#decide_approval!`/`run_frozen_call!` (uses `ApplicationTool.find` + `in_session`); `Rbrun::Conversation::*::Component`; `current_tenant = current_user.tenant`; routes `login`/`sessions`/`approvals` match the controllers.
 

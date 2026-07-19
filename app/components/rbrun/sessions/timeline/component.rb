@@ -72,7 +72,7 @@ module Rbrun
 
         private
 
-        def rows = @messages.reject { |m| m.role == "user" || m.event_type == "artifact" }
+        def rows = @messages.reject { |m| m.role == "user" }
 
         def flush(out, run) = (out << [ :tools, run ] if run.any?)
 

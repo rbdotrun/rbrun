@@ -56,7 +56,7 @@ module Rbrun
       request = @session.messages.where(role: "user", event_type: "text").order(:id).last&.content
       [
         "The previous run failed on a technical error. The user asks you to resume.",
-        ("The request you were answering was: «#{request.to_s.strip}»." if request && !request.to_s.empty?),
+        ("The request you were answering was: \"#{request.to_s.strip}\"." if request && !request.to_s.empty?),
         "IMPORTANT: your in-flight answer was LOST — the user received nothing. Write the COMPLETE " \
         "answer now. Do NOT redo tool actions already executed; reuse their results. Do not mention " \
         "the interruption."

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `rbrun` is a **mountable Rails engine** that is, conceptually, a standalone agentic-runner application — it owns its own database, assets, and (optional) auth, and mounts into a host app only for deployment convenience. It packages an agentic Claude SDK runner — agentic runner + skill pattern + sandbox backend — as provider sub-gems under a batteries-included engine.
 
 **The design is the contract.** Before changing anything structural, read:
-- `docs/superpowers/specs/2026-07-19-rbrun-port-design.md` — the full architecture + the fixed **8-phase contract**.
+- `docs/superpowers/specs/2026-07-19-rbrun-design.md` — the full architecture + the fixed **8-phase contract**.
 - `docs/superpowers/plans/*.md` — the just-in-time per-phase implementation plans.
 
 Build order: **1 Skeleton+config kernel · 2 Sandbox · 3 Runtime · 4 Persistence+config spine · 5 Tool base+turn loop · 6 Worktrees (GitHub) +auth (all done) · 7 Component DSL+primitives+assets · 8 Conversation UI.** Each phase is one spec→plan→execute cycle, validated by its dogfood before the next plan is written.

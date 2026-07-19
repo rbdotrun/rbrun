@@ -1,5 +1,5 @@
-// Primitives::Menu sidecar — WAI-ARIA roving-tabindex keyboard navigation.
-// Ported from the rbrun_ui Menu controller. Items declare themselves with
+// Rbrun::Ui::Menu sidecar — WAI-ARIA roving-tabindex keyboard navigation.
+// Items declare themselves with
 // `data-menu-target="item"`; one item holds tabindex=0 at a time and Arrow /
 // Home / End move the active index. Enter/Space activate the focused item by
 // clicking it (works for both <a> links and <button> form items).
@@ -8,7 +8,7 @@
 // viewport (IntersectionObserver) — so a menu inside a dropdown always starts
 // at the top when the dropdown opens.
 //
-// Markup contract (rendered by Primitives::Menu):
+// Markup contract (rendered by Rbrun::Ui::Menu::Component):
 //   <div data-controller="menu" data-action="keydown->menu#navigate" role="menu">
 //     <a data-menu-target="item" role="menuitem" tabindex="-1">…</a>
 //     ...

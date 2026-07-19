@@ -1,10 +1,10 @@
-// Primitives::Dropdown sidecar — a controller-owned floating menu panel
+// Rbrun::Ui::Dropdown sidecar — a controller-owned floating menu panel
 // anchored with Floating UI. The controller owns visibility, outside-press
 // dismissal, Escape handling, focus return, and focusing the first menu item
 // on open. Floating UI fills the positioning gap (CSS anchor positioning is
 // not yet broadly supported), flipping/shifting to stay on screen.
 //
-// Markup contract (rendered by Primitives::Dropdown):
+// Markup contract (rendered by Rbrun::Ui::Dropdown::Component):
 //   <div data-controller="dropdown"
 //        data-dropdown-placement-value="top-start"
 //        data-dropdown-offset-value="6">

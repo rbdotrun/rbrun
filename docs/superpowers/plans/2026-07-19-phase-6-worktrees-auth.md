@@ -13,7 +13,7 @@
 - **Worktree = 1 sandbox + 1 branch**, `has_many :sessions`. The sandbox lives on the **Worktree**, not the Session (`Session#sandbox` delegates to `worktree.sandbox`).
 - **The agent commits via git tools** (Bash) — nothing auto-commits. rbrun **reads the resulting SHAs** after the turn and records `Commit` rows. Reading is **guarded**: a non-git sandbox (unit tests) records nothing, never errors.
 - **Tenancy roots on the Worktree**; a Session inherits its tenant slug from its Worktree on create.
-- **GitHub is the store.** `Artifact`/`ArtifactVersion` do not exist. Provisioning + the agent's pushes use `Rbrun.config.github_pat`.
+- **GitHub is the store.** Work is git history on GitHub, not blobs in the DB. Provisioning + the agent's pushes use `Rbrun.config.github_pat`.
 - **Naming:** `Worktree` is rbrun's term, NOT a git worktree.
 - **Dogfood:** `lib/tasks/rbrun/dogfood/worktree.rake`, one scenario, never variabilized; a real turn where the agent edits + commits + pushes. Creds/repo from `.env` (`GITHUB_PAT`, `RBRUN_WORKTREE_REPO`).
 - **Ruby 3.4.4.**
@@ -661,7 +661,7 @@ git commit -m "feat(dogfood): worktree — a real turn commits to GitHub (Phase 
 - Record per-turn commit SHAs (agent commits via git; rbrun reads) → Task 3, guarded. ✓
 - Optional built-in auth (`User` + config-seeded, extensible; `current_tenant` hook) → Task 4. ✓
 - Dogfood `worktree` (real turn edits + commits + pushes) → Task 5. ✓
-- `Artifact`/`ArtifactVersion` absent. ✓
+- Work is git history on GitHub, not DB blobs. ✓
 
 **2. Placeholder scan:** No TODO/"handle later". `<ts>` = "use a real timestamp". Every code block complete.
 

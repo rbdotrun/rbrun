@@ -433,7 +433,7 @@ module Rbrun
     class ClaudeSdk
       SERVER = "rbrun"
 
-      # The driver's own package — the SDK + zod. NOT the app's toolchain (an artifact installs that
+      # The driver's own package — the SDK + zod. NOT the app's toolchain (the built app installs that
       # itself). Pinned; staged and `bun install`ed every turn.
       AGENT_PACKAGE = {
         "name" => "rbrun-agent",

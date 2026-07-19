@@ -412,8 +412,8 @@ Host apps register their own tools. Depends on Phase 4.
 
 ### Phase 6 — Engine host: Worktrees (GitHub-backed) + auth
 
-The deliverable is **git history on GitHub**, not byte-blobs in the DB. `Artifact`/`ArtifactVersion`
-are dropped. A new **`Worktree`** (rbrun's term — *not* a git worktree) is the unit of work:
+The deliverable is **git history on GitHub**, not byte-blobs in the DB. A **`Worktree`** (rbrun's
+term — *not* a git worktree) is the unit of work:
 
 - **1 Worktree = 1 sandbox + 1 git branch**, spun on creation (a branch off a base ref in a repo).
 - **`Worktree has_many :sessions`.** Every Session (conversation) under a Worktree runs its turns in
@@ -493,7 +493,7 @@ turn, the branch's new commits render. ✓/✗ + screenshots.
   `ClaudeSdk::Runner` (its only AR touchpoint is the sandbox + credentials → injected).
 - **Engine host (Rails/AR/Turbo-coupled):** `AgentTurn` (the `on_event`/`tool_handler` sink),
   `ApplicationTool`/`AgentTools`, `Worktree`/`Session`/`SessionMessage` (the conversation aggregate;
-  there is no `Artifact*` — work is GitHub git history), controllers/jobs/channels.
+  work is GitHub git history), controllers/jobs/channels.
 
 ```
 

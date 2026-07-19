@@ -771,7 +771,7 @@ git commit -m "feat(sandbox): Local adapter — process sessions (spawn/stream/i
 
 - Produces: `Rbrun::Sandbox::Daytona::Client.new(api_key:, api_url:, dockerfile: nil, snapshot_name: nil, cpu: nil, memory: nil, disk: nil)` with `Client::Error` and the full wire surface: `find_or_create(labels)`, `find_by_labels`, `await_started`, `request_start`, `destroy(id)`, snapshot machinery (`snapshot_ref`, `ensure_snapshot`, `create_snapshot`, `snapshot_state`, `await_snapshot_active`), `exec(id, command, timeout:)`, `download(id, path)`, `create_session`, `session_exec`, `session_input`, `session_command`, `session_logs_follow`, `create_folder`, `upload(id, path, source)`.
 
-This is the snapshot-based `Daytona::Client`. Its design: (1) credentials + **the snapshot Dockerfile and resources come from constructor kwargs** (`dockerfile`/`snapshot_name`/`cpu`/`memory`/`disk`), never `Rails.application.credentials` and never a hardcoded image — **the host injects its own Dockerfile**; a minimal bun+shell `DEFAULT_DOCKERFILE` applies when none is given; (2) no office2text/base64 embedding — hosts add tooling in their own Dockerfile; (3) module namespace `Rbrun::Sandbox::Daytona`; (4) core Ruby only, no ActiveSupport (`nil?/empty?` not `blank?`, `arr.include?` not `.in?(arr)`); (5) `require "json"/"digest"/"cgi"` at the top. The box is a self-built, content-addressed Daytona **snapshot** (built server-side from the Dockerfile string, reused across turns).
+This is the snapshot-based `Daytona::Client`. Its design: (1) credentials + **the snapshot Dockerfile and resources come from constructor kwargs** (`dockerfile`/`snapshot_name`/`cpu`/`memory`/`disk`), never `Rails.application.credentials` and never a hardcoded image — **the host injects its own Dockerfile**; a minimal bun+shell `DEFAULT_DOCKERFILE` applies when none is given; (2) no bundled document-conversion/base64 embedding — hosts add tooling in their own Dockerfile; (3) module namespace `Rbrun::Sandbox::Daytona`; (4) core Ruby only, no ActiveSupport (`nil?/empty?` not `blank?`, `arr.include?` not `.in?(arr)`); (5) `require "json"/"digest"/"cgi"` at the top. The box is a self-built, content-addressed Daytona **snapshot** (built server-side from the Dockerfile string, reused across turns).
 
 - [ ] **Step 1: Write the failing (network-free) test**
 
@@ -850,7 +850,7 @@ end
 require "rbrun/sandbox/daytona/client"
 ```
 
-- [ ] **Step 4: Port the client**
+- [ ] **Step 4: Build the client**
 
 `gems/rbrun-sandbox/lib/rbrun/sandbox/daytona/client.rb`:
 
@@ -1172,7 +1172,7 @@ Expected: PASS (2 runs, 0 failures). If `Faraday::Adapter::AsyncHttp` is not the
 
 ```bash
 git add gems/rbrun-sandbox/lib/rbrun/sandbox/daytona.rb gems/rbrun-sandbox/lib/rbrun/sandbox/daytona/client.rb gems/rbrun-sandbox/test/rbrun/sandbox/daytona_client_test.rb
-git commit -m "feat(sandbox): Daytona::Client — faithful Faraday+async-http port (config-injected creds)"
+git commit -m "feat(sandbox): Daytona::Client — Faraday+async-http client (config-injected creds)"
 ```
 
 ---
@@ -1520,7 +1520,7 @@ end
 - [ ] **Step 4: Run the daytona dogfood** (requires `test/dummy` credentials with `daytona.api_key`/`api_url`)
 
 Run: `bin/rails app:dogfood:sandbox_daytona`
-Expected (with creds): all ✓ (box up / files / exec / process session), then `teardown: box destroyed`. Without creds: a clean `abort` message telling you to set them — not a failure of the port.
+Expected (with creds): all ✓ (box up / files / exec / process session), then `teardown: box destroyed`. Without creds: a clean `abort` message telling you to set them — not a failure of the adapter.
 
 - [ ] **Step 5: Run the whole gem suite once more + commit**
 
@@ -1539,7 +1539,7 @@ git commit -m "feat(dogfood): sandbox_local (offline) + sandbox_daytona (live) �
 - Normalized contract (`exec/exec_stream/upload/read/exist?/glob/create_folder/session_*/destroy!` + `ExecResult` + `FileUpload`) → Tasks 1 (values), 3–4 (local), 6 (daytona). ✓
 - `sandbox_provider` family via `Rbrun::Sandbox.new(provider:)` constant lookup, no registration → Task 1 dispatcher. ✓
 - `local` adapter (real host executor) → Tasks 3–4. ✓
-- `daytona` adapter (Faraday+async-http, label-addressed, raw async-http `session_logs_follow`) → Tasks 5–6 (faithful port). ✓
+- `daytona` adapter (Faraday+async-http, label-addressed, raw async-http `session_logs_follow`) → Tasks 5–6. ✓
 - HTTP invariant honored (Faraday+async_http adapter; raw async-http carve-out) → Task 5. ✓
 - Deliverables: gem + unit tests (pure logic + local integration) → Tasks 1–6; two hardcoded dogfoods → Task 7. ✓
 

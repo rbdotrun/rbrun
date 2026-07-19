@@ -327,7 +327,7 @@ async function main(): Promise<void> {
       // runner sets CLAUDE_CONFIG_DIR instead of HOME. Nothing of the developer's own ~/.claude
       // (plugins, commands, foreign skills) can reach the agent.
       settingSources: ["project"],
-      skills: SKILLS, // teaches it how an artifact is built (auto-adds the Skill tool)
+      skills: SKILLS, // teaches it how the app is built (auto-adds the Skill tool)
       includePartialMessages: true,
       ...(config.resume ? { resume: config.resume } : {}),
       canUseTool: async (

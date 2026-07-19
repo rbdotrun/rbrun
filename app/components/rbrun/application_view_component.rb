@@ -4,7 +4,7 @@ require "dry/initializer"
 require "lucide-rails"
 
 module Rbrun
-  # The component DSL. view_component is imported; this reproduces the
+  # The component DSL. view_component is imported; this defines the
   # authoring surface: option/param (Dry::Initializer) + style variants (StyleVariants) +
   # tailwind_merge (css: overrides win) + inline erb_template + the component() helper + Stimulus
   # auto-wiring. No Dry::Effects/current_user, no domain ApplicationHelper (see the spec).

@@ -801,4 +801,4 @@ git commit -m "feat(dogfood): session_turn + gate — real turns through Session
 
 **Risk areas (validated by dogfood):** `ruby_llm` load behavior + the real `canUseTool` gate firing — the `gate` dogfood is the only thing that proves the SDK actually interrupts on a `needs_approval!` tool (the stubbed `AgentTurn`/`run_turn` tests prove the Ruby freezing, not the SDK).
 
-**Note carried to Phase 6:** `SessionMessage#decide_approval!`/`run_frozen_call!` (approve/reject a frozen row → run the tool → resume) + the `Artifact`/`SaveArtifactVersion` flow build directly on the gated rows and `ApplicationTool.find` established here.
+**Note carried to Phase 6:** `SessionMessage#decide_approval!`/`run_frozen_call!` (approve/reject a frozen row → run the tool → resume) builds directly on the gated rows and `ApplicationTool.find` established here.

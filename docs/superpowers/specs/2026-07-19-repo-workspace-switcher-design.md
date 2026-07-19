@@ -1,6 +1,6 @@
 # Repo Workspace Switcher — Design
 
-> Feature spec, post-Phase-8. Extends the rbrun port (`2026-07-19-rbrun-port-design.md`). One
+> Feature spec, post-Phase-8. Extends the rbrun engine design (`2026-07-19-rbrun-design.md`). One
 > spec → one just-in-time plan → branch → TDD → dogfood → PR, same cadence as the phases.
 
 **Goal:** Give rbrun a left sidebar with a **repo switcher** below the logo — the workspace you act
@@ -16,8 +16,8 @@ nav, implemented in Stimulus) whose rows are fed by **server-side GitHub search*
 
 ## 1. Concept: what "workspace" is
 
-The switchable workspace in rbrun is the **Repo**. rbrun has two org-ish axes — they are **not** the
-same:
+The switchable workspace in rbrun is the **Repo**. rbrun has two workspace-like axes — they are
+**not** the same:
 
 | axis                            | role                                                                            |
 | ------------------------------- | ------------------------------------------------------------------------------- |
@@ -87,7 +87,7 @@ helper) and Stimulus registry. rbrun uses `Rbrun::Ui::` + `Rbrun::ApplicationVie
 ### 2.4 Explicitly OUT of scope (app-shell extras, not the sidebar)
 
 `account_meter` (billing/quota), `drawer`/`dialog`/`confirm_dialog`, the `#flash` toast surface, the
-`turbo_stream_from "user_#{id}"` user stream, and the Communication/Bibliothèque nav groups. None are
+`turbo_stream_from "user_#{id}"` user stream, and any extra nav groups. None are
 part of "the sidebar shell + behaviours"; they can come later if wanted.
 
 ---
