@@ -51,5 +51,17 @@ module Rbrun
         @github_repos ||
         Rbrun::GithubRepos.new(pat: config(tenant).github_pat)
     end
+
+    # The external MCP servers to materialize for a turn, scoped to (tenant, repo). Defaults to the
+    # tenant's enabled DB rows (self-host / DB path); a host sets Rbrun.mcp_resolver (the SaaS
+    # injection seam) to supply per-(tenant, repo) servers carrying live secrets. Same idiom as
+    # config_resolver / github_repos_resolver: reentrant, set-once, pure read. Returns McpServer::Spec[].
+    attr_writer :mcp_resolver
+
+    def mcp_servers_for(tenant, repo)
+      return @mcp_resolver.call(tenant, repo) if @mcp_resolver
+
+      Rbrun::McpServer.for_tenant(tenant).where(enabled: true).map(&:to_spec)
+    end
   end
 end

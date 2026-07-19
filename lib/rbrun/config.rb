@@ -107,6 +107,7 @@ module Rbrun
     def reset_config!
       @config = Config.new
       @config_resolver = nil
+      @mcp_resolver = nil
     end
 
     # Host-set DI seam (same idiom as current_tenant_resolver / current_user_resolver): given a tenant
