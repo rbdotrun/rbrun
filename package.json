@@ -1,0 +1,15 @@
+{
+  "name": "rbrun",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i app/assets/stylesheets/rbrun/application.tailwind.css -o app/assets/builds/rbrun/rbrun.css --minify",
+    "build:js": "bun build app/javascript/rbrun/rbrun.js --outfile app/assets/builds/rbrun/rbrun.js --minify",
+    "build": "bun run build:css && bun run build:js"
+  },
+  "devDependencies": {
+    "@hotwired/turbo-rails": "^8.0.0",
+    "@hotwired/stimulus": "^3.2.0",
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0"
+  }
+}

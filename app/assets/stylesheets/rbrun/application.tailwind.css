@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Scan the engine's components + views for classes. */
+@source "../../components/rbrun/**/*.{rb,erb}";
+@source "../../../app/views/**/*.erb";
+
+/* The brand palette the primitives assume (default-*). Swap these for your brand. */
+@theme {
+  --color-default-50: #eef2ff;
+  --color-default-100: #e0e7ff;
+  --color-default-500: #6366f1;
+  --color-default-600: #4f46e5;
+  --color-default-700: #4338ca;
+}
