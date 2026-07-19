@@ -1,5 +1,6 @@
 require "turbo-rails"
 require "stimulus-rails"
+require "lucide-rails"
 
 module Rbrun
   class Engine < ::Rails::Engine

@@ -1,0 +1,20 @@
+<div class="mx-auto max-w-3xl p-6">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-lg font-semibold">Conversations</h1>
+    <%= button_to "New conversation", rbrun.sessions_path, method: :post,
+          class: "rounded-md bg-default-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-default-500" %>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <% @sessions.each do |session| %>
+      <%= link_to rbrun.session_path(session),
+            class: "rounded-lg border border-slate-200 p-4 transition-colors hover:border-default-300 hover:bg-slate-50" do %>
+        <p class="font-medium text-slate-800"><%= session.display_title %></p>
+        <p class="text-xs text-slate-400"><%= session.status %> · <%= session.created_at.strftime("%d/%m/%Y") %></p>
+      <% end %>
+    <% end %>
+    <% if @sessions.empty? %>
+      <p class="text-sm text-slate-400">No conversations yet.</p>
+    <% end %>
+  </div>
+</div>

@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "new_message" do %>
+  <%= render "rbrun/messages/form", session: @session, working: @session.working? %>
+<% end %>
