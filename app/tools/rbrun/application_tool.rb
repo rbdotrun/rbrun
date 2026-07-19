@@ -59,6 +59,27 @@ module Rbrun
     def self.custom_approval?      = @custom_approval == true
     def self.approval_submit_route = @approval_submit_route
 
+    # Fail the boot if any DECLARED custom approval is half-built — validates what was declared (no
+    # orphan scan), folder-per-unit, exact contract: a card component AND a named submit route.
+    def self.validate_tool_approvals!
+      Rails.application.routes_reloader.execute_unless_loaded # engine routes load lazily
+      Rbrun.tools.each { |klass| validate_tool_approval!(klass) if klass.custom_approval? }
+    end
+
+    def self.validate_tool_approval!(klass)
+      name  = klass.new.name
+      label = "#{klass} custom approval"
+
+      klass.needs_approval? or raise Rbrun::Conventions::Error, "#{label}: custom_approval! implies a gate"
+      Rbrun::Conventions.resolve!("Rbrun::Sessions::ToolsValidation::#{name.camelize}::Component", label,
+                                  base: Rbrun::Sessions::ToolsValidation::Base)
+
+      route = klass.approval_submit_route
+      unless Rbrun::Engine.routes.named_routes.key?(route.to_sym)
+        raise Rbrun::Conventions::Error, "#{label}: submit route :#{route} is not defined (add `as: :#{route}`)"
+      end
+    end
+
     # The roster serialized to the SDK-client shape (name + description + params + gating).
     def self.manifest = Rbrun.tools.map { |klass| manifest_entry(klass) }
 
