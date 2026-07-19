@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_130003) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_140001) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -52,6 +52,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_130003) do
     t.index ["worktree_id"], name: "index_rbrun_sessions_on_worktree_id"
   end
 
+  create_table "rbrun_skill_versions", force: :cascade do |t|
+    t.binary "archive", null: false
+    t.datetime "created_at", null: false
+    t.string "digest", null: false
+    t.integer "skill_id", null: false
+    t.string "source", null: false
+    t.index ["skill_id", "digest"], name: "index_rbrun_skill_versions_on_skill_id_and_digest", unique: true
+    t.index ["skill_id"], name: "index_rbrun_skill_versions_on_skill_id"
+  end
+
+  create_table "rbrun_skills", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_version_id"
+    t.string "dismissed_digest"
+    t.string "divergence_digest"
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.index ["tenant", "slug"], name: "index_rbrun_skills_on_tenant_and_slug", unique: true
+  end
+
   create_table "rbrun_users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
@@ -75,4 +97,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_130003) do
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
+  add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"
 end
