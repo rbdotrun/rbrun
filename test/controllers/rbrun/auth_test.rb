@@ -11,6 +11,16 @@ module Rbrun
       Rbrun.instance_variable_set(:@config, saved)
     end
 
+    test "auth_managed_at_runtime satisfies validate! without config users" do
+      saved = Rbrun.instance_variable_get(:@config)
+      Rbrun.reset_config!
+      Rbrun.config.auth_managed_at_runtime = true
+      assert_nothing_raised { Rbrun.config.validate! }   # built-in login, users created at runtime
+      assert_empty Rbrun.config.users
+    ensure
+      Rbrun.instance_variable_set(:@config, saved)
+    end
+
     test "an unauthenticated request redirects to login" do
       get "/rbrun/c"
       assert_redirected_to "/rbrun/login"

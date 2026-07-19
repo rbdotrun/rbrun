@@ -7,14 +7,14 @@ module Rbrun
   # Config-aware constructors: read Rbrun.config and hand the pure gems an explicit config hash via
   # Rbrun.build. The gems themselves never read global state.
   class << self
-    def sandbox(provider = nil, **opts)
+    def sandbox(provider = nil, tenant: nil, **opts)
       require "rbrun/sandbox"
-      build(Rbrun::Sandbox, config.sandbox_provider, provider: provider, **opts)
+      build(Rbrun::Sandbox, config(tenant).sandbox_provider, provider: provider, **opts)
     end
 
-    def runtime(sandbox:, provider: nil, **opts)
+    def runtime(sandbox:, provider: nil, tenant: nil, **opts)
       require "rbrun/runtime"
-      build(Rbrun::Runtime, config.runtime_provider, provider: provider, sandbox: sandbox, **opts)
+      build(Rbrun::Runtime, config(tenant).runtime_provider, provider: provider, sandbox: sandbox, **opts)
     end
 
     # The tool roster: engine built-ins + host-registered tools. ApplicationTool.manifest/find read it.

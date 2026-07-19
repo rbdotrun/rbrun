@@ -7,16 +7,18 @@ module Rbrun
     DEFAULT_TENANT = "rbrun"
     FAMILIES = %i[sandbox runtime dns server].freeze
 
-    attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt
+    attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt,
+                  :auth_managed_at_runtime
     attr_reader :users
 
     def initialize
-      @database_connection = :rbrun
-      @subprocess_timeout  = 900
-      @github_pat          = nil
-      @tenancy_key         = "tenant"
-      @users               = []
-      @providers           = {}
+      @database_connection     = :rbrun
+      @subprocess_timeout      = 900
+      @github_pat              = nil
+      @tenancy_key             = "tenant"
+      @auth_managed_at_runtime = false
+      @users                   = []
+      @providers               = {}
       @system_prompt       = <<~PROMPT
         You are an assistant working inside a sandboxed workspace. Call the `identity` tool first to
         learn who you are working for. Use your tools to fulfil the request; when asked for a
@@ -34,19 +36,30 @@ module Rbrun
       define_method("#{family}_provider=") { |hash| @providers[family] = hash }
     end
 
-    # Auth is mandatory: at least one built-in user, or a host-supplied current_user resolver.
-    def auth_configured? = users.any? || !Rbrun.instance_variable_get(:@current_user_resolver).nil?
+    # Auth is mandatory: at least one built-in user, a host-supplied current_user resolver, OR the
+    # host running rbrun's built-in login with users created at runtime (invite/CRUD, empty at boot)
+    # — signalled by c.auth_managed_at_runtime. Strict "no auth ⇒ no boot" stays the default.
+    def auth_configured?
+      users.any? ||
+        !Rbrun.instance_variable_get(:@current_user_resolver).nil? ||
+        auth_managed_at_runtime
+    end
 
     def validate!
       return if auth_configured?
 
       raise Rbrun::ConfigError,
-            "rbrun requires auth: define at least one c.user (or set Rbrun.current_user_resolver)"
+            "rbrun requires auth: define at least one c.user, set Rbrun.current_user_resolver, " \
+            "or set c.auth_managed_at_runtime = true (built-in login, users created at runtime)"
     end
   end
 
   class << self
-    def config
+    # The static, process-global config — the boot-time truth (Rbrun.configure fills it) and the
+    # source for process-global reads (database_connection, tenancy_key column, boot validate!).
+    def config(tenant = nil)
+      return @config_resolver.call(tenant) if tenant && @config_resolver
+
       @config ||= Config.new
     end
 
@@ -57,6 +70,15 @@ module Rbrun
 
     def reset_config!
       @config = Config.new
+      @config_resolver = nil
     end
+
+    # Host-set DI seam (same idiom as current_tenant_resolver / current_user_resolver): given a tenant
+    # slug, return the Config to use for that tenant's per-tenant reads — sandbox_provider,
+    # runtime_provider, github_pat, system_prompt. Consulted ONLY where a tenant is threaded in
+    # (Rbrun.sandbox/runtime/config(tenant)); process-global reads always use the static global. When
+    # unset, every tenant falls back to the static global, so self-hosting is byte-for-byte unchanged.
+    # Keep it cheap/memoized — it is called several times per turn.
+    attr_writer :config_resolver
   end
 end

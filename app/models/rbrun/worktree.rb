@@ -13,7 +13,7 @@ module Rbrun
     before_validation :assign_branch, on: :create
 
     # The branch's checkout, shared by every Session under this Worktree. Addressed by the worktree id.
-    def sandbox = @sandbox ||= Rbrun.sandbox(labels: { worktree: id.to_s })
+    def sandbox = @sandbox ||= Rbrun.sandbox(tenant: tenant, labels: { worktree: id.to_s })
 
     # Clone the repo into the sandbox and spin the branch off base — using the config github_pat. Run
     # once, when the worktree is first used.
@@ -23,7 +23,7 @@ module Rbrun
     end
 
     def provision_command
-      pat = Rbrun.config.github_pat
+      pat = Rbrun.config(tenant).github_pat
       url = "https://x-access-token:#{pat}@github.com/#{repo}.git"
       ws  = sandbox.workspace
       <<~SH.strip
