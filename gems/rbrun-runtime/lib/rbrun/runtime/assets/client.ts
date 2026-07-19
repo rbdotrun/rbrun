@@ -5,7 +5,7 @@
 // TOOLS OVER THE PIPE (stdio duplex — no HTTP): each manifest entry becomes an in-process MCP
 // tool whose handler writes a `tool_request` to stdout and AWAITS a `tool_response` on stdin.
 // The Ruby parent — already reading this process's stdout to drive the turn — runs the tool
-// inline (as the chat's tenant) and writes the result back to stdin. One linear ping-pong in
+// inline (as the session's tenant) and writes the result back to stdin. One linear ping-pong in
 // the same fiber that spawned us: no network, no token, no self-connection, no deadlock.
 //
 // Permission model: AUTO tools are allowlisted (run silently → their handler fires); a
@@ -31,7 +31,7 @@ import { z } from "zod";
 
 const SERVER = "rbrun";
 
-// cwd is the chat's workspace; the runner staged the skills under its .claude/.
+// cwd is the session's workspace; the runner staged the skills under its .claude/.
 const SKILLS_DIR = join(process.cwd(), ".claude", "skills");
 
 // Whatever the runner staged into <workspace>/.claude/skills/ — read off the directory, never
@@ -251,27 +251,24 @@ async function main(): Promise<void> {
 
   const server = createSdkMcpServer({ name: SERVER, version: "1.0.0", tools });
 
-  // The built-ins the agent may reach. Bash is one of them now.
+  // The built-ins the agent may reach. Bash is included.
   //
-  // It was not, and could not be, while this ran on the developer's machine: there is no
-  // scoped-ALLOW syntax for Bash (only scoped deny), so a shell could not be path-gated, and the
-  // rules that tried were the rules nobody could read — `bun install --cwd 56` denied while
-  // `ls`, sanctioned nowhere, ran. The build became a tool to escape that.
-  //
-  // The turn now runs in a disposable box that holds one conversation's work and nothing else: no
-  // repo, no /Users/ben, no other tenant. There is nothing there to path-gate. The container is
-  // the boundary; canUseTool never was a good filesystem guard and no longer pretends to be one.
+  // Bash cannot be safely path-gated: the SDK has no scoped-ALLOW syntax for it (only scoped deny),
+  // so allowlisting Bash is all-or-nothing and a shell can always sidestep a path rule. rbrun does
+  // not try to. Each turn runs in a disposable box holding one session's work and nothing else — no
+  // host repo, no home directory, no other tenant. There is nothing there to path-gate: the
+  // container is the boundary, and canUseTool is not a filesystem guard.
   const BUILTIN = new Set(["Read", "Write", "Edit", "Glob", "Grep", "Bash"]);
 
   // ONLY our MCP tools. Nothing else goes in here.
   //
   // A bare entry ("Read", "Bash") auto-approves that tool GLOBALLY, before canUseTool and before
-  // any path rule — so listing Read/Edit lets the agent read anywhere on the disk, and listing
+  // any path rule — so listing Read/Edit would let the agent read anywhere on disk, and listing
   // Bash(...) allowlists Bash WHOLESALE (there is no scoped-allow syntax for Bash; only scoped
-  // DENY). That is how `find /Users/ben/...` ran against an explicit deny branch.
+  // DENY). A bare allowlist entry therefore overrides any path deny you set.
   //
   // The file tools and the two bun commands are granted by the workspace's own settings.json,
-  // which the Runner writes — path-scoped to ./**, which is the chat's workspace and nothing else.
+  // which the Runner writes — path-scoped to ./**, which is the session's workspace and nothing else.
   const allowedTools = config.manifest
     .filter((m) => !m.needs_approval)
     .map((m) => `mcp__${SERVER}__${m.name}`);
@@ -321,7 +318,7 @@ async function main(): Promise<void> {
       mcpServers: { [SERVER]: server },
       tools: TOOLS, // what EXISTS — see the const. Without it the SDK ships its whole surface.
       allowedTools,
-      // Load project settings FROM CWD — the chat's workspace — so the skills the runner staged
+      // Load project settings FROM CWD — the session's workspace — so the skills the runner staged
       // into <workspace>/.claude/skills/ are discovered. This is "project", not "user": the SDK
       // would read a co-located .claude as *user* source if HOME were the cwd, which is why the
       // runner sets CLAUDE_CONFIG_DIR instead of HOME. Nothing of the developer's own ~/.claude
@@ -335,7 +332,7 @@ async function main(): Promise<void> {
         input: Record<string, unknown>,
         opts: { toolUseID: string },
       ) => {
-        // The built-ins are allowed outright: cwd is this chat's box, and the box is the boundary.
+        // The built-ins are allowed outright: cwd is this session's box, and the box is the boundary.
         if (BUILTIN.has(toolName))
           return { behavior: "allow", updatedInput: input };
         const bare = toolName.replace(`mcp__${SERVER}__`, "");
@@ -379,7 +376,7 @@ async function main(): Promise<void> {
     if (!gated) throw err;
   }
 
-  // The gate is a normal end of run. Rails reads stop_reason to flip the chat to needs_approval;
+  // The gate is a normal end of run. Rails reads stop_reason to flip the session to needs_approval;
   // the frozen call is already on its way as the `needs_approval` line.
   if (gated && !resultEmitted) {
     emit({

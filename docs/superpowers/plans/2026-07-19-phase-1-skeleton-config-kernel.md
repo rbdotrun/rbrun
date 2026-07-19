@@ -473,7 +473,7 @@ namespace :dogfood do
     Rbrun.configure do |c|
       c.database_connection = :rbrun
       c.tenancy_key         = "tenant"
-      c.user email: "ben@dee.mx", password: "secret"
+      c.user email: "dev@example.com", password: "secret"
       c.sandbox_provider = { default: :sqlite, sqlite: { path: "/tmp/box.db" } }
     end
 
@@ -481,7 +481,7 @@ namespace :dogfood do
     dog.ok "flat knob defaulted (subprocess_timeout=900)", Rbrun.config.subprocess_timeout == 900
     dog.ok "tenancy_key = tenant", Rbrun.config.tenancy_key == "tenant"
     dog.ok "one user, default tenant rbrun",
-           Rbrun.config.users == [ { email: "ben@dee.mx", password: "secret", tenant: "rbrun" } ]
+           Rbrun.config.users == [ { email: "dev@example.com", password: "secret", tenant: "rbrun" } ]
 
     dog.header "provider resolved by convention"
     obj = Rbrun.build(DogfoodDemoFamily, Rbrun.config.sandbox_provider) # default: :sqlite

@@ -196,7 +196,7 @@ Rbrun.configure do |c|
   c.tenancy_key         = "tenant"          # name of the required slug column scoping every record (§6)
 
   # ── optional built-in auth (repeatable; omit ⇒ host supplies current_tenant) (§6) ──
-  c.user email: "ben@dee.mx",     password: ENV["RBRUN_PW"], tenant: "notiplus"
+  c.user email: "dev@example.com", password: ENV["RBRUN_PW"], tenant: "acme"
   c.user email: "alice@acme.com", password: ENV["ALICE_PW"], tenant: "acme"
 
   # ── providers: always a hash, always `<family>_provider` ──────

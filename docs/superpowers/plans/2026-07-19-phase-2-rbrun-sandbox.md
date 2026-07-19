@@ -97,7 +97,7 @@ require_relative "lib/rbrun/sandbox/version"
 Gem::Specification.new do |spec|
   spec.name        = "rbrun-sandbox"
   spec.version     = Rbrun::Sandbox::VERSION
-  spec.authors     = [ "Ben" ]
+  spec.authors     = [ "rbdotrun" ]
   spec.summary     = "Sandbox backends for rbrun (local, daytona) behind one exec/file/session contract."
   spec.license     = "MIT"
   spec.required_ruby_version = ">= 3.2"
