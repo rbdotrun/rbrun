@@ -81,6 +81,11 @@ interface Config {
   resume?: string | null;
   max_turns?: number | null;
   attachments?: Attachment[];
+  mcp?: {
+    servers?: Record<string, unknown>;
+    tools?: Record<string, string[] | null>;
+    permissions?: Record<string, Record<string, string>>;
+  } | null;
 }
 
 // The turn as a streaming user message: the text, plus a content block per inlinable upload
@@ -251,6 +256,27 @@ async function main(): Promise<void> {
 
   const server = createSdkMcpServer({ name: SERVER, version: "1.0.0", tools });
 
+  // External MCP servers (Stripe, Linear, …) the runner staged via config.mcp — merged ALONGSIDE the
+  // in-process rbrun server, never replacing it. `servers` is name → {command,args,env} | {type,url,
+  // headers}; `tools` is name → allowlist | null(all); `permissions` is name → {default, <tool>: perm}.
+  // Only always_allow tools go in allowedTools (auto-approved); needs_approval routes through
+  // canUseTool (the approval gate); blocked is never exposed.
+  const mcp = config.mcp ?? { servers: {}, tools: {}, permissions: {} };
+  const externalServers: Record<string, unknown> = mcp.servers ?? {};
+  const externalAllowed: string[] = [];
+  for (const name of Object.keys(externalServers)) {
+    const perms: Record<string, string> = (mcp.permissions ?? {})[name] ?? {};
+    const def = perms.default ?? "always_allow";
+    const list: string[] | null = (mcp.tools ?? {})[name] ?? null;
+    if (list === null) {
+      if (def === "always_allow") externalAllowed.push(`mcp__${name}__*`);
+    } else {
+      for (const t of list) {
+        if ((perms[t] ?? def) === "always_allow") externalAllowed.push(`mcp__${name}__${t}`);
+      }
+    }
+  }
+
   // The built-ins the agent may reach. Bash is included.
   //
   // Bash cannot be safely path-gated: the SDK has no scoped-ALLOW syntax for it (only scoped deny),
@@ -269,9 +295,12 @@ async function main(): Promise<void> {
   //
   // The file tools and the two bun commands are granted by the workspace's own settings.json,
   // which the Runner writes — path-scoped to ./**, which is the session's workspace and nothing else.
-  const allowedTools = config.manifest
-    .filter((m) => !m.needs_approval)
-    .map((m) => `mcp__${SERVER}__${m.name}`);
+  const allowedTools = [
+    ...config.manifest
+      .filter((m) => !m.needs_approval)
+      .map((m) => `mcp__${SERVER}__${m.name}`),
+    ...externalAllowed,
+  ];
 
   // The tools that EXIST for this agent. Without this the SDK exposes its whole built-in surface,
   // and two of them break us outright:
@@ -315,7 +344,7 @@ async function main(): Promise<void> {
       // final structured emit; the SDK default cap cuts the turn off mid-work, yielding a
       // null structured_output. Generous by default, overridable per run.
       maxTurns: config.max_turns ?? 60,
-      mcpServers: { [SERVER]: server },
+      mcpServers: { [SERVER]: server, ...externalServers },
       tools: TOOLS, // what EXISTS — see the const. Without it the SDK ships its whole surface.
       allowedTools,
       // Load project settings FROM CWD — the session's workspace — so the skills the runner staged

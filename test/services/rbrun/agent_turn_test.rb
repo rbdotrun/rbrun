@@ -80,7 +80,9 @@ module Rbrun
       AgentTurn.new(session: @session, runtime: runtime).run("go")
 
       assert_equal({ "command" => "npx", "args" => [ "-y", "x" ], "env" => { "K" => "v" } },
-                   runtime.mcp.dig("mcpServers", "stripe"))
+                   runtime.mcp.dig("servers", "stripe"))
+      assert runtime.mcp.key?("tools")
+      assert runtime.mcp.key?("permissions")
     end
 
     test "the MCP resolver is called with the session's tenant + the WORKTREE's repo (R1)" do

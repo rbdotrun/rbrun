@@ -46,7 +46,7 @@ module Rbrun
           stage_client
           stage_skills(skills)
           stage_settings
-          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume)
+          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp)
           run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
         ensure
           @sandbox.exec("rm -f #{config_path}") if config_path
@@ -89,7 +89,7 @@ module Rbrun
 
       # The run config (api_key + prompt + client config), uploaded and deleted when the run ends — the
       # key never outlives the turn. Returns its remote path.
-      def write_config_file(prompt:, system:, tools:, resume:)
+      def write_config_file(prompt:, system:, tools:, resume:, mcp: nil)
         path = File.join(agent_dir, "config.json")
         @sandbox.write(path, {
           api_key: @api_key,
@@ -97,6 +97,7 @@ module Rbrun
           system_prompt: system,
           model: @model,
           manifest: tools,
+          mcp: mcp, # external MCP servers ({servers,tools,permissions}) — secrets live+die with this file
           resume: resume,
           max_turns: @max_turns
         }.to_json)

@@ -61,8 +61,14 @@ module Rbrun
       capped = Rbrun::Mcp::ToolBudget.apply(specs,
                                             builtin_count: Rbrun::Mcp::ToolBudget::BUILTIN_COUNT,
                                             rbrun_count: Rbrun::ApplicationTool.manifest.size)
-      Rbrun::Mcp::Materializer.call(capped)
+      {
+        "servers"     => Rbrun::Mcp::Materializer.call(capped)["mcpServers"],
+        "tools"       => capped.to_h { |s| [ s.name.to_s, s.tools ] },
+        "permissions" => capped.to_h { |s| [ s.name.to_s, stringify_perms(s.tool_permissions) ] }
+      }
     end
+
+    def stringify_perms(perms) = (perms || {}).to_h { |k, v| [ k.to_s, v.to_s ] }
 
     # Materialize the acting tenant's current skill versions into a temp folder for the runtime to
     # stage. The DB is the source — never files/config. nil when the tenant has no skills.
