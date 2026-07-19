@@ -85,6 +85,7 @@ interface Config {
     servers?: Record<string, unknown>;
     tools?: Record<string, string[] | null>;
     permissions?: Record<string, Record<string, string>>;
+    approved?: string[]; // full mcp__srv__tool names the user approved this session — allowed on resume
   } | null;
 }
 
@@ -263,6 +264,7 @@ async function main(): Promise<void> {
   // canUseTool (the approval gate); blocked is never exposed.
   const mcp = config.mcp ?? { servers: {}, tools: {}, permissions: {} };
   const externalServers: Record<string, unknown> = mcp.servers ?? {};
+  const externalApproved = new Set<string>(mcp.approved ?? []);
   const externalAllowed: string[] = [];
   for (const name of Object.keys(externalServers)) {
     const perms: Record<string, string> = (mcp.permissions ?? {})[name] ?? {};
@@ -364,6 +366,23 @@ async function main(): Promise<void> {
         // The built-ins are allowed outright: cwd is this session's box, and the box is the boundary.
         if (BUILTIN.has(toolName))
           return { behavior: "allow", updatedInput: input };
+
+        // External MCP tools (mcp__<srv>__<tool>, srv != our SERVER). always_allow ones are in
+        // allowedTools and never reach here; this handles needs_approval (park) and the resume.
+        if (toolName.startsWith("mcp__") && !toolName.startsWith(`mcp__${SERVER}__`)) {
+          if (externalApproved.has(toolName))
+            return { behavior: "allow", updatedInput: input }; // approved on a prior turn → the SERVER runs it
+          const [, srv, ...rest] = toolName.split("__");
+          const perms: Record<string, string> = (mcp.permissions ?? {})[srv] ?? {};
+          const p = perms[rest.join("__")] ?? perms.default ?? "always_allow";
+          if (p === "needs_approval") {
+            gated = true;
+            emit({ type: "needs_approval", tool: toolName, arguments: input, tool_use_id: opts.toolUseID, tool_kind: "mcp" });
+            return { behavior: "deny", message: "Awaiting user approval.", interrupt: true };
+          }
+          return { behavior: "deny", message: `Tool ${toolName} is not permitted.` };
+        }
+
         const bare = toolName.replace(`mcp__${SERVER}__`, "");
         if (!ourTools.has(bare)) {
           return {
@@ -383,6 +402,7 @@ async function main(): Promise<void> {
             tool: bare,
             arguments: input,
             tool_use_id: opts.toolUseID,
+            tool_kind: "ruby",
           });
           return {
             behavior: "deny",

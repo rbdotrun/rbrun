@@ -100,6 +100,45 @@ module Rbrun
       assert_nil runtime.mcp
     end
 
+    class McpGatingRuntime
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
+        on_event.call({ type: "session", session_id: "sess-mcp" })
+        on_event.call({ type: "needs_approval", tool: "mcp__stripe__pay", arguments: { "amt" => 5 },
+                        tool_use_id: "g9", tool_kind: "mcp" })
+        { type: "result", stop_reason: "awaiting_approval" }
+      end
+    end
+
+    test "an external MCP needs_approval call freezes with tool_kind mcp (R3)" do
+      turn = AgentTurn.new(session: @session, runtime: McpGatingRuntime.new)
+      turn.run("pay")
+      assert turn.gated?
+      frozen = @session.messages.gated.last
+      assert_equal "mcp__stripe__pay", frozen.payload["name"]
+      assert_equal "mcp", frozen.payload["tool_kind"]
+    end
+
+    test "approving an MCP call does NOT run it in Ruby — it nudges the resume, no tool_result" do
+      frozen = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "g9",
+        approval_status: "pending", payload: { "name" => "mcp__stripe__pay", "input" => {}, "tool_kind" => "mcp" })
+
+      nudge = nil
+      assert_no_difference("@session.messages.where(event_type: 'tool_result').count") do
+        nudge = frozen.decide_approval!("approve")
+      end
+      assert_match(/Call it again/, nudge)
+    end
+
+    test "the resume run passes approved MCP tools so the SERVER executes them" do
+      Rbrun::McpServer.create!(tenant: "acme", name: "stripe", transport: "stdio", command: "npx")
+      @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "g9",
+        approval_status: "approved", payload: { "name" => "mcp__stripe__pay", "tool_kind" => "mcp" })
+
+      runtime = McpCapturingRuntime.new
+      AgentTurn.new(session: @session, runtime: runtime).run("continue")
+      assert_includes runtime.mcp["approved"], "mcp__stripe__pay"
+    end
+
     test "a needs_approval event freezes a pending tool_use row and marks the turn gated" do
       turn = AgentTurn.new(session: @session, runtime: GatingRuntime.new)
       turn.run("do the dangerous thing")

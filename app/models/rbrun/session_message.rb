@@ -37,7 +37,12 @@ module Rbrun
       return nil if claimed.zero?
 
       reload
-      approval_rejected? ? refusal_nudge : run_frozen_call!
+      return refusal_nudge if approval_rejected?
+
+      # R3: an external MCP tool is executed by the SERVER, not Ruby. Approving it doesn't run anything
+      # here — the resume re-runs with it allowed (see AgentTurn#approved_mcp_tools) and the server
+      # runs it. Only Ruby tools execute via run_frozen_call!.
+      mcp_tool? ? mcp_approved_nudge : run_frozen_call!
     end
 
     private
@@ -65,6 +70,16 @@ module Rbrun
         payload: { "tool_use_id" => tool_use_id, "result" => result, "is_error" => !!failed })
 
       "The user approved #{name}. Result: #{result.to_json}. Continue."
+    end
+
+    def mcp_tool? = payload["tool_kind"] == "mcp"
+
+    # The external server reconnects asynchronously on resume; if the first re-call reports the tool
+    # unavailable, that is the connection still settling, not a real absence — retry.
+    def mcp_approved_nudge
+      "The user approved #{payload['name']} — it is now enabled. Call it again with the same arguments. " \
+        "If the first call reports the tool unavailable, wait a moment and retry it once or twice; " \
+        "it is reconnecting."
     end
 
     def refusal_nudge = "The user refused #{payload['name']}. Do not retry it; propose an alternative."

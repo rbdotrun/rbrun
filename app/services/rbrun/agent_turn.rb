@@ -64,11 +64,20 @@ module Rbrun
       {
         "servers"     => Rbrun::Mcp::Materializer.call(capped)["mcpServers"],
         "tools"       => capped.to_h { |s| [ s.name.to_s, s.tools ] },
-        "permissions" => capped.to_h { |s| [ s.name.to_s, stringify_perms(s.tool_permissions) ] }
+        "permissions" => capped.to_h { |s| [ s.name.to_s, stringify_perms(s.tool_permissions) ] },
+        "approved"    => approved_mcp_tools # full mcp__srv__tool names the user approved — allow on resume
       }
     end
 
     def stringify_perms(perms) = (perms || {}).to_h { |k, v| [ k.to_s, v.to_s ] }
+
+    # External MCP tools the user has already approved this session — the resume run allows them so
+    # the SERVER (not Ruby) executes them.
+    def approved_mcp_tools
+      @session.messages.gated.where(approval_status: "approved")
+              .select { |m| m.payload["tool_kind"] == "mcp" }
+              .filter_map { |m| m.payload["name"] }.uniq
+    end
 
     # Materialize the acting tenant's current skill versions into a temp folder for the runtime to
     # stage. The DB is the source — never files/config. nil when the tenant has no skills.
@@ -178,7 +187,8 @@ module Rbrun
     def record_needs_approval(event)
       @gated = true
       row("assistant", "tool_use", tool_use_id: event[:tool_use_id], approval_status: "pending",
-          payload: { "id" => event[:tool_use_id], "name" => event[:tool].to_s, "input" => event[:arguments] || {} })
+          payload: { "id" => event[:tool_use_id], "name" => event[:tool].to_s, "input" => event[:arguments] || {},
+                     "tool_kind" => (event[:tool_kind] || "ruby").to_s })
     end
   end
 end
