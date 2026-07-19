@@ -18,7 +18,8 @@ end
 # Rbrun.config is global singleton state, set once by test/dummy's initializer. A test that mutates
 # it (e.g. reset_config! to exercise config parsing) would otherwise leak an empty/altered config
 # into whatever test runs next under a different seed. Snapshot the config object before each test
-# and restore it after, so config mutation can never cross test boundaries.
+# and restore it after, so config mutation can never cross test boundaries. (The tenant
+# config_resolver is cleared by reset_config!, so tests that set it clean up through that public API.)
 class ActiveSupport::TestCase
   setup    { @__rbrun_config = Rbrun.instance_variable_get(:@config) }
   teardown { Rbrun.instance_variable_set(:@config, @__rbrun_config) }

@@ -35,10 +35,10 @@ module Rbrun
     private
 
     def call_client(prompt)
-      runtime = @runtime || Rbrun.runtime(sandbox: @session.sandbox)
+      runtime = @runtime || Rbrun.runtime(tenant: @session.tenant, sandbox: @session.sandbox)
       runtime.run(
         prompt: prompt,
-        system: Rbrun.config.system_prompt,
+        system: Rbrun.config(@session.tenant).system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
         resume: @session.sdk_session_id,
         tool_handler: method(:run_tool),
