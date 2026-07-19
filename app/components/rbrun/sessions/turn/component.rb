@@ -1,5 +1,5 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module Turn
       # One exchange: the user line, then the assistant response rendered by the Timeline over this
       # turn's event-log rows. turn_<id> is the anchor a turn-open re-broadcast replaces.

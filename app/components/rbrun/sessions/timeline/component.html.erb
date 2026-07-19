@@ -1,4 +1,4 @@
 <% segments.each_with_index do |(kind, payload), i| %>
-  <%= render Rbrun::Conversation::Segment::Component.new(
+  <%= render Rbrun::Sessions::Segment::Component.new(
         kind: kind, payload: payload, results: results, open: open_at?(i)) %>
 <% end %>

@@ -33,4 +33,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "dry-initializer"
   spec.add_dependency "lucide-rails"
   spec.add_dependency "redcarpet"
+  spec.add_dependency "turbo-rails"
+  spec.add_dependency "stimulus-rails"
 end

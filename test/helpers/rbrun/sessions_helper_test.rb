@@ -1,8 +1,8 @@
 require "test_helper"
 
 module Rbrun
-  class ConversationHelperTest < ActionView::TestCase
-    include Rbrun::ConversationHelper
+  class SessionsHelperTest < ActionView::TestCase
+    include Rbrun::SessionsHelper
 
     test "markdown renders bold + escapes raw html" do
       out = markdown("**x** <script>alert(1)</script>")

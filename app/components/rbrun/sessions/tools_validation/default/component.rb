@@ -1,9 +1,9 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module ToolsValidation
       module Default
         # The fallback gate: raw args (as code) + the shared Valider/Refuser action.
-        class Component < Rbrun::Conversation::ToolsValidation::Base
+        class Component < Rbrun::Sessions::ToolsValidation::Base
         end
       end
     end

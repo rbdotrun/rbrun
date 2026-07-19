@@ -16,7 +16,7 @@ module Rbrun
     end
 
     def timeline_html
-      render_inline(Rbrun::Conversation::Timeline::Component.new(messages: @session.messages.to_a, working: false)).to_html
+      render_inline(Rbrun::Sessions::Timeline::Component.new(messages: @session.messages.to_a, working: false)).to_html
     end
 
     test "renders assistant prose as markdown" do
@@ -35,8 +35,8 @@ module Rbrun
     end
 
     test "dom_id_for keys a tools run by its first call and a prose block by its row id" do
-      assert_equal "work_9", Rbrun::Conversation::Segment::Component.dom_id_for(:tools, [ Struct.new(:id).new(9) ])
-      assert_equal "seg_7", Rbrun::Conversation::Segment::Component.dom_id_for(:prose, Struct.new(:id).new(7))
+      assert_equal "work_9", Rbrun::Sessions::Segment::Component.dom_id_for(:tools, [ Struct.new(:id).new(9) ])
+      assert_equal "seg_7", Rbrun::Sessions::Segment::Component.dom_id_for(:prose, Struct.new(:id).new(7))
     end
   end
 end

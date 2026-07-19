@@ -1,0 +1,10 @@
+<%= form_with url: rbrun.approval_path(tool_use_id), method: :patch, class: "flex items-center gap-2" do %>
+  <button type="submit" name="decision" value="approve"
+          class="inline-flex items-center rounded-md bg-default-600 px-2 py-1 text-xs font-medium text-white hover:bg-default-500">
+    Approve
+  </button>
+  <button type="submit" name="decision" value="refuse"
+          class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+    Refuse
+  </button>
+<% end %>

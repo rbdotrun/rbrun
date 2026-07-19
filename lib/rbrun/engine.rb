@@ -1,3 +1,6 @@
+require "turbo-rails"
+require "stimulus-rails"
+
 module Rbrun
   class Engine < ::Rails::Engine
     isolate_namespace Rbrun

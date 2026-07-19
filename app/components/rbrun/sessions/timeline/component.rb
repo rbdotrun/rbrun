@@ -1,5 +1,5 @@
 module Rbrun
-  module Conversation
+  module Sessions
     # The agent's side of one turn as a sequence of SEGMENTS: assistant text → :prose; the app's own
     # voice → :internal; a RUN of consecutive tool events → one :tools accordion. This object is both
     # the initial renderer AND the source of truth a live broadcast consults (segment_index_for /
@@ -48,7 +48,7 @@ module Rbrun
 
         def segment_at(index) = segments[index]
 
-        def dom_id_at(index) = Rbrun::Conversation::Segment::Component.dom_id_for(*segments[index])
+        def dom_id_at(index) = Rbrun::Sessions::Segment::Component.dom_id_for(*segments[index])
 
         def segment_index_for(message)
           anchor = message.tool_result? ? paired_use(message) : message

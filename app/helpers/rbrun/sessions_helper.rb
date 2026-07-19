@@ -4,7 +4,7 @@ require "json"
 module Rbrun
   # Conversation view helpers: markdown for assistant prose, tool_body for tool args/results, the
   # approval action form, and the tools-validation component resolver.
-  module ConversationHelper
+  module SessionsHelper
     MARKDOWN = Redcarpet::Markdown.new(
       Redcarpet::Render::HTML.new(escape_html: true, hard_wrap: true),
       autolink: true, fenced_code_blocks: true, tables: true, strikethrough: true
@@ -26,13 +26,13 @@ module Rbrun
 
     # The shared gate form (one PATCH, two submits keyed by decision).
     def approval_actions(tool_use_id)
-      render "rbrun/conversations/approval_actions", tool_use_id: tool_use_id
+      render "rbrun/sessions/approval_actions", tool_use_id: tool_use_id
     end
 
     # The validation card component for a tool. rbrun ships one fallback (Default); hosts add their
-    # own per-tool cards by defining Rbrun::Conversation::ToolsValidation::<Name>::Component.
+    # own per-tool cards by defining Rbrun::Sessions::ToolsValidation::<Name>::Component.
     def tools_validation_component(_name)
-      Rbrun::Conversation::ToolsValidation::Default::Component
+      Rbrun::Sessions::ToolsValidation::Default::Component
     end
   end
 end

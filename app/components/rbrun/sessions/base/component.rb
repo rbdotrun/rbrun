@@ -1,5 +1,5 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module Base
       # The full conversation: the streaming message timeline plus the composer. The Session page
       # renders this.

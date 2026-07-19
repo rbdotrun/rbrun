@@ -1,10 +1,10 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module ToolsValidation
       # The contract every tool-call validation card inherits: handed the pending tool_use row
       # (`call:`), it derives everything from it. Subclasses render their own card via a sidecar erb.
       class Base < Rbrun::ApplicationViewComponent
-        include Rbrun::ConversationHelper
+        include Rbrun::SessionsHelper
 
         def initialize(call:)
           @call = call

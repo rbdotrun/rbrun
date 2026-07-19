@@ -16,9 +16,28 @@ module Rbrun
 
     def run(content)
       @session.messages.create!(role: "user", event_type: "text", content: content)
+      call_client(content)
+    end
+
+    # Continue after an approval decision — the tool already ran. NOT a user message; log an app-voice
+    # `internal` row and hand the nudge straight to the SDK.
+    def continue(nudge)
+      internal("Decision recorded — resuming.", "approval")
+      call_client(nudge)
+    end
+
+    # Resume a failed turn — the SDK session carries the partial state; restate the request.
+    def resume
+      internal("Resuming at your request.", "resume")
+      call_client(resume_prompt)
+    end
+
+    private
+
+    def call_client(prompt)
       runtime = @runtime || Rbrun.runtime(sandbox: @session.sandbox)
       runtime.run(
-        prompt: content,
+        prompt: prompt,
         system: Rbrun.config.system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
         resume: @session.sdk_session_id,
@@ -27,7 +46,22 @@ module Rbrun
       )
     end
 
-    private
+    def internal(text, kind)
+      @session.messages.create!(role: "assistant", event_type: "internal", content: text, payload: { "kind" => kind })
+    end
+
+    # The nudge for a retried turn: the answer in flight was LOST (rewrite it), the actions were not
+    # (don't redo them), and don't narrate the failure.
+    def resume_prompt
+      request = @session.messages.where(role: "user", event_type: "text").order(:id).last&.content
+      [
+        "The previous run failed on a technical error. The user asks you to resume.",
+        ("The request you were answering was: «#{request.to_s.strip}»." if request && !request.to_s.empty?),
+        "IMPORTANT: your in-flight answer was LOST — the user received nothing. Write the COMPLETE " \
+        "answer now. Do NOT redo tool actions already executed; reuse their results. Do not mention " \
+        "the interruption."
+      ].compact.join("\n")
+    end
 
     # The stdio tool bridge: log the tool_use, run it as the tenant, log the tool_result, return
     # { result:, is_error: } for the runtime to answer on the subprocess's stdin.

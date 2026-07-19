@@ -1,11 +1,11 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module Segment
       # ONE segment of a turn's timeline, rendered on its own so it can be live-updated in isolation:
       # a :prose block, an :internal note, or a :tools run (the work accordion). Keyed by a stable
       # #dom_id so a live event replaces only its node (live == reload).
       class Component < Rbrun::ApplicationViewComponent
-        include Rbrun::ConversationHelper
+        include Rbrun::SessionsHelper
 
         def initialize(kind:, payload:, results: {}, open: false)
           @kind = kind

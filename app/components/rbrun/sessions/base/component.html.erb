@@ -7,15 +7,15 @@
       <div id="conversation_<%= session.id %>" class="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
         <% turns = session.turns.to_a %>
         <% turns.each_with_index do |(user_message, messages), i| %>
-          <%= render "rbrun/conversations/turn", user_message: user_message, messages: messages,
+          <%= render "rbrun/sessions/turn", user_message: user_message, messages: messages,
                 working: (session.working? && i == turns.size - 1) %>
         <% end %>
       </div>
 
-      <%= render "rbrun/conversations/working", session: session %>
+      <%= render "rbrun/sessions/working", session: session %>
 
       <div id="commits_<%= session.id %>" class="mx-auto w-full max-w-3xl px-4">
-        <%= render(Rbrun::Conversation::Commits::Component.new(session: session)) %>
+        <%= render(Rbrun::Sessions::Commits::Component.new(session: session)) %>
       </div>
     </div>
 

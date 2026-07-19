@@ -1,5 +1,5 @@
 module Rbrun
-  module Conversation
+  module Sessions
     module Default
       # The default conversation, full width.
       class Component < Rbrun::ApplicationViewComponent
@@ -8,7 +8,7 @@ module Rbrun
         end
 
         def call
-          tag.div(render(Rbrun::Conversation::Base::Component.new(session: @session)), class: "h-full w-full")
+          tag.div(render(Rbrun::Sessions::Base::Component.new(session: @session)), class: "h-full w-full")
         end
       end
     end
