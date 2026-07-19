@@ -1,0 +1,7 @@
+<div class="border-t border-slate-200">
+  <%= component("code_block", code: tool_body(input), language: "json") %>
+</div>
+<div class="flex items-center gap-2 border-t border-default-200 bg-default-50 px-2.5 py-2">
+  <%= approval_actions(tool_use_id) %>
+  <span class="ml-auto text-[11px] text-slate-400">Or ask for a change in the conversation.</span>
+</div>

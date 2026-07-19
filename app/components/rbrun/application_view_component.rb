@@ -1,6 +1,7 @@
 require "view_component_contrib"
 require "tailwind_merge"
 require "dry/initializer"
+require "lucide-rails"
 
 module Rbrun
   # The component DSL, migrated from work/insiti. view_component is imported; this reproduces the
@@ -11,6 +12,7 @@ module Rbrun
     extend Dry::Initializer
     include ViewComponentContrib::StyleVariants
     include Rbrun::ComponentHelper
+    include LucideRails::RailsHelper
 
     # Every resolved class string is tailwind-merged, so later utilities override earlier conflicts.
     style_config.postprocess_with do |classes|

@@ -1,0 +1,10 @@
+<div id="agent_working_<%= session.id %>">
+  <% if session.working? %>
+    <div class="mx-auto flex w-full max-w-3xl px-4 pb-6">
+      <div class="flex items-center gap-2 text-sm text-slate-500">
+        <%= component("spinner", size: :sm) %>
+        <span>The agent is working…</span>
+      </div>
+    </div>
+  <% end %>
+</div>

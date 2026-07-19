@@ -1,0 +1,51 @@
+<% if kind == :prose %>
+  <div id="<%= dom_id %>" class="cv-reason md prose prose-sm max-w-none"><%= markdown(payload.content) %></div>
+
+<% elsif kind == :internal %>
+  <div id="<%= dom_id %>" class="flex items-center gap-2 text-xs text-slate-400">
+    <%= lucide_icon("rotate-cw", class: "size-3.5 shrink-0") %>
+    <span><%= payload.content %></span>
+  </div>
+
+<% else %>
+  <details data-controller="sticky-details" id="<%= dom_id %>" class="group/work" <%= "open" if open %>>
+    <summary class="flex cursor-pointer select-none items-center gap-2 py-1 text-xs text-slate-500 marker:content-none">
+      <%= lucide_icon("chevron-right", class: "size-3.5 shrink-0 text-slate-300 transition-transform group-open/work:rotate-90") %>
+      <span class="font-medium"><%= helpers.pluralize(steps.size, "action") %></span>
+    </summary>
+
+    <div class="ml-1.5 mt-1 flex flex-col gap-1.5 border-l-2 border-slate-100 pl-3">
+      <% steps.each do |s| %>
+        <details data-controller="sticky-details" id="step_<%= s[:id] %>"
+                 <%= "open" if s[:approval] == "pending" %>
+                 class="<%= helpers.class_names('group/step rounded-md border bg-slate-50', (s[:approval] == 'pending' ? 'border-default-300' : 'border-slate-200')) %>">
+          <summary class="flex cursor-pointer select-none items-center gap-2 px-2.5 py-1.5 text-xs marker:content-none">
+            <%= lucide_icon((s[:error] ? "circle-alert" : "wrench"), class: helpers.class_names("size-3.5 shrink-0", (s[:error] ? "text-red-500" : "text-slate-400"))) %>
+            <span class="font-medium text-slate-600"><%= s[:name] %></span>
+            <% if (hint = tool_hint(s[:input])).present? %>
+              <span class="truncate font-mono text-slate-400"><%= hint %></span>
+            <% end %>
+            <%= lucide_icon("chevron-right", class: "ml-auto size-3.5 shrink-0 text-slate-300 transition-transform group-open/step:rotate-90") %>
+          </summary>
+          <% if s[:approval] == "pending" %>
+            <%= render tools_validation_component(s[:name]).new(call: s[:row]) %>
+          <% else %>
+            <div class="divide-y divide-slate-200 border-t border-slate-200">
+              <pre class="overflow-x-auto whitespace-pre-wrap break-words px-2.5 py-2 text-[11px] leading-relaxed text-slate-500"><%= tool_body(s[:input]) %></pre>
+              <% if s[:result].present? %>
+                <pre class="overflow-x-auto whitespace-pre-wrap break-words px-2.5 py-2 text-[11px] leading-relaxed text-slate-500"><%= tool_body(s[:result]) %></pre>
+              <% end %>
+            </div>
+            <% if (badge = approval_badge(s[:approval])) %>
+              <div class="flex items-center gap-2 border-t border-slate-200 px-2.5 py-2">
+                <span class="<%= helpers.class_names('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold', badge[:style]) %>">
+                  <%= lucide_icon(badge[:icon], class: "size-3") %><%= badge[:label] %>
+                </span>
+              </div>
+            <% end %>
+          <% end %>
+        </details>
+      <% end %>
+    </div>
+  </details>
+<% end %>

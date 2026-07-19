@@ -1,0 +1,33 @@
+<%= helpers.turbo_stream_from "rbrun_session_#{session.id}" %>
+
+<div class="flex h-full min-h-0 flex-col" data-controller="autoscroll">
+  <div class="relative flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1 overflow-y-auto" data-autoscroll-target="viewport"
+         data-action="scroll->autoscroll#scrolled">
+      <div id="conversation_<%= session.id %>" class="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
+        <% turns = session.turns.to_a %>
+        <% turns.each_with_index do |(user_message, messages), i| %>
+          <%= render "rbrun/conversations/turn", user_message: user_message, messages: messages,
+                working: (session.working? && i == turns.size - 1) %>
+        <% end %>
+      </div>
+
+      <%= render "rbrun/conversations/working", session: session %>
+
+      <div id="commits_<%= session.id %>" class="mx-auto w-full max-w-3xl px-4">
+        <%= render(Rbrun::Conversation::Commits::Component.new(session: session)) %>
+      </div>
+    </div>
+
+    <button type="button" data-autoscroll-target="button" data-action="autoscroll#resume"
+            class="absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50">
+      <%= lucide_icon("arrow-down", class: "size-3.5") %> Resume following
+    </button>
+  </div>
+
+  <div id="composer" class="flex-shrink-0 border-t border-slate-200">
+    <div class="mx-auto w-full max-w-3xl p-4">
+      <%= render "rbrun/messages/form", session: session, working: session.working? %>
+    </div>
+  </div>
+</div>

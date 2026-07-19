@@ -1,0 +1,8 @@
+<%= form_with url: rbrun.approval_path(tool_use_id), method: :patch, class: "flex items-center gap-2" do %>
+  <%= component("button", variant: :primary, size: :xs, type: "submit", name: "decision", value: "approve") do %>
+    Approve
+  <% end %>
+  <%= component("button", variant: :outline, size: :xs, type: "submit", name: "decision", value: "refuse") do %>
+    Refuse
+  <% end %>
+<% end %>
