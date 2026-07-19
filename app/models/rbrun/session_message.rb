@@ -11,7 +11,8 @@ module Rbrun
     before_create :assign_turn
 
     enum :approval_status,
-         { pending: "pending", approved: "approved", rejected: "rejected", cancelled: "cancelled" },
+         { pending: "pending", approved: "approved", rejected: "rejected", cancelled: "cancelled",
+           answered: "answered" }, # answered = a custom gate (ask_user) was submitted (not approve/reject)
          prefix: :approval, validate: { allow_nil: true }
 
     scope :gated, -> { where.not(approval_status: nil) }

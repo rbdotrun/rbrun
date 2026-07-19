@@ -19,6 +19,14 @@ module Rbrun
       assert_equal [ pending ], @session.messages.gated.to_a
     end
 
+    test "answered (custom gate) is a valid status, prefixed predicate, and counts as gated" do
+      row = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "t3",
+                                      approval_status: "answered", payload: { "name" => "ask_user" })
+      assert row.approval_answered?
+      refute row.approval_pending?
+      assert_includes @session.messages.gated, row
+    end
+
     test "user_message threads agent rows to the turn lead" do
       lead = @session.messages.create!(role: "user", event_type: "text", content: "do it")
       reply = @session.messages.create!(role: "assistant", event_type: "text", content: "done",
