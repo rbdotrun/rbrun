@@ -1,0 +1,39 @@
+<div id="workflow_<%= session.id %>">
+  <% run = Rbrun::Workflow::Run.new(session) %>
+  <% if session.workflow && !session.workflow_status_cancelled? %>
+    <div class="mx-auto w-full max-w-3xl px-4 pt-3" data-controller="workflow">
+      <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <button type="button" data-action="workflow#toggle"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+          <% if run.all_done? %>
+            <%= lucide_icon("circle-check", class: "size-4 text-green-600") %>
+          <% else %>
+            <%= lucide_icon("loader", class: "size-4 text-slate-400") %>
+          <% end %>
+          <span class="font-medium text-slate-800"><%= run.current_step&.title || session.workflow.label %></span>
+          <span class="ml-auto tabular-nums text-xs text-slate-500"><%= run.done_count %>/<%= run.total %></span>
+          <%= lucide_icon("chevron-down", class: "size-4 text-slate-400 transition-transform", data: { "workflow-target": "chevron" }) %>
+        </button>
+        <div class="hidden border-t border-slate-100 px-3 py-2" data-workflow-target="body">
+          <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Task progress</p>
+          <ol class="flex flex-col gap-1.5">
+            <% run.steps.each do |step| %>
+              <li class="flex items-baseline gap-2 text-sm">
+                <% if run.done?(step) %>
+                  <%= lucide_icon("circle-check", class: "size-3.5 shrink-0 translate-y-0.5 text-green-600") %>
+                  <span class="text-slate-500 line-through"><%= step.title %></span>
+                <% else %>
+                  <span class="mt-1 size-2 shrink-0 rounded-full bg-slate-300"></span>
+                  <span class="text-slate-700"><%= step.title %></span>
+                <% end %>
+              </li>
+            <% end %>
+          </ol>
+          <%= button_to "Cancel workflow", rbrun.session_message_path(session), method: :post,
+                params: { message: { content: "Cancel the current workflow." } },
+                class: "mt-3 text-xs font-medium text-slate-500 hover:text-slate-700" %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
