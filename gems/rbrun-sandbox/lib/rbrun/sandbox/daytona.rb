@@ -1,2 +1,11 @@
 # frozen_string_literal: true
-# (filled in a later task)
+
+module Rbrun
+  module Sandbox
+    class Daytona
+      # adapter methods added in Task 6
+    end
+  end
+end
+
+require "rbrun/sandbox/daytona/client"
