@@ -467,6 +467,13 @@ async function drain(
     };
     captureSession(m.session_id);
 
+    // Readiness: surface external MCP server connection state so a real connect-FAILURE is loud
+    // (retryable) instead of the model silently proceeding without the tool. Pending is tolerated.
+    if (m.type === "system") {
+      const sys = m as unknown as { mcp_servers?: Array<{ name: string; status: string }> };
+      if (sys.mcp_servers) emit({ type: "mcp_status", servers: sys.mcp_servers });
+    }
+
     if (
       m.type === "stream_event" &&
       m.event?.type === "content_block_delta" &&

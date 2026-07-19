@@ -109,6 +109,21 @@ module Rbrun
       end
     end
 
+    class McpStatusRuntime
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
+        on_event.call({ type: "mcp_status", servers: [ { name: "stripe", status: "failed" }, { name: "rbrun", status: "connected" } ] })
+        on_event.call({ type: "result", stop_reason: "end_turn" })
+        { type: "result", stop_reason: "end_turn" }
+      end
+    end
+
+    test "a settled MCP connection failure is surfaced loud, not silent (readiness)" do
+      AgentTurn.new(session: @session, runtime: McpStatusRuntime.new).run("go")
+      status = @session.messages.find_by(event_type: "mcp_status")
+      assert status, "a failed server produces a visible row"
+      assert_includes status.payload["failed"], "stripe"
+    end
+
     test "an external MCP needs_approval call freezes with tool_kind mcp (R3)" do
       turn = AgentTurn.new(session: @session, runtime: McpGatingRuntime.new)
       turn.run("pay")

@@ -45,6 +45,7 @@ module Rbrun
         begin
           stage_client
           stage_skills(skills)
+          prewarm_mcp(mcp)
           stage_settings
           config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp)
           run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
@@ -65,6 +66,27 @@ module Rbrun
         @sandbox.write(File.join(agent_dir, "package.json"), JSON.pretty_generate(AGENT_PACKAGE))
         @sandbox.write(File.join(agent_dir, "client.ts"), File.read(CLIENT_TS))
         @sandbox.exec!("cd #{agent_dir} && bun install", timeout: 180)
+      end
+
+      # Pre-fetch declared stdio MCP server packages into the box's package cache, so the SDK's spawn
+      # is warm (fast connect) instead of a cold download on the first turn. Best-effort — a failure
+      # here must not fail the turn. Kills the cold-start half of the connect race at the source.
+      def prewarm_mcp(mcp)
+        servers = mcp && (mcp["servers"] || mcp[:servers])
+        return if servers.blank?
+
+        servers.each_value do |entry|
+          command = entry["command"] || entry[:command]
+          next unless %w[bunx npx].include?(command.to_s)
+
+          args = entry["args"] || entry[:args] || []
+          pkg = args.find { |a| !a.to_s.start_with?("-") }
+          next if pkg.to_s.empty?
+
+          @sandbox.exec("cd #{agent_dir} && bun add #{pkg}", timeout: 120)
+        end
+      rescue StandardError => e
+        warn "[rbrun] mcp prewarm skipped: #{e.message}"
       end
 
       # A skill is a folder; stage the tree under <workspace>/.claude/skills/ where the SDK's project

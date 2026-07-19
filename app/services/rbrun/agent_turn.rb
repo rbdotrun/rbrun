@@ -135,6 +135,7 @@ module Rbrun
       when "token"               then row("assistant", "token", content: event[:text].to_s, payload: event)
       when "session"             then record_session(event)
       when "needs_approval"      then record_needs_approval(event)
+      when "mcp_status"          then record_mcp_status(event)
       when "builtin_tool_use"    then record_builtin_tool_use(event)
       when "builtin_tool_result" then record_builtin_tool_result(event)
       else row(nil, event[:type].to_s, payload: event)
@@ -184,6 +185,18 @@ module Rbrun
     # A needs_approval tool reached the gate. The client already interrupted its run — this just
     # FREEZES the call as a durable pending tool_use row. name/input frozen here are the exact action
     # the owner decides on.
+    # Readiness gate: an external MCP server that SETTLED as "failed" is a lost capability — log it
+    # loud and persist a visible row (retryable), rather than the model silently proceeding without
+    # the tool. "pending" is tolerated (still connecting).
+    def record_mcp_status(event)
+      failed = Array(event[:servers]).select { |s| (s[:status] || s["status"]).to_s == "failed" }
+      return if failed.empty?
+
+      names = failed.map { |s| s[:name] || s["name"] }
+      Rails.logger.warn("[rbrun] mcp servers failed to connect: #{names.join(', ')}")
+      row(nil, "mcp_status", payload: { "failed" => names })
+    end
+
     def record_needs_approval(event)
       @gated = true
       row("assistant", "tool_use", tool_use_id: event[:tool_use_id], approval_status: "pending",
