@@ -83,8 +83,9 @@ transport (hard-won reconnect discipline: on stream drop, re-check the process e
 reconnect from the last byte offset). This is preserved verbatim.
 
 Builtins (`Read`/`Write`/`Edit`/`Glob`/`Grep`/`Bash`) run **inside the sandbox** by the SDK (this is
-how the agent builds artifacts). App tools run **in Ruby**. Artifact files live only in the sandbox
-until a tool reads them back.
+how the agent edits files and runs `git`). App tools run **in Ruby**. The agent's work lives in the
+Worktree's git branch and is persisted by the agent **committing + pushing to GitHub** via its own
+git tools (see the Worktree model, Phase 6); rbrun records the commit SHAs.
 
 > **Terminology — three distinct "session" concepts, kept separate throughout:**
 >
@@ -175,7 +176,9 @@ The sub-gems are tool-agnostic. The engine owns tools:
 - `Rbrun::ApplicationTool < RubyLLM::Tool` — base class; RubyLLM is used **only** here, for the tool
   DSL + `ruby-llm-schema` param utilities. `self.manifest` / `self.find(name)` / `needs_approval!` /
   `#execute(**) → { "data" } | { "error" }` (string-keyed).
-- Generic built-in tools shipped by the engine (e.g. `SaveArtifactVersion`, an identity tool).
+- Generic built-in tools shipped by the engine (e.g. an identity tool). The agent's *work* is git
+  commits it makes via its own Bash/git tools inside the Worktree's sandbox — not a tool that lifts
+  bytes into the DB.
 - Host apps add their own tools to the engine's tool list (`Rbrun.tools`). Tools resolve to the
   agent's manifest and dispatch via the `tool_handler` bridge.
 
@@ -410,26 +413,43 @@ Host apps register their own tools. Depends on Phase 4.
 - `dogfood/gate.rake` — a `needs_approval!` tool actually **parks** the run (`status=needs_approval`,
   a pending `tool_use` row frozen, nothing ran), and Bash confinement holds.
 
-### Phase 6 — Engine host: artifacts + auth
+### Phase 6 — Engine host: Worktrees (GitHub-backed) + auth
 
-**Scope:** `Artifact` + `ArtifactVersion` (+ `Artifact::Medium` value object) + the `SaveArtifactVersion`
-tool (lifts built bytes off the sandbox into an immutable version, never through the model); optional
-built-in auth — `User` model + config-seeded users (idempotent upsert on boot; extensible DB row) +
-the `current_tenant` hook (host override when auth is off). Depends on Phase 5.
-**Deliverables:** artifact + auth tests.
-**Dogfood gate — `dogfood/artifact.rake`:** the agent builds an artifact in the sandbox and
-`SaveArtifactVersion` lifts the bytes back into an `ArtifactVersion`.
+The deliverable is **git history on GitHub**, not byte-blobs in the DB. `Artifact`/`ArtifactVersion`
+are dropped. A new **`Worktree`** (rbrun's term — *not* a git worktree) is the unit of work:
+
+- **1 Worktree = 1 sandbox + 1 git branch**, spun on creation (a branch off a base ref in a repo).
+- **`Worktree has_many :sessions`.** Every Session (conversation) under a Worktree runs its turns in
+  that **same** sandbox, on that **same** branch — multiple conversations accumulate one working copy.
+- The **sandbox belongs to the Worktree**, not the Session: this **relocates** `Session#sandbox`
+  (shipped in Phase 4) to `Worktree#sandbox` (`Rbrun.sandbox(labels: { worktree: id })`); `Session
+  belongs_to :worktree` and reads its sandbox/branch through it.
+- **Tenancy roots on the Worktree** (the `<tenancy_key>` slug); Sessions derive their tenant from it.
+- The **agent commits + pushes via git tools** (Bash) during turns — nothing auto-commits. rbrun
+  **records the resulting commit SHAs** (a lightweight `Commit`/turn reference; GitHub is the store).
+
+**Scope:** `Worktree` model (repo + base + branch + `#sandbox`, `Tenanted`, `has_many :sessions`) +
+its provisioning (create branch off base, clone/checkout in the sandbox, using the config `github_pat`);
+relocate the sandbox from `Session` to `Worktree` (+ `Session belongs_to :worktree`); record per-turn
+commit SHAs (read from git after the turn); optional built-in auth — `User` model + config-seeded users
+(idempotent upsert on boot; extensible DB row) + the `current_tenant` hook (host override when auth is
+off). A Worktree is created against `{ repo:, base: }` (caller-provided or a config default). Depends
+on Phase 5.
+**Deliverables:** Worktree + Session-relocation + auth tests.
+**Dogfood gate — `dogfood/worktree.rake`:** create a Worktree (spins a branch + sandbox), run a real
+turn in a Session under it where the agent edits a file and `git commit`+`push`es via its tools, and
+confirm the commit landed on the branch (GitHub) and its SHA was recorded.
 
 ### Phase 7 — Engine UI (controllers, jobs, channels, Turbo, bun bundle, auth screen)
 
 **Scope:** `MessagesController` / `ApprovalsController`, `AgentTurnJob`, ActionCable channels, Turbo
-Stream views (session timeline, approval footer, artifact render), bun-built CSS/JS in
+Stream views (session timeline, approval footer, the Worktree's commit/diff view), bun-built CSS/JS in
 `app/assets/builds/rbrun/`, login screen (when auth is on), engine mounted + navigable in
 `test/dummy`. Depends on Phase 6.
 **Deliverables:** working mounted UI; controller/system tests.
 **Dogfood gate — `dogfood/browser.rake`:** drive a real conversation in a headless browser: Turbo
 appends the turn, the working indicator shows, the approval footer appears and a decision resumes the
-turn, a built artifact renders. ✓/✗ + screenshots.
+turn, the branch's new commits render. ✓/✗ + screenshots.
 
 ---
 
@@ -453,8 +473,8 @@ turn, a built artifact renders. ✓/✗ + screenshots.
 - **Portable with light deps (parameterize credentials/logger/root):** `Daytona::Client`/`Workspace`,
   `ClaudeSdk::Runner` (its only AR touchpoint is `@chat.sandbox` + credentials → injected).
 - **Rewritten as engine host (was Rails/AR/Turbo-coupled):** `AgentTurn` (→ `on_event`/`tool_handler`
-  sink), `ApplicationTool`/`AgentTools`, `Session`/`SessionMessage`/`Artifact*` (insitix's
-  `Chat`/`ChatMessage`), controllers/jobs/channels.
+  sink), `ApplicationTool`/`AgentTools`, `Worktree`/`Session`/`SessionMessage` (insiti's
+  `Chat`/`ChatMessage`; insiti's `Artifact*` is dropped — work is GitHub git history), controllers/jobs/channels.
 
 ```
 
