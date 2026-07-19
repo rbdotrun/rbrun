@@ -2,7 +2,7 @@ require "test_helper"
 
 module Rbrun
   class SessionMessageTest < ActiveSupport::TestCase
-    setup { @session = Session.create!(tenant: "acme") }
+    setup { @session = rbrun_session(tenant: "acme") }
 
     test "persists an event row verbatim with json payload" do
       m = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "t1",

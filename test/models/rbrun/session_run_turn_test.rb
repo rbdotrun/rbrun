@@ -17,7 +17,7 @@ module Rbrun
       def run(**) = raise("kaboom")
     end
 
-    setup { @s = Session.create!(tenant: "acme") }
+    setup { @s = rbrun_session(tenant: "acme") }
 
     test "a clean turn ends done" do
       @s.run_turn("hi", runtime: OkRuntime.new)

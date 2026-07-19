@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_130001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_130002) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -47,7 +47,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_130001) do
     t.string "status", default: "idle", null: false
     t.string "tenant", null: false
     t.datetime "updated_at", null: false
+    t.integer "worktree_id", null: false
     t.index ["tenant"], name: "index_rbrun_sessions_on_tenant"
+    t.index ["worktree_id"], name: "index_rbrun_sessions_on_worktree_id"
   end
 
   create_table "rbrun_worktrees", force: :cascade do |t|
@@ -63,4 +65,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_130001) do
   add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
+  add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
 end
