@@ -46,4 +46,25 @@ class MenuDropdownTest < ActiveSupport::TestCase
     assert_includes out, "Sign out"
     assert_includes out, "role=\"menu\""
   end
+
+  test "nav_item marked active gets aria-current=page + active classes + icon" do
+    out = html(Rbrun::Ui::NavItem::Component.new(label: "Conversations", href: "/c", icon: "messages-square", active: true))
+    assert_includes out, "aria-current=\"page\""
+    assert_includes out, "bg-default-50 text-default-700"
+    assert_includes out, "Conversations"
+    assert_includes out, "<svg"   # lucide icon
+  end
+
+  test "nav_item inactive by default renders inactive classes" do
+    out = html(Rbrun::Ui::NavItem::Component.new(label: "Docs", href: "/docs", icon: "file"))
+    assert_includes out, "text-slate-600"
+    refute_includes out, "aria-current"
+  end
+
+  test "nav_group renders label + the collapsed 1px line stand-in" do
+    out = html(Rbrun::Ui::NavGroup::Component.new(label: "Library"))
+    assert_includes out, "Library"
+    assert_includes out, "group-data-[collapsed]/sidebar:opacity-100"   # the LINE
+    assert_includes out, "aria-hidden=\"true\""
+  end
 end
