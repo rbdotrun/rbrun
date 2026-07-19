@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_140001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_150000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -21,6 +21,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_140001) do
     t.index ["session_id"], name: "index_rbrun_commits_on_session_id"
     t.index ["worktree_id", "sha"], name: "index_rbrun_commits_on_worktree_id_and_sha", unique: true
     t.index ["worktree_id"], name: "index_rbrun_commits_on_worktree_id"
+  end
+
+  create_table "rbrun_mcp_servers", force: :cascade do |t|
+    t.json "args", default: []
+    t.string "auth"
+    t.string "command"
+    t.string "config_digest"
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.json "env", default: {}
+    t.json "headers", default: {}
+    t.string "name", null: false
+    t.string "tenant", null: false
+    t.json "tool_permissions", default: {}
+    t.json "tools"
+    t.string "transport", null: false
+    t.datetime "updated_at", null: false
+    t.string "url"
+    t.index ["tenant", "name"], name: "index_rbrun_mcp_servers_on_tenant_and_name", unique: true
   end
 
   create_table "rbrun_session_messages", force: :cascade do |t|
