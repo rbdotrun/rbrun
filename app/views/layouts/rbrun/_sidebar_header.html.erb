@@ -1,0 +1,29 @@
+<%# The sidebar's toggler header — ported from insiti layouts/_sidebar_header. Logo slot (left) +
+    panel toggler (right). rbrun uses a text mark (no SVG asset): the slot stacks three faces —
+    "rbrun" wordmark (expanded), an "rb" mark (a same-scale crop, so collapsing reads as "run"
+    dissolving while "rb" stays put), and a rail toggler that takes the mark's spot when the
+    collapsed rail is hovered.
+
+    Contract: render INSIDE the `group/sidebar` container carrying `data-controller="sidebar"`. The
+    only local is `home_path` — where the logo links. %>
+<div class="flex items-center justify-between px-1.5" id="sidebar-header">
+  <div class="relative h-7 w-14 shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] group-data-[collapsed]/sidebar:w-7">
+    <%= link_to home_path, "aria-label": "Home",
+          class: "absolute inset-0 flex items-center overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-default-500 focus-visible:ring-offset-1" do %>
+      <span class="absolute inset-y-0 left-0 flex items-center text-lg font-semibold tracking-tight text-slate-900 transition-[opacity,filter] duration-300 group-data-[collapsed]/sidebar:opacity-0 group-data-[collapsed]/sidebar:blur-[4px]">rbrun</span>
+      <span aria-hidden="true"
+            class="absolute inset-y-0 left-0 flex items-center text-lg font-semibold tracking-tight text-slate-900 opacity-0 blur-[4px] transition-[opacity,filter,left,translate] duration-300 group-data-[collapsed]/sidebar:left-1/2 group-data-[collapsed]/sidebar:-translate-x-1/2 group-data-[collapsed]/sidebar:opacity-100 group-data-[collapsed]/sidebar:blur-none group-data-[collapsed]/sidebar:group-hover/sidebar:opacity-0 group-data-[collapsed]/sidebar:group-hover/sidebar:blur-[4px]">rb</span>
+    <% end %>
+    <button type="button" id="sidebar-rail-toggle" tabindex="-1" aria-hidden="true"
+            data-action="sidebar#toggle" title="Open panel"
+            class="absolute inset-0 flex items-center justify-center rounded-md text-slate-500/80 bg-slate-200/80 hover:bg-slate-200/90 hover:text-slate-600 opacity-0 pointer-events-none transition-opacity duration-150 group-data-[collapsed]/sidebar:group-hover/sidebar:opacity-100 group-data-[collapsed]/sidebar:group-hover/sidebar:pointer-events-auto">
+      <%= lucide_icon("panel-right", class: "size-4") %>
+    </button>
+  </div>
+  <button type="button" id="sidebar-toggle"
+          data-action="sidebar#toggle"
+          class="relative flex size-7 shrink-0 items-center justify-center rounded-md text-slate-500/80 bg-slate-200/80 transition-[color,background-color,scale,opacity] duration-150 hover:bg-slate-200/90 hover:text-slate-600 active:scale-[0.96] before:absolute before:-inset-1.5 before:content-[''] group-data-[collapsed]/sidebar:opacity-0 group-data-[collapsed]/sidebar:pointer-events-none group-data-[collapsed]/sidebar:focus-visible:opacity-100"
+          aria-label="Toggle panel">
+    <%= lucide_icon("panel-right", class: "size-4") %>
+  </button>
+</div>

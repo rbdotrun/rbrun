@@ -8,15 +8,39 @@
   <%= javascript_include_tag "rbrun/rbrun", type: "module", "data-turbo-track": "reload" %>
 </head>
 <body class="h-screen bg-white text-slate-900">
-  <div class="flex h-full flex-col">
-    <header class="flex flex-shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2">
-      <%= link_to "rbrun", rbrun.sessions_path, class: "font-semibold" %>
-      <div class="flex items-center gap-3 text-sm text-slate-500">
-        <span><%= current_user&.email %></span>
-        <%= button_to "Sign out", rbrun.logout_path, method: :delete, class: "hover:text-slate-700" %>
+  <div class="flex h-full min-h-0 w-full min-w-0">
+    <%# The rail: w-64 ↔ w-16, collapse keyed off data-collapsed (cookie-persisted so the server
+        renders the collapsed markup directly — no flash). data-ready gates the width transition. %>
+    <div class="group/sidebar flex h-full w-64 flex-shrink-0 flex-col gap-3 overflow-hidden p-3 data-[collapsed]:w-16 data-[ready]:transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+         id="navbar" data-controller="sidebar" <%= "data-collapsed" if cookies[:sidebar_collapsed] == "1" %>>
+      <%= render "layouts/rbrun/sidebar_header", home_path: rbrun.sessions_path %>
+
+      <%# Repo switcher — the searchable command-menu (filled in T5). %>
+      <%= render "layouts/rbrun/repo_switcher" %>
+
+      <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden" id="sidebar-nav">
+        <%= component("nav_item", label: "Conversations", href: rbrun.sessions_path, icon: "messages-square") %>
+      </nav>
+
+      <%# User area — dropdown opening upward. %>
+      <div class="border-t pt-2 pb-1" id="sidebar-footer">
+        <%= component("dropdown", placement: :top_start, trigger_class: "block w-full") do |d| %>
+          <% d.with_trigger do %>
+            <button type="button"
+                    class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-slate-100 group-data-[collapsed]/sidebar:pl-1">
+              <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-default-600 text-sm font-semibold text-white"><%= current_user&.email.to_s[0, 1].to_s.upcase %></span>
+              <span class="min-w-0 flex-1 truncate text-sm text-slate-700 group-data-[collapsed]/sidebar:opacity-0"><%= current_user&.email %></span>
+              <%= lucide_icon("chevrons-up-down", class: "size-4 shrink-0 text-slate-400 group-data-[collapsed]/sidebar:opacity-0") %>
+            </button>
+          <% end %>
+          <% d.with_menu do |m| %>
+            <% m.link "Sign out", href: rbrun.logout_path, icon: "log-out", data: { turbo_method: :delete } %>
+          <% end %>
+        <% end %>
       </div>
-    </header>
-    <main class="min-h-0 flex-1"><%= yield %></main>
+    </div>
+
+    <main class="min-h-0 min-w-0 flex-1 overflow-hidden"><%= yield %></main>
   </div>
 </body>
 </html>

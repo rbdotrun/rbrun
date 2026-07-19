@@ -1,0 +1,10 @@
+<%# Repo switcher placeholder — T5 replaces this with the searchable command-menu (dropdown hosting
+    a search input + a Turbo frame of GitHub results) wired to current_repo. %>
+<div id="repo_switcher">
+  <button type="button"
+          class="flex w-full items-center gap-2 rounded-md border bg-white px-2 py-1.5 text-left text-sm shadow-xs transition-colors hover:bg-slate-50 group-data-[collapsed]/sidebar:pl-[7px]">
+    <span class="flex size-6 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-400"><%= lucide_icon("github", class: "size-3.5") %></span>
+    <span class="flex-1 truncate text-slate-500 group-data-[collapsed]/sidebar:opacity-0">Select a repository</span>
+    <%= lucide_icon("chevrons-up-down", class: "size-4 shrink-0 text-slate-400 group-data-[collapsed]/sidebar:opacity-0") %>
+  </button>
+</div>

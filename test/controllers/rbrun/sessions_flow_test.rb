@@ -20,6 +20,24 @@ module Rbrun
       assert_select "#composer"
     end
 
+    test "the collapsible sidebar rail renders with its regions" do
+      get "/rbrun/c"
+      assert_response :success
+      assert_select "#navbar[data-controller=?]", "sidebar"
+      assert_select "#sidebar-header"
+      assert_select "#repo_switcher"
+      assert_select "#sidebar-nav", text: /Conversations/
+      assert_select "#sidebar-footer", text: /dev@rbrun.test/
+      refute_match(/data-collapsed/, @response.body)
+    end
+
+    test "the sidebar_collapsed cookie makes the server render the collapsed rail" do
+      cookies[:sidebar_collapsed] = "1"
+      get "/rbrun/c"
+      assert_response :success
+      assert_select "#navbar[data-collapsed]"
+    end
+
     test "creating a conversation redirects to its show page" do
       assert_difference("Rbrun::Session.count", 1) { post "/rbrun/c" }
       assert_response :redirect
