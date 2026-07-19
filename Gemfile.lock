@@ -2,12 +2,15 @@ PATH
   remote: .
   specs:
     rbrun (0.1.0)
+      async (>= 2.0)
+      async-http (>= 0.60)
+      async-http-faraday (>= 0.12)
       bcrypt
       dry-initializer
+      faraday (~> 2.0)
+      faraday-multipart (~> 1.0)
       lucide-rails
       rails (>= 8.1.3)
-      rbrun-runtime
-      rbrun-sandbox
       redcarpet
       ruby_llm
       stimulus-rails

@@ -5,21 +5,22 @@ Short description and motivation.
 How to use my plugin.
 
 ## Installation
-Add this line to your application's Gemfile:
+
+Add rbrun to your application's Gemfile:
 
 ```ruby
-gem "rbrun"
+gem "rbrun", github: "rbdotrun/rbrun"
 ```
 
-And then execute:
 ```bash
 $ bundle
 ```
 
-Or install it yourself as:
-```bash
-$ gem install rbrun
-```
+That's the whole install. rbrun is internally composed of two provider sub-gems (`rbrun-sandbox`,
+`rbrun-runtime`, under `gems/`), but the engine **vendors** them — it packages their code and puts it
+on its load path — so the host installs a single gem with no extra Gemfile lines and nothing to
+publish. The sub-gems keep their own gemspecs and stay independently publishable, should that ever be
+wanted; consuming rbrun never requires it.
 
 ## Contributing
 Contribution directions go here.
