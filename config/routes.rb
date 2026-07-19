@@ -8,5 +8,9 @@ Rbrun::Engine.routes.draw do
   post "c/:id/retry", to: "sessions#retry",  as: :session_retry
   resources :approvals, only: :update, param: :tool_use_id
 
+  # Repo workspace switcher: the searchable result frame + the switch action.
+  get  "repos",        to: "repositories#index",  as: :repos
+  post "repos/switch", to: "repositories#switch", as: :switch_repo
+
   root to: "sessions#index"
 end

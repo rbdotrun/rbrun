@@ -1,0 +1,4 @@
+<%# Loaded into the switcher's Turbo frame (initial lazy load + every debounced search). %>
+<%= turbo_frame_tag "repo_results" do %>
+  <%= render "rbrun/repositories/results", repos: @repos, current: current_repo %>
+<% end %>

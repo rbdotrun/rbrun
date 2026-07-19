@@ -36,5 +36,12 @@ module Rbrun
     attr_writer :current_user_resolver
 
     def current_user_from(session) = @current_user_resolver&.call(session)
+
+    # The repo directory behind the sidebar switcher. Defaults to a GithubRepos on the config PAT;
+    # a host/test may override with any object responding to #list / #search (a DI seam, not a
+    # registry — same shape as the resolvers above).
+    attr_writer :github_repos
+
+    def github_repos = @github_repos || Rbrun::GithubRepos.new(pat: config.github_pat)
   end
 end

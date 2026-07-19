@@ -6,7 +6,7 @@ module Rbrun
 
     included do
       before_action :require_authentication
-      helper_method :current_user, :current_tenant
+      helper_method :current_user, :current_tenant, :current_repo
     end
 
     private
@@ -17,6 +17,10 @@ module Rbrun
     end
 
     def current_tenant = current_user&.tenant
+
+    # The acting workspace: a GitHub "owner/name", session-backed (no Repo table). Scoped within the
+    # tenant — a repo's conversations are the Sessions whose Worktree carries this string.
+    def current_repo = session[:rbrun_repo].presence
 
     def require_authentication
       redirect_to rbrun.login_path unless current_user

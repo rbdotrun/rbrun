@@ -28,6 +28,9 @@ module Rbrun
 
         renders_one :trigger
         renders_one :menu, Rbrun::Ui::Menu::Component
+        # Arbitrary panel content (e.g. a search input + a Turbo frame) when the floating panel isn't
+        # a plain menu. Positioning/open/close behaviour is identical — only the content differs.
+        renders_one :panel
 
         def floating_placement = @placement.to_s.tr("_", "-")
 
@@ -48,7 +51,7 @@ module Rbrun
                  hidden
                  aria-hidden="true"
                  class="<%= class_names(PANEL, @panel_class) %>">
-              <%= menu %>
+              <%= menu %><%= panel %>
             </div>
           </div>
         ERB
