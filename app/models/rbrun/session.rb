@@ -147,11 +147,11 @@ module Rbrun
       broadcast_working
     end
 
+    # Repaint ONLY the message form (#composer_form) — not the whole #composer. The workflow band is a
+    # sibling in the same card, with its own target, so a status flip never wipes it.
     def broadcast_composer
-      form = Rbrun::ApplicationController.render(partial: "rbrun/messages/form", locals: { session: self, working: working? })
-      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}", target: "composer",
-        html: %(<div id="composer" class="flex-shrink-0 border-t border-slate-200">) +
-              %(<div class="mx-auto w-full max-w-3xl p-4">#{form}</div></div>))
+      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}", target: "composer_form",
+        partial: "rbrun/messages/form", locals: { session: self, working: working? })
     end
 
     def broadcast_working

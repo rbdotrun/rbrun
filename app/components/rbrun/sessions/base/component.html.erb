@@ -25,11 +25,13 @@
     </button>
   </div>
 
-  <%= render "rbrun/sessions/workflow", session: session %>
-
   <div id="composer" class="flex-shrink-0 border-t border-slate-200">
     <div class="mx-auto w-full max-w-3xl p-4">
-      <%= render "rbrun/messages/form", session: session, working: session.working? %>
+      <%# One unified card: the workflow band is the composer's HEADER, the message form its body. %>
+      <div class="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-xs transition-colors focus-within:border-default-500 focus-within:ring-1 focus-within:ring-default-500">
+        <%= render "rbrun/sessions/workflow", session: session %>
+        <%= render "rbrun/messages/form", session: session, working: session.working? %>
+      </div>
     </div>
   </div>
 </div>

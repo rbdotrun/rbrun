@@ -29,6 +29,14 @@ module Rbrun
       assert_select "form[action=?]", "/rbrun/c/#{@session.id}" # the cancel button posts to the composer endpoint
     end
 
+    test "the band is the composer's header — band + form are one unit inside #composer" do
+      @session.update!(workflow: @workflow, workflow_status: "active")
+      get "/rbrun/c/#{@session.id}"
+      # both live inside #composer (the band is a composer continuation, not a detached card above it)
+      assert_select "#composer #workflow_#{@session.id} [data-controller=workflow]"
+      assert_select "#composer #composer_form form#new_message"
+    end
+
     test "cancelled → the band hides" do
       @session.update!(workflow: @workflow, workflow_status: "cancelled")
       get "/rbrun/c/#{@session.id}"
