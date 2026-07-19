@@ -30,5 +30,11 @@ module Rbrun
     attr_writer :current_tenant_resolver
 
     def current_tenant = @current_tenant_resolver&.call || Rbrun::Config::DEFAULT_TENANT
+
+    # Optional host-supplied auth: given the controller session, return the acting user (any object
+    # responding to #tenant). When set, it satisfies the mandatory-auth requirement.
+    attr_writer :current_user_resolver
+
+    def current_user_from(session) = @current_user_resolver&.call(session)
   end
 end

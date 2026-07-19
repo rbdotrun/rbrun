@@ -10,5 +10,8 @@ module Rbrun
         app.config.assets.precompile += %w[ rbrun/rbrun.css rbrun/rbrun.js ]
       end
     end
+
+    # Auth is mandatory — fail fast at boot if nothing provides it.
+    config.after_initialize { Rbrun.config.validate! }
   end
 end

@@ -1,0 +1,12 @@
+<div class="mx-auto mt-24 w-full max-w-sm">
+  <%= component("card", title: "Sign in") do %>
+    <% if @error %><p class="mb-3 text-sm text-red-600"><%= @error %></p><% end %>
+    <%= form_with url: rbrun.login_path, method: :post, class: "flex flex-col gap-3" do %>
+      <input type="email" name="email" placeholder="Email" autocomplete="email" autofocus
+             class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+      <input type="password" name="password" placeholder="Password" autocomplete="current-password"
+             class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+      <%= component("button", variant: :primary, type: "submit", full: true) do %>Sign in<% end %>
+    <% end %>
+  <% end %>
+</div>

@@ -33,6 +33,16 @@ module Rbrun
       define_method("#{family}_provider") { @providers[family] || {} }
       define_method("#{family}_provider=") { |hash| @providers[family] = hash }
     end
+
+    # Auth is mandatory: at least one built-in user, or a host-supplied current_user resolver.
+    def auth_configured? = users.any? || !Rbrun.instance_variable_get(:@current_user_resolver).nil?
+
+    def validate!
+      return if auth_configured?
+
+      raise Rbrun::ConfigError,
+            "rbrun requires auth: define at least one c.user (or set Rbrun.current_user_resolver)"
+    end
   end
 
   class << self

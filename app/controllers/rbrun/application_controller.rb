@@ -1,6 +1,11 @@
 module Rbrun
   class ApplicationController < ActionController::Base
-    # Make the component("name", …) string-render helper available in every engine view.
+    include Rbrun::Authentication
+
+    # Make the component() + conversation helpers available in every engine view.
     helper Rbrun::ComponentHelper
+    helper Rbrun::ConversationHelper
+
+    layout "rbrun/application"
   end
 end
