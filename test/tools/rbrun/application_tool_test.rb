@@ -16,6 +16,13 @@ class ApplicationToolTest < ActiveSupport::TestCase
     def execute = { "data" => "boom" }
   end
 
+  class FormGate < Rbrun::ApplicationTool
+    custom_approval! submit: :form_gate_response
+    description "custom gate"
+    parameter :form_spec, type: "object", required: true
+    def name = "form_gate"
+  end
+
   setup do
     @saved_tools = Rbrun.tools.dup
     Rbrun.instance_variable_set(:@tools, [ Adder, Dangerous ])
@@ -51,5 +58,25 @@ class ApplicationToolTest < ActiveSupport::TestCase
     session = rbrun_session(tenant: "acme")
     tool = Adder.in_session(session)
     assert_equal({ "data" => { "sum" => 5 } }, tool.execute(a: 2, b: 3))
+  end
+
+  test "custom_approval! implies a gate + custom card + submit route" do
+    assert FormGate.needs_approval?, "custom_approval! is a gate"
+    assert FormGate.custom_approval?
+    assert_equal :form_gate_response, FormGate.approval_submit_route
+  end
+
+  test "a custom gate has a degrade execute (no computed result)" do
+    assert_equal({ "data" => { "gated" => "form_gate_response" } }, FormGate.new.execute(form_spec: {}))
+  end
+
+  test "a plain needs_approval tool is not a custom approval" do
+    assert Dangerous.needs_approval?
+    refute Dangerous.custom_approval?
+    assert_nil Dangerous.approval_submit_route
+  end
+
+  test "manifest still reports needs_approval true for a custom gate" do
+    assert_equal true, Rbrun::ApplicationTool.manifest_entry(FormGate)["needs_approval"]
   end
 end
