@@ -20,6 +20,7 @@ module Rbrun
     config.after_initialize do
       Rbrun.config.validate!
       Rbrun::SkillSeeder.seed_at_boot!
+      Rbrun::McpSeeder.seed_at_boot!
     end
   end
 end
