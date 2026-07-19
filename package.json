@@ -7,8 +7,9 @@
     "build": "bun run build:css && bun run build:js"
   },
   "devDependencies": {
-    "@hotwired/turbo-rails": "^8.0.0",
+    "@floating-ui/dom": "^1.8.0",
     "@hotwired/stimulus": "^3.2.0",
+    "@hotwired/turbo-rails": "^8.0.0",
     "@tailwindcss/cli": "^4.0.0",
     "tailwindcss": "^4.0.0"
   }
