@@ -7,6 +7,8 @@ Rbrun::Engine.routes.draw do
   post "c/:id",       to: "messages#create", as: :session_message
   post "c/:id/retry", to: "sessions#retry",  as: :session_retry
   resources :approvals, only: :update, param: :tool_use_id
+  # Custom gate: ask_user submits its picks here (a custom_approval! tool → its own submit route).
+  post "ask_user/:tool_use_id", to: "ask_user_responses#create", as: :ask_user_response
 
   # Repo workspace switcher: the searchable result frame + the switch action.
   get  "repos",        to: "repositories#index",  as: :repos
