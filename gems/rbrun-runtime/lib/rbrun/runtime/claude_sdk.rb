@@ -36,6 +36,23 @@ module Rbrun
         raise Error, "anthropic_api_key missing" if @api_key.nil? || @api_key.to_s.empty?
       end
 
+      # One turn. Stages everything, runs the client in a detached sandbox session, and streams its
+      # events: tool_request → tool_handler (run in Ruby, answered on stdin); everything else →
+      # on_event; result/error → terminal. Returns the terminal result event. The config.json (with
+      # the api_key) is removed in ensure — the key never outlives the turn.
+      def run(prompt:, system:, tools: [], skills: nil, resume: nil, tool_handler: nil, on_event: nil)
+        config_path = nil
+        begin
+          stage_client
+          stage_skills(skills)
+          stage_settings
+          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume)
+          run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
+        ensure
+          @sandbox.exec("rm -f #{config_path}") if config_path
+        end
+      end
+
       private
 
       # Sibling of the workspace (parallels Daytona's /home/daytona/agent) — outside the agent's cwd so
@@ -121,6 +138,71 @@ module Rbrun
         else obj
         end
       end
+
+      # Drive the client as a DETACHED session command over the sandbox contract. If the log stream
+      # drops, the process keeps running and we RECONNECT from `offset`. Terminal state comes only from
+      # the client's own result/error — never the transport.
+      def run_over_session(command, tool_handler:, on_event:)
+        session_id = "turn-#{SecureRandom.hex(6)}"
+        @sandbox.session_create(session_id)
+        cmd_id = @sandbox.session_exec(session_id, command)
+
+        result = nil
+        error_message = nil
+        terminal = false
+        buf = +""
+        offset = 0
+        deadline = monotonic + @timeout
+
+        dispatch = lambda do |chunk|
+          buf << chunk
+          while (nl = buf.index("\n"))
+            line = buf.slice!(0..nl)
+            event = to_canonical(line)
+            next unless event
+
+            case event[:type]
+            when "tool_response" then next # our own stdin echoed by the session — never a client event
+            when "result"        then result = stringify_output(event); error_message = nil; terminal = true
+            when "error"         then error_message = event[:message]; terminal = true
+            when "tool_request"  then answer_tool_request(session_id, cmd_id, event, tool_handler)
+            else on_event&.call(event)
+            end
+          end
+          terminal
+        end
+
+        until terminal
+          remaining = deadline - monotonic
+          raise Error, "client run timed out after #{@timeout}s" if remaining <= 0
+
+          begin
+            offset = @sandbox.session_logs_follow(session_id, cmd_id, skip: offset, timeout: remaining, &dispatch)
+          rescue Rbrun::Sandbox::TimeoutError
+            raise Error, "client run timed out after #{@timeout}s"
+          rescue StandardError => e
+            @logger&.debug { "[rbrun-runtime] log stream interrupted (#{e.class}: #{e.message}) — re-checking the command" }
+          end
+          break if terminal
+
+          exit_code = @sandbox.session_command(session_id, cmd_id)["exitCode"]
+          next if exit_code.nil? # still running, stream merely dropped → reconnect
+
+          raise Error, "client exited #{exit_code} without a result"
+        end
+
+        raise Error, error_message if error_message
+
+        result
+      end
+
+      # The tool bridge: run the requested tool in Ruby, write its result to the client's stdin.
+      def answer_tool_request(session_id, cmd_id, event, tool_handler)
+        response = tool_handler&.call(event) || { result: { error: "no tool handler" }, is_error: true }
+        @sandbox.session_input(session_id, cmd_id, { type: "tool_response", id: event[:id], **response }.to_json + "\n")
+      end
+
+      def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end
