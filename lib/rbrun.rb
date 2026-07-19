@@ -37,11 +37,19 @@ module Rbrun
 
     def current_user_from(session) = @current_user_resolver&.call(session)
 
-    # The repo directory behind the sidebar switcher. Defaults to a GithubRepos on the config PAT;
-    # a host/test may override with any object responding to #list / #search (a DI seam, not a
-    # registry — same shape as the resolvers above).
-    attr_writer :github_repos
+    # The repo directory behind the sidebar switcher, tenant-aware. Precedence:
+    #   1. github_repos_resolver — a host proc taking the tenant (e.g. a GitHub-App-installation-scoped
+    #      lister per tenant). The multi-tenant seam.
+    #   2. a static github_repos override (tenant-agnostic) — the single-object seam tests/self-host use.
+    #   3. the default: a GithubRepos on the tenant's PAT (config(tenant).github_pat) — so a multi-tenant
+    #      host that only sets config_resolver gets per-tenant PATs for free, no override needed.
+    # All DI seams, no registry — same idiom as the resolvers above.
+    attr_writer :github_repos, :github_repos_resolver
 
-    def github_repos = @github_repos || Rbrun::GithubRepos.new(pat: config.github_pat)
+    def github_repos(tenant = nil)
+      @github_repos_resolver&.call(tenant) ||
+        @github_repos ||
+        Rbrun::GithubRepos.new(pat: config(tenant).github_pat)
+    end
   end
 end

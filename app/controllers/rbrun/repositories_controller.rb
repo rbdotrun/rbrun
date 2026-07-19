@@ -6,7 +6,7 @@ module Rbrun
     # Turbo frame of results. Blank q → recent repos; a query → GitHub search. Rendered as menu links
     # the command controller turns into picks.
     def index
-      @repos = Rbrun.github_repos.search(query: params[:q].to_s)
+      @repos = Rbrun.github_repos(current_tenant).search(query: params[:q].to_s)
     end
 
     # Set the acting workspace (+ its default branch, for worktree base) and return to its index.
