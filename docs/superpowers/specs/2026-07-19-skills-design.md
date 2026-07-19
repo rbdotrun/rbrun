@@ -56,7 +56,7 @@ skills. Both are collected on `Rbrun::Config` and consumed only by the seeder.
 Tenant-scoped (always-on tenancy). A `Skill` is identity; a `SkillVersion` is immutable content.
 
 ```
-rbrun_skills            (tenant, slug, name, current_version_id, divergence_digest, created_at, updated_at)
+rbrun_skills            (tenant, slug, name, current_version_id, divergence_digest, dismissed_digest, created_at, updated_at)
                         index: [tenant, slug] UNIQUE
 rbrun_skill_versions    (skill_id, digest, archive, source, created_at)
                         index: [skill_id, digest] UNIQUE ; source enum: file | inline | ui
@@ -67,7 +67,10 @@ rbrun_skill_versions    (skill_id, digest, archive, source, created_at)
   (tar/gzip stamp mtime, so archive bytes aren't a pure function of content). Two folders with the
   same files ⇒ same digest.
 - `current_version_id` — the version the runtime stages.
-- `divergence_digest` — set when an authored source differs from `current` (see §4); nil when clean.
+- `divergence_digest` — set when an authored source differs from **both** `current` and
+  `dismissed_digest` (see §4); nil when clean.
+- `dismissed_digest` — an authored digest the user reviewed and chose to keep the stored version
+  over. Suppresses re-warning until the source changes to a *new* digest.
 
 ## 3. Archive — folder ⇄ blob (`Rbrun::SkillArchive`)
 
@@ -86,17 +89,20 @@ For each authored skill (file or inline), pack → `digest` → compare to the s
 |---|---|
 | no `Skill` for the slug | create `Skill` + first `SkillVersion` (source), set `current`. (Authoring, not conflict.) |
 | `digest == current.digest` | no-op; clear any `divergence_digest`. |
-| `digest != current.digest` | **divergence**: leave `current` untouched, set `divergence_digest`, **warn**. |
+| `digest == dismissed_digest` | no-op (reviewed + kept); no warn. |
+| `digest ∉ {current.digest, dismissed_digest}` | **divergence**: leave `current` untouched, set `divergence_digest`, **warn**. |
 | pack/parse fails (bad folder, missing/broken `SKILL.md` frontmatter) | **issue**: warn, create nothing. |
 
 The seeder **never auto-applies** a change. Runs at boot (engine `after_initialize`, warn-only) and
 on demand via `rbrun:skills:seed`. Warnings go to the boot log **and** the persisted
 `divergence_digest` so the UI can surface them.
 
-**Resolution — the warn → Cancel / Reload contract** (same verbs everywhere):
+**Resolution — the warn → Keep stored / Reload contract** (same verbs everywhere):
 - **Reload** — apply the authored source: append a `SkillVersion` (its digest), move `current`,
-  clear `divergence_digest`, re-stage. *Make live match source, as a new version.*
-- **Cancel** — keep `current`; clear `divergence_digest` (dismiss). The source and DB stay diverged.
+  clear `divergence_digest` **and** `dismissed_digest`, re-stage. *Make live match source, as a new version.*
+- **Keep stored** — keep `current` as live; record `dismissed_digest = authored digest` and clear
+  `divergence_digest`. Re-warns only if the source later changes to a *new* digest. (This is the
+  conscious "I reviewed the diff and I'm keeping the stored one" — not a silent dismiss.)
 
 ## 5. Staging — DB → sandbox (per turn)
 
@@ -121,9 +127,10 @@ Entry point: a **"Skills"** link in the **footer user dropdown** (bottom of the 
 
 `Rbrun::SkillsController#index` → a panel listing the tenant's skills: name, slug, current version
 (short digest), `source`, updated-at. For any skill with a `divergence_digest` **or** a seed issue, a
-banner shows the problem + the **diff** (authored source vs `current`), with **[Cancel]** and
-**[Reload]** actions (`#reconcile`, `decision: cancel|reload`). Reload appends a version + moves
-`current`; Cancel clears the flag.
+banner shows the problem + the **diff** (authored source vs `current`), with **[Keep stored]** and
+**[Reload]** actions (`#reconcile`, `decision: keep|reload`). Reload appends a version + moves
+`current` (clears both flags); Keep stored records `dismissed_digest` (suppresses re-warning until
+the source changes to a new digest).
 
 ## 8. Out of scope (next pass)
 
