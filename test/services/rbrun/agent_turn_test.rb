@@ -4,7 +4,7 @@ module Rbrun
   class AgentTurnTest < ActiveSupport::TestCase
     # A scripted stand-in for a runtime adapter: plays events into on_event and round-trips the tool.
     class ToolCallingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
         on_event.call({ type: "session", session_id: "sess-1" })
         on_event.call({ type: "assistant", text: "on it" })
         resp = tool_handler.call({ type: "tool_request", id: "t1", name: "identity", args: {} })
@@ -15,7 +15,7 @@ module Rbrun
     end
 
     class GatingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
         on_event.call({ type: "session", session_id: "sess-2" })
         on_event.call({ type: "needs_approval", tool: "dangerous", arguments: { "x" => 1 }, tool_use_id: "g1" })
         { type: "result", stop_reason: "awaiting_approval" }
@@ -43,7 +43,7 @@ module Rbrun
     class SkillsCapturingRuntime
       attr_reader :staged
 
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
         @staged = skills && Rbrun::SkillArchive.read_dir(skills)
         on_event.call({ type: "result", stop_reason: "end_turn" })
         { type: "result", stop_reason: "end_turn" }
@@ -61,6 +61,41 @@ module Rbrun
 
       assert_equal({ "pdf/SKILL.md" => "# staged\n" }, runtime.staged,
                    "the current version's folder is staged under <slug>/")
+    end
+
+    class McpCapturingRuntime
+      attr_reader :mcp, :seen
+
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
+        @mcp = mcp
+        on_event.call({ type: "result", stop_reason: "end_turn" })
+        { type: "result", stop_reason: "end_turn" }
+      end
+    end
+
+    test "a turn materializes the tenant's enabled MCP servers into mcp.json" do
+      Rbrun::McpServer.create!(tenant: "acme", name: "stripe", transport: "stdio", command: "npx",
+                               args: [ "-y", "x" ], env: { "K" => "v" })
+      runtime = McpCapturingRuntime.new
+      AgentTurn.new(session: @session, runtime: runtime).run("go")
+
+      assert_equal({ "command" => "npx", "args" => [ "-y", "x" ], "env" => { "K" => "v" } },
+                   runtime.mcp.dig("mcpServers", "stripe"))
+    end
+
+    test "the MCP resolver is called with the session's tenant + the WORKTREE's repo (R1)" do
+      seen = nil
+      Rbrun.mcp_resolver = ->(tenant, repo) { seen = [ tenant, repo ]; [] }
+      AgentTurn.new(session: @session, runtime: ToolCallingRuntime.new).run("go")
+      assert_equal [ "acme", "acme/webapp" ], seen
+    ensure
+      Rbrun.mcp_resolver = nil
+    end
+
+    test "no MCP servers ⇒ mcp is nil" do
+      runtime = McpCapturingRuntime.new
+      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      assert_nil runtime.mcp
     end
 
     test "a needs_approval event freezes a pending tool_use row and marks the turn gated" do

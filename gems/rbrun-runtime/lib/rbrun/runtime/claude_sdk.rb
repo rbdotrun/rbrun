@@ -40,7 +40,7 @@ module Rbrun
       # events: tool_request → tool_handler (run in Ruby, answered on stdin); everything else →
       # on_event; result/error → terminal. Returns the terminal result event. The config.json (with
       # the api_key) is removed in ensure — the key never outlives the turn.
-      def run(prompt:, system:, tools: [], skills: nil, resume: nil, tool_handler: nil, on_event: nil)
+      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, tool_handler: nil, on_event: nil)
         config_path = nil
         begin
           stage_client

@@ -42,12 +42,26 @@ module Rbrun
         system: Rbrun.config(@session.tenant).system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
         skills: skills_dir,
+        mcp: materialize_mcp,
         resume: @session.sdk_session_id,
         tool_handler: method(:run_tool),
         on_event: method(:ingest)
       )
     ensure
       FileUtils.remove_entry(skills_dir) if skills_dir && Dir.exist?(skills_dir)
+    end
+
+    # Resolve this turn's external MCP servers (resolver if set, else the tenant's enabled DB rows),
+    # keep them under the SDK tool ceiling, and materialize the mcp.json the runtime stages. Keyed on
+    # the WORKTREE's repo (not a controller value — AgentTurn runs in a job). nil ⇒ no external servers.
+    def materialize_mcp
+      specs = Rbrun.mcp_servers_for(@session.tenant, @session.worktree.repo)
+      return nil if specs.empty?
+
+      capped = Rbrun::Mcp::ToolBudget.apply(specs,
+                                            builtin_count: Rbrun::Mcp::ToolBudget::BUILTIN_COUNT,
+                                            rbrun_count: Rbrun::ApplicationTool.manifest.size)
+      Rbrun::Mcp::Materializer.call(capped)
     end
 
     # Materialize the acting tenant's current skill versions into a temp folder for the runtime to

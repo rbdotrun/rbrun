@@ -12,6 +12,7 @@ module Rbrun
     # CEILING is the single source of the number; the runtime is handed it so client.ts can't drift.
     module ToolBudget
       CEILING = 40
+      BUILTIN_COUNT = 7 # the SDK built-ins client.ts exposes (Skill, Read, Write, Edit, Glob, Grep, Bash)
       PRIORITY = { "always_allow" => 2, "needs_approval" => 1 }.freeze
 
       module_function
