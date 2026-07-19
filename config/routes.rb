@@ -12,5 +12,9 @@ Rbrun::Engine.routes.draw do
   get  "repos",        to: "repositories#index",  as: :repos
   post "repos/switch", to: "repositories#switch", as: :switch_repo
 
+  # Skills panel: list + reconcile a divergence (keep|reload).
+  get  "skills",                 to: "skills#index",     as: :skills
+  post "skills/:slug/reconcile", to: "skills#reconcile", as: :reconcile_skill
+
   root to: "sessions#index"
 end

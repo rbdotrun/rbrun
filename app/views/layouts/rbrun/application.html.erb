@@ -34,6 +34,8 @@
             </button>
           <% end %>
           <% d.with_menu do |m| %>
+            <% m.link "Skills", href: rbrun.skills_path, icon: "sparkles" %>
+            <% m.separator %>
             <% m.link "Sign out", href: rbrun.logout_path, icon: "log-out", data: { turbo_method: :delete } %>
           <% end %>
         <% end %>

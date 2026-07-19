@@ -10,9 +10,9 @@ module Rbrun
   class SkillSeeder
     Result = Data.define(:slug, :status, :message)
 
-    # Assemble the authored seed sources: skills_path/<slug>/ folders (source: :file) then inline
-    # config skills (source: :inline).
-    def self.from_config(config, tenant:)
+    # Assemble the authored seed sources (non-mutating): skills_path/<slug>/ folders (source: :file)
+    # then inline config skills (source: :inline). Also used by the Skills panel for live diffs.
+    def self.authored_from_config(config)
       authored = []
       dir = config.skills_path.to_s
       if dir.present? && Dir.exist?(dir)
@@ -22,7 +22,11 @@ module Rbrun
         end
       end
       config.skills.each { |s| authored << s.merge(source: :inline) }
-      new(tenant: tenant, authored: authored)
+      authored
+    end
+
+    def self.from_config(config, tenant:)
+      new(tenant: tenant, authored: authored_from_config(config))
     end
 
     # Boot hook (engine after_initialize): seed the self-host tenant from config, WARN-only — a
