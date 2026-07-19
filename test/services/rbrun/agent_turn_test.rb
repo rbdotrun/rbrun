@@ -23,7 +23,7 @@ module Rbrun
     end
 
     setup do
-      @session = Session.create!(tenant: "acme")
+      @session = rbrun_session(tenant: "acme")
       Rbrun.register_tool(Rbrun::Tools::Identity)
     end
 

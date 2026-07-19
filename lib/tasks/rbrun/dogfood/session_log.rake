@@ -14,7 +14,8 @@ namespace :dogfood do
   task session_log: :environment do
     dog = Rbrun::Dogfood
 
-    session = Rbrun::Session.create!(tenant: "dogfood")
+    worktree = Rbrun::Worktree.create!(tenant: "dogfood", repo: "rbdotrun/dogfood", base: "main")
+    session = worktree.sessions.create!
     lead = session.messages.create!(role: "user", event_type: "text", content: "build me a report")
     session.messages.create!(role: "assistant", event_type: "session", payload: { "session_id" => "sess-abc" })
     session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "t1",
@@ -29,7 +30,7 @@ namespace :dogfood do
     dog.ok "status is needs_approval", session.needs_approval?
 
     dog.header "tenancy"
-    other = Rbrun::Session.create!(tenant: "someone-else")
+    other = Rbrun::Worktree.create!(tenant: "someone-else", repo: "x/y").sessions.create!
     dog.ok "for_tenant('dogfood') finds our session", Rbrun::Session.for_tenant("dogfood").include?(session)
     dog.ok "for_tenant('dogfood') excludes the other tenant", !Rbrun::Session.for_tenant("dogfood").include?(other)
 

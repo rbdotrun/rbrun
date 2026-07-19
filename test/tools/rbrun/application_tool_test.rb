@@ -48,7 +48,7 @@ class ApplicationToolTest < ActiveSupport::TestCase
   end
 
   test "in_session builds a tool bound to the session's tenant" do
-    session = Rbrun::Session.create!(tenant: "acme")
+    session = rbrun_session(tenant: "acme")
     tool = Adder.in_session(session)
     assert_equal({ "data" => { "sum" => 5 } }, tool.execute(a: 2, b: 3))
   end

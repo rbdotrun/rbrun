@@ -26,4 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rbrun-sandbox"
   spec.add_dependency "rbrun-runtime"
   spec.add_dependency "ruby_llm"
+  spec.add_dependency "bcrypt"
 end

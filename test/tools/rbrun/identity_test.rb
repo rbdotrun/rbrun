@@ -5,7 +5,7 @@ module Rbrun
     class IdentityTest < ActiveSupport::TestCase
       test "identity is registered and returns tenant + session id" do
         assert_includes Rbrun.tools, Rbrun::Tools::Identity
-        session = Rbrun::Session.create!(tenant: "acme")
+        session = rbrun_session(tenant: "acme")
         out = Identity.in_session(session).execute
         assert_equal "acme", out.dig("data", "tenant")
         assert_equal session.id, out.dig("data", "session_id")
