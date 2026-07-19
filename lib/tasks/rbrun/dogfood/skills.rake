@@ -45,6 +45,13 @@ namespace :dogfood do
       dog.ok "the agent used the skill (reply carries its marker)", reply.include?("ZORP-42")
       dog.info "reply", reply.squish[0, 160]
 
+      tool_uses = session.messages.where(event_type: "tool_use")
+      dog.info "tool_use events", tool_uses.map { |m| m.payload["name"] }.inspect
+      skill_call = tool_uses.find { |m| m.payload["name"].to_s == "Skill" }
+      dog.info "Skill tool input", skill_call&.payload&.dig("input").inspect
+      dog.ok "a Skill tool_call loaded THIS skill (dogfood-greeting) in the session_message log",
+             skill_call.present? && skill_call.payload.dig("input", "skill") == "dogfood-greeting"
+
       dog.header "editing the source surfaces a divergence (never clobbers)"
       before = skill.reload.current_version.digest
       Rbrun.config.skills.clear

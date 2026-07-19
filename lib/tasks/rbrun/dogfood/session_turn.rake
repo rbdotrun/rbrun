@@ -30,7 +30,8 @@ namespace :dogfood do
     end
     Rbrun.register_tool(demo)
 
-    session = Rbrun::Session.create!(tenant: "dogfood")
+    worktree = Rbrun::Worktree.create!(tenant: "dogfood", repo: "rbdotrun/dogfood", base: "main")
+    session  = worktree.sessions.create!
     begin
       session.run_turn("Call the dogfood_echo tool with the message 'pong', then tell me what it returned.")
 
@@ -50,7 +51,7 @@ namespace :dogfood do
       dog.info "reply", session.messages.where(event_type: "text", role: "assistant").last&.content.to_s.squish[0, 160]
     ensure
       session.sandbox.destroy!
-      session.destroy!
+      worktree.destroy!
     end
   end
 end

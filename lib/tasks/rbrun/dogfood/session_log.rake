@@ -36,7 +36,9 @@ namespace :dogfood do
 
     dog.header "event log shape"
     dog.ok "one frozen (gated) tool_use row", session.messages.gated.count == 1
-    dog.ok "agent rows thread to the user lead", session.messages.where(user_message_id: lead.id).count == 2
+    # Every non-user row threads to the open lead via SessionMessage#assign_turn: the `session` meta
+    # event + both `tool_use` rows = 3.
+    dog.ok "agent rows thread to the user lead", session.messages.where(user_message_id: lead.id).count == 3
 
     dog.header "config-aware constructors"
     box = session.sandbox

@@ -31,7 +31,8 @@ namespace :dogfood do
     end
     Rbrun.register_tool(demo)
 
-    session = Rbrun::Session.create!(tenant: "dogfood")
+    worktree = Rbrun::Worktree.create!(tenant: "dogfood", repo: "rbdotrun/dogfood", base: "main")
+    session  = worktree.sessions.create!
     begin
       session.run_turn("Deploy the app to production now, using the dogfood_deploy tool.")
       session.reload
@@ -49,7 +50,7 @@ namespace :dogfood do
       end
     ensure
       session.sandbox.destroy!
-      session.destroy!
+      worktree.destroy!
     end
   end
 end
