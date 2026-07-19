@@ -46,7 +46,8 @@ module Rbrun
     test "for_tenant scopes; slug is unique per tenant" do
       make(slug: "pdf", tenant: "rbrun")
       make(slug: "pdf", tenant: "acme")
-      assert_equal 1, Rbrun::Skill.for_tenant("rbrun").count
+      assert_equal 1, Rbrun::Skill.for_tenant("rbrun").where(slug: "pdf").count
+      assert_equal 1, Rbrun::Skill.for_tenant("acme").where(slug: "pdf").count
       assert_raises(ActiveRecord::RecordNotUnique) do
         Rbrun::Skill.create!(tenant: "rbrun", slug: "pdf", name: "dup")
       end

@@ -54,8 +54,9 @@ module Rbrun
         cfg.skills_path = root
         cfg.skill "from-inline", "# inline\n"
 
-        statuses = Rbrun::SkillSeeder.from_config(cfg, tenant: "rbrun").call.map(&:status)
-        assert_equal [ :created, :created ], statuses
+        results = Rbrun::SkillSeeder.from_config(cfg, tenant: "rbrun").call.index_by(&:slug)
+        assert_equal :created, results["from-file"].status
+        assert_equal :created, results["from-inline"].status
         assert Rbrun::Skill.for_tenant("rbrun").exists?(slug: "from-file")
         assert Rbrun::Skill.for_tenant("rbrun").exists?(slug: "from-inline")
       end

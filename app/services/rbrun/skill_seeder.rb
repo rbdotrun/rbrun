@@ -10,10 +10,24 @@ module Rbrun
   class SkillSeeder
     Result = Data.define(:slug, :status, :message)
 
-    # Assemble the authored seed sources (non-mutating): skills_path/<slug>/ folders (source: :file)
-    # then inline config skills (source: :inline). Also used by the Skills panel for live diffs.
+    # Engine-shipped skills (e.g. workflow-creator) — always seeded, like a built-in tool. A host can
+    # still override one by authoring a same-slug skill (it seeds later, so it wins on divergence).
+    BUILTIN_DIR = Rbrun::Engine.root.join("app/skills")
+
+    def self.builtin_authored
+      return [] unless BUILTIN_DIR.exist?
+
+      Dir.glob(BUILTIN_DIR.join("*").to_s).select { |d| File.directory?(d) }.sort.map do |folder|
+        slug = File.basename(folder)
+        { slug: slug, name: slug, files: Rbrun::SkillArchive.read_dir(folder), source: :file }
+      end
+    end
+
+    # Assemble the authored seed sources (non-mutating): engine built-ins first, then skills_path/<slug>/
+    # folders (source: :file), then inline config skills (source: :inline). Also used by the Skills panel
+    # for live diffs.
     def self.authored_from_config(config)
-      authored = []
+      authored = builtin_authored
       dir = config.skills_path.to_s
       if dir.present? && Dir.exist?(dir)
         Dir.glob(File.join(dir, "*")).select { |d| File.directory?(d) }.sort.each do |folder|
@@ -35,7 +49,7 @@ module Rbrun
     # Skills panel you'd use to reconcile it. No-ops (silent) when nothing is configured or the DB /
     # table isn't there yet (migrate/setup) — that's not an error.
     def self.seed_at_boot!
-      return unless Rbrun.config.skills_path.present? || Rbrun.config.skills.any?
+      return unless BUILTIN_DIR.exist? || Rbrun.config.skills_path.present? || Rbrun.config.skills.any?
       return unless Rbrun::Skill.table_exists?
 
       from_config(Rbrun.config, tenant: Rbrun::Config::DEFAULT_TENANT).call.each do |r|
