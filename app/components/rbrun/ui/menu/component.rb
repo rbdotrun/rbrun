@@ -2,7 +2,7 @@ module Rbrun
   module Ui
     module Menu
       # A keyboard-reachable list of menu actions. Standalone, or composed inside a Ui::Dropdown to
-      # form the classic dropdown menu. Ported from insiti Primitives::Menu — items are added in
+      # form the classic dropdown menu. Items are added in
       # insertion order via plain methods so mixed header/link/separator sequences keep their order:
       #
       #   <%= component("menu") do |m| %>

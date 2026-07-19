@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 
-// The searchable command-menu behind the repo switcher — the Stimulus reproduction of insiti's
-// React Command/Combobox (rbrun has no React). It owns only the query: a debounced keystroke points
+// The searchable command-menu behind the repo switcher — a Stimulus command palette (cmdk-style;
+// rbrun has no React). It owns only the query: a debounced keystroke points
 // the results Turbo frame at the search endpoint, and the server (GitHub search via the PAT) renders
 // the matching repo rows back into the frame. Keyboard nav + picking are handled elsewhere (the menu
 // controller inside the frame; each row is a turbo POST to switch). On open, focus the input.

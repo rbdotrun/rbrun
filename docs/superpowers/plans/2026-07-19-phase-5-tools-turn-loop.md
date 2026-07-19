@@ -640,7 +640,7 @@ git commit -m "feat(engine): Session#run_turn — status transitions + gate land
 **Interfaces:**
 - Consumes: `Rbrun::Session`, `Rbrun::ApplicationTool`, `Rbrun::Dogfood`. Reconfigure providers from `.env` (Daytona + the OAuth token) — secrets, not scenario knobs.
 
-Both run a REAL turn through `Session#run_turn` (real Claude, real Daytona box), like insiti's dogfoods. They register a demo tool, drive the turn, and read the persisted event log.
+Both run a REAL turn through `Session#run_turn` (real Claude, real Daytona box). They register a demo tool, drive the turn, and read the persisted event log.
 
 - [ ] **Step 1: the session_turn dogfood**
 

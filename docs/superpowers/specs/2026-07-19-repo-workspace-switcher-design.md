@@ -4,37 +4,37 @@
 > spec → one just-in-time plan → branch → TDD → dogfood → PR, same cadence as the phases.
 
 **Goal:** Give rbrun a left sidebar with a **repo switcher** below the logo — the workspace you act
-in — faithfully porting insitix's sidebar _shell + behaviours_, with the _content_ swapped from orgs
-to repos.
+in. The sidebar is a collapsible rail _shell_ with well-defined _behaviours_; the switcher's _content_
+is the repo universe.
 
-**One-line contract:** The **repo is the workspace** (insitix's Org-equivalent). It is **session-backed**,
-**not a new table**. The switcher is insitix's `dropdown` shell hosting a **command-menu** (the
-`Command`/`Combobox` search UX, reproduced in Stimulus) whose rows are fed by **server-side GitHub
-search** via the config `github_pat`.
+**One-line contract:** The **repo is the workspace**. It is **session-backed**, **not a new table**.
+The switcher is a `dropdown` shell hosting a **command-menu** (a search box → filtered list → keyboard
+nav, implemented in Stimulus) whose rows are fed by **server-side GitHub search** via the config
+`github_pat`.
 
 ---
 
 ## 1. Concept: what "workspace" is
 
-insitix's switchable workspace is the **Org** (`current_organisation`, session-backed from the login
-payload). rbrun has two org-ish axes — they are **not** the same:
+The switchable workspace in rbrun is the **Repo**. rbrun has two org-ish axes — they are **not** the
+same:
 
-| insitix                          | rbrun                             | role                                                                            |
-| -------------------------------- | --------------------------------- | ------------------------------------------------------------------------------- |
-| Org (switchable, session-backed) | **Repo**                          | the workspace you act in — _this is what the dropdown switches_                 |
-| Org-as-tenancy                   | **Tenant** (`c.tenancy_key` slug) | always-on isolation key, **config-defined, never user-switched** (invariant #8) |
+| axis                            | role                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| **Repo** (session-backed)       | the workspace you act in — _this is what the dropdown switches_                 |
+| **Tenant** (`c.tenancy_key` slug) | always-on isolation key, **config-defined, never user-switched** (invariant #8) |
 
 ```
-Tenant   (isolation, from config)          ~ insitix data-tenancy
-└─ Repo   (workspace — session-backed)      ~ insitix Org      ← dropdown below the logo
-   └─ Worktree (one branch + one sandbox)   ~ insitix project
-      └─ Session  (one conversation)        ~ insitix chat
+Tenant   (isolation, from config)
+└─ Repo   (workspace — session-backed)      ← dropdown below the logo
+   └─ Worktree (one branch + one sandbox)
+      └─ Session  (one conversation)
 ```
 
 **No `Repo` table.** A repo is identified by its GitHub `full_name` (`owner/name`). `current_repo` is
-a session string (`session[:rbrun_repo]`), exactly analogous to insitix's session-backed
-`current_organisation`. A repo's conversations are the Sessions whose Worktree carries that `repo`
-string, within the tenant. "Recent repos" come for free from
+a session string (`session[:rbrun_repo]`), session-backed like any other current-workspace selector.
+A repo's conversations are the Sessions whose Worktree carries that `repo` string, within the tenant.
+"Recent repos" come for free from
 `Worktree.for_tenant(t).distinct.pluck(:repo)`; the full universe comes from GitHub on demand.
 
 This retires the hardcoded `default_worktree` / `RBRUN_WORKTREE_REPO` fallback in
@@ -42,51 +42,49 @@ This retires the hardcoded `default_worktree` / `RBRUN_WORKTREE_REPO` fallback i
 
 ---
 
-## 2. Faithful shell port (behaviours identical; only content differs)
+## 2. The sidebar shell (behaviours fixed; only content differs)
 
-Port these insitix pieces **as-is in behaviour**, into rbrun's DSL (`Rbrun::Ui::*`,
-`Rbrun::ApplicationViewComponent`, the `component()` helper) and Stimulus registry. insitix uses
-`Primitives::` + `ApplicationComponent` + bare `class_names`; rbrun uses `Rbrun::Ui::` +
-`Rbrun::ApplicationViewComponent` + `helpers.class_names` (or `cn` for tailwind-merge). Adapt the
-namespace and helper access **only** — never the behaviour.
+These pieces live in rbrun's DSL (`Rbrun::Ui::*`, `Rbrun::ApplicationViewComponent`, the `component()`
+helper) and Stimulus registry. rbrun uses `Rbrun::Ui::` + `Rbrun::ApplicationViewComponent` +
+`helpers.class_names` (or `cn` for tailwind-merge).
 
 ### 2.1 Components (`app/components/rbrun/ui/…`)
 
-- **`dropdown`** ← insitix `Primitives::Dropdown`. Trigger + floating panel; `renders_one :trigger`,
+- **`dropdown`** — trigger + floating panel; `renders_one :trigger`,
   `renders_one :menu, Rbrun::Ui::Menu::Component`. `placement`/`offset`/`trigger_class`/`panel_class`.
   Positioning + open/close/outside-press/Escape/focus owned by the `dropdown` Stimulus controller.
-- **`menu`** ← insitix `Primitives::Menu`. `renders_many :items` with `link`/`current`/`header`/
+- **`menu`** — `renders_many :items` with `link`/`current`/`header`/
   `separator` builders (`m.link`, `m.current`, `m.header`, `m.separator`). Each link is
   `role="menuitem"` + `data-menu-target="item"`; `avatar:`/`icon:`/`active:`/`disabled:` supported.
-- **`nav_item`** ← insitix `Primitives::NavItem`. Icon + label row; auto-active via `current_page?`;
-  the collapse fade classes (`group-data-[collapsed]/sidebar:*`) copied verbatim.
-- **`nav_group`** ← insitix `Primitives::NavGroup`. Group heading that swaps to a 1px rule when the
-  rail is collapsed. Copied verbatim.
+- **`nav_item`** — icon + label row; auto-active via `current_page?`;
+  the collapse fade classes (`group-data-[collapsed]/sidebar:*`).
+- **`nav_group`** — group heading that swaps to a 1px rule when the
+  rail is collapsed.
 
 ### 2.2 Stimulus controllers (`app/javascript/rbrun/controllers/…`, registered in `rbrun.js`)
 
-- **`sidebar`** ← insitix `sidebar_controller.js` (verbatim). `data-collapsed` is the single source of
+- **`sidebar`** — `data-collapsed` is the single source of
   truth; `data-ready` gated after two rAFs to kill the Turbo open→closed flash; state persisted in the
   `sidebar_collapsed` cookie so the **server renders collapsed markup directly**.
-- **`dropdown`** ← insitix `dropdown_controller.js` (verbatim). **Depends on `@floating-ui/dom`** —
+- **`dropdown`** — **depends on `@floating-ui/dom`** —
   add it to `package.json` devDeps and the bun bundle. Owns visibility, floating position
   (offset/flip/shift + autoUpdate), outside-press dismiss, Escape, focus return, focus-first-item.
-- **`menu`** ← insitix `menu_controller.js` (verbatim). Roving-tabindex WAI-ARIA keyboard nav;
+- **`menu`** — roving-tabindex WAI-ARIA keyboard nav;
   IntersectionObserver resets to the first item when the menu becomes visible.
 
 ### 2.3 Layout + header
 
-- **`_sidebar_header`** ← insitix `layouts/_sidebar_header.html.erb`, adapted: rbrun logo/wordmark +
-  collapsed mark + rail-hover toggler + the panel toggle button. Same collapse mechanics, same
+- **`_sidebar_header`** — rbrun logo/wordmark +
+  collapsed mark + rail-hover toggler + the panel toggle button. Collapse mechanics driven by
   `data-action="sidebar#toggle"`. (rbrun ships a simple wordmark; no SVG logo asset required — a text
   mark with the same three-face collapse behaviour is acceptable.)
-- **`layouts/rbrun/application.html.erb`** — rewritten from today's top-header into the
+- **`layouts/rbrun/application.html.erb`** — the
   `group/sidebar` shell: `w-64 ↔ w-16`, `data-controller="sidebar"`, `data-collapsed` from the cookie.
   Regions top→bottom: **header** (`_sidebar_header`) · **repo switcher** (§3) · **nav**
-  (`nav_item "Conversations"`) · **footer user menu** (dropdown opening upward → email + sign out,
-  ported from insitix's footer dropdown behaviour). `<main>` renders `yield`.
+  (`nav_item "Conversations"`) · **footer user menu** (dropdown opening upward → email + sign out).
+  `<main>` renders `yield`.
 
-### 2.4 Explicitly OUT of scope (insitix app-shell extras, not the sidebar)
+### 2.4 Explicitly OUT of scope (app-shell extras, not the sidebar)
 
 `account_meter` (billing/quota), `drawer`/`dialog`/`confirm_dialog`, the `#flash` toast surface, the
 `turbo_stream_from "user_#{id}"` user stream, and the Communication/Bibliothèque nav groups. None are
@@ -94,21 +92,19 @@ part of "the sidebar shell + behaviours"; they can come later if wanted.
 
 ---
 
-## 3. The repo switcher content (the ONE thing that isn't a static port)
+## 3. The repo switcher content (the ONE dynamic piece)
 
-insitix's org switcher is a **static** `menu` (list of `m.link` orgs). rbrun's repo universe is
-unbounded (the PAT "sees everything"), so the switcher's _content_ is a **command-menu**: insitix's
-`Command`/`Combobox` search UX (search box → filtered list → check on current → keyboard nav),
-reproduced in Stimulus (rbrun has no React/`cmdk`), fed by **server-side GitHub search**.
+rbrun's repo universe is unbounded (the PAT "sees everything"), so the switcher's _content_ is a
+**command-menu**: a search box → filtered list → check on current → keyboard nav, implemented in
+Stimulus (rbrun has no React/`cmdk`), fed by **server-side GitHub search**.
 
 - **Face (trigger):** current repo as `owner/name` + `chevrons-up-down`, or _"Select a repository"_
-  when none is chosen (insitix's empty-state analogue). Rendered via the ported `dropdown` trigger
+  when none is chosen (the empty state). Rendered via the `dropdown` trigger
   slot; broadcast-target-friendly (`id="repo_label"`) so a future tool could redraw it in place.
 - **Panel:** a search `<input>` (autofocused on open) + a Turbo-frame result list of `menu` items.
-- **`command` Stimulus controller** (new, small — the rbrun reproduction of the Combobox behaviour):
-  debounces input (~200ms) and drives the Turbo request that swaps the result list. Keyboard nav is
-  the ported `menu` controller. This is the only genuinely new JS; it mirrors `Combobox`'s role
-  (own the query, feed the list) without React.
+- **`command` Stimulus controller** (small): debounces input (~200ms) and drives the Turbo request
+  that swaps the result list. Keyboard nav is the `menu` controller. This is the only genuinely new
+  JS; it owns the query and feeds the list, without React.
 - **Data:** `Rbrun::GithubRepos` service (§4) → `search(query:)`. Empty query returns recent/updated
   repos; a query hits GitHub search. Rows are `owner/name` (+ `default_branch`, `private`).
 - **Choosing a repo** → sets `session[:rbrun_repo]`, records nothing in the DB, redirects to the repo's
@@ -141,7 +137,7 @@ volume low); a short TTL cache is a later optimization.
 - **`Rbrun::RepositoriesController`**
   - `GET /repos` (`index`) — the command-menu result list (Turbo frame); `params[:q]` → `GithubRepos#search`.
   - `POST /repos/switch` — body `{ repo: "owner/name" }` → set `session[:rbrun_repo]`, redirect to
-    `sessions_path`. (insitix's `switch_organisation_path`, `turbo_method: :post` analogue.)
+    `sessions_path`. (`turbo_method: :post`.)
 - **`Rbrun::SessionsController`**
   - `index` — scope to `current_repo`: `Session.for_tenant(t).joins(:worktree).where(rbrun_worktrees: { repo: current_repo })`. Empty/prompt state when `current_repo` is nil.
   - `create` — replace `default_worktree` with `worktree_for(current_repo)`:

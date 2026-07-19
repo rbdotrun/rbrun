@@ -1,7 +1,7 @@
 module Rbrun
   module Ui
     module Dropdown
-      # A trigger + a floating menu panel. Ported from insiti Primitives::Dropdown. Positioning is
+      # A trigger + a floating menu panel. Positioning is
       # computed by Floating UI in the `dropdown` Stimulus controller (offset / flip / shift, tracks
       # on scroll+resize); the controller also owns toggle, outside-click dismiss, Escape-to-close,
       # focus return, and focus-first-item on open.

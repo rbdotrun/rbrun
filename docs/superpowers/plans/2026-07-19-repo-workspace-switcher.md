@@ -3,8 +3,8 @@
 > **For agentic workers:** execute task-by-task, TDD. Steps use `- [ ]`. Spec:
 > `docs/superpowers/specs/2026-07-19-repo-workspace-switcher-design.md`.
 
-**Goal:** Left sidebar with a repo switcher below the logo — faithful port of insitix's sidebar
-shell/behaviours, content swapped orgs→repos; repo = session-backed workspace; switcher fed by
+**Goal:** Left sidebar with a repo switcher below the logo — the sidebar shell and its behaviours,
+with repos as the switchable content; repo = session-backed workspace; switcher fed by
 server-side GitHub search.
 
 **Tech:** ViewComponent (`Rbrun::Ui::*` DSL), Stimulus (+ `@floating-ui/dom`), Turbo frames, Faraday
@@ -28,9 +28,9 @@ on async-http, minitest (DI, no mocks), bun bundle.
 **Interfaces produced:** `Rbrun::Ui::Menu::Component` (`m.link/current/header/separator`),
 `Rbrun::Ui::Dropdown::Component` (`renders_one :trigger`, `renders_one :menu`).
 
-- [ ] Port `Primitives::Menu` → `Rbrun::Ui::Menu::Component` (namespace + `helpers.class_names`/`safe_join`; keep item classes verbatim). Nested item classes as inner ViewComponents rendered via `call`.
-- [ ] Port `Primitives::Dropdown` → `Rbrun::Ui::Dropdown::Component` (`renders_one :menu, Rbrun::Ui::Menu::Component`; erb_template with the `data-controller="dropdown"` contract).
-- [ ] Port `menu_controller.js` + `dropdown_controller.js` verbatim; register both in `rbrun.js`; add `@floating-ui/dom` to devDeps + `bun add`.
+- [ ] Build `Rbrun::Ui::Menu::Component` (`helpers.class_names`/`safe_join`; keep item classes exact). Nested item classes as inner ViewComponents rendered via `call`.
+- [ ] Build `Rbrun::Ui::Dropdown::Component` (`renders_one :menu, Rbrun::Ui::Menu::Component`; erb_template with the `data-controller="dropdown"` contract).
+- [ ] Build `menu_controller.js` + `dropdown_controller.js`; register both in `rbrun.js`; add `@floating-ui/dom` to devDeps + `bun add`.
 - [ ] Test: render a dropdown with trigger + `m.current`/`m.link`/`m.separator`; assert `role="menu"`, `role="menuitem"`, `data-dropdown-target`, active check icon.
 - [ ] `bin/rails test test/components/rbrun/menu_dropdown_test.rb`, rubocop, commit.
 
@@ -39,7 +39,7 @@ on async-http, minitest (DI, no mocks), bun bundle.
 **Files:** Create `app/components/rbrun/ui/nav_item/component.rb`, `app/components/rbrun/ui/nav_group/component.rb`;
 Test append to `test/components/rbrun/menu_dropdown_test.rb`.
 
-- [ ] Port both verbatim (namespace + `helpers.class_names`/`helpers.current_page?`/`helpers.lucide_icon`; keep collapse fade classes exact).
+- [ ] Build both (`helpers.class_names`/`helpers.current_page?`/`helpers.lucide_icon`; keep collapse fade classes exact).
 - [ ] Test: nav_item active (explicit `active: true`) → `aria-current="page"` + ACTIVE classes; nav_group renders label + the collapsed 1px LINE span.
 - [ ] test, rubocop, commit.
 
@@ -51,7 +51,7 @@ Test append to `test/components/rbrun/menu_dropdown_test.rb`.
 
 **Interfaces consumed:** Task 1/2 components. **Produced:** the `group/sidebar` shell.
 
-- [ ] Port `sidebar_controller.js` verbatim; register in `rbrun.js`.
+- [ ] Build `sidebar_controller.js`; register in `rbrun.js`.
 - [ ] `_sidebar_header`: rbrun wordmark + collapsed mark + rail-hover toggler + toggle button; same `sidebar#toggle` actions + collapse classes (text mark, no SVG).
 - [ ] Rewrite `application.html.erb`: `group/sidebar w-64 data-[collapsed]:w-16`, `data-controller="sidebar"`, `data-collapsed` from `cookies[:sidebar_collapsed]`. Regions: header · repo-switcher placeholder (Task 5) · `nav_item "Conversations"` · footer user-menu dropdown (email + sign out). `<main>` = yield.
 - [ ] Test: signed-in `GET /rbrun/c` renders `#navbar[data-controller="sidebar"]`, the Conversations nav_item, the footer email; with `sidebar_collapsed=1` cookie the element has `data-collapsed`.

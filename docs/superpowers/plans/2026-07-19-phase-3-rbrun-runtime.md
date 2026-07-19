@@ -42,7 +42,7 @@ runtime.run(
 - `lib/rbrun/runtime.rb` — `module Rbrun::Runtime`, `Error`, `ADAPTERS`, `.new` dispatcher.
 - `lib/rbrun/runtime/version.rb`
 - `lib/rbrun/runtime/claude_sdk.rb` — the adapter (staging + run loop + tool bridge + `to_canonical`).
-- `lib/rbrun/runtime/assets/client.ts` — the Agent SDK driver (ported from insiti, gem asset).
+- `lib/rbrun/runtime/assets/client.ts` — the Agent SDK driver (gem asset).
 - `lib/rbrun/runtime/assets/tsconfig.json`
 - `test/test_helper.rb` + `test/rbrun/runtime/*_test.rb` + `test/support/protocol_script.sh`
 
@@ -154,43 +154,29 @@ module Rbrun
 end
 ```
 
-- [ ] **Step 3: stage the `client.ts` + `tsconfig.json` assets**
+- [ ] **Step 3: author the `client.ts` + `tsconfig.json` assets**
 
-Copy the driver verbatim from the newer insiti source, then apply exactly two edits (it is otherwise generic and domain-free):
+`client.ts` is a generic, domain-free Agent SDK driver. Create the assets directory and write the driver, pinning the two rbrun-specific values called out below:
 
 ```bash
 mkdir -p gems/rbrun-runtime/lib/rbrun/runtime/assets
-cp /Users/ben/Desktop/insiti-files/app/clients/claude_sdk/agent/client.ts gems/rbrun-runtime/lib/rbrun/runtime/assets/client.ts
-cp /Users/ben/Desktop/insiti-files/app/clients/claude_sdk/tsconfig.json  gems/rbrun-runtime/lib/rbrun/runtime/assets/tsconfig.json
 ```
 
-Edit 1 — rename the MCP server (in `client.ts`):
-```
-const SERVER = "insitix";
-```
-→
+The MCP server name is `rbrun` (in `client.ts`):
 ```
 const SERVER = "rbrun";
 ```
 
-Edit 2 — neutralize the two French user-facing deny messages to English (in `canUseTool`):
-```
-message: `L'outil ${toolName} n'est pas disponible. Utilise uniquement tes outils dédiés.`,
-```
-→
+The two user-facing deny messages in `canUseTool` read in English:
 ```
 message: `Tool ${toolName} is not available. Use only your dedicated tools.`,
 ```
 and
 ```
-message: "En attente de validation de l'utilisateur.",
-```
-→
-```
 message: "Awaiting user approval.",
 ```
 
-Everything else in `client.ts` stays as-is (protocol, Zod schema build, `canUseTool` gate, `drain`, the flushing error handler). Confirm the emitted protocol matches the Runner: `session · token · assistant · tool_request · needs_approval · builtin_tool_use · builtin_tool_result · result · error`, and stdin `tool_response {id, result, is_error}`.
+`tsconfig.json` is the standard Bun/TypeScript config the driver compiles under. The rest of `client.ts` is the generic driver: the protocol, the Zod schema build, the `canUseTool` gate, `drain`, and the flushing error handler. Confirm the emitted protocol matches the Runner: `session · token · assistant · tool_request · needs_approval · builtin_tool_use · builtin_tool_result · result · error`, and stdin `tool_response {id, result, is_error}`.
 
 - [ ] **Step 4: failing dispatch test**
 
@@ -263,7 +249,7 @@ Expected: PASS (3 runs, 0 failures).
 
 ```bash
 git add gems/rbrun-runtime Gemfile.lock
-git commit -m "feat(runtime): rbrun-runtime skeleton — dispatcher + client.ts asset (ported)"
+git commit -m "feat(runtime): rbrun-runtime skeleton — dispatcher + client.ts asset"
 ```
 
 ---
@@ -938,7 +924,7 @@ git commit -m "feat(dogfood): runtime — a real Claude turn in a Daytona box (P
 - Deliverables: gem + unit tests for pure stream-parsing/dispatch (`to_canonical` direct; the loop against a real local process, not a stub) → Tasks 3–4. Dogfood gate `runtime.rake` (real turn on local, no engine) → Task 5. ✓
 - Sandbox-agnostic loop (runs on local + daytona) → the Runner drives only the sandbox contract; the uniform-timeout patch (Task 2) is what lets it. ✓
 
-**2. Placeholder scan:** No TODO/"handle edge cases"/"similar to". The Task 1 `ClaudeSdk` stub is explicitly replaced in Task 3. `client.ts` is a verbatim copy with two exact, shown edits. Every Ruby block is complete.
+**2. Placeholder scan:** No TODO/"handle edge cases"/"similar to". The Task 1 `ClaudeSdk` stub is explicitly replaced in Task 3. `client.ts` is a generic driver with the two rbrun-specific values shown explicitly. Every Ruby block is complete.
 
 **3. Type/name consistency:** `Rbrun::Runtime.new(provider:, sandbox:, config:)`; `ClaudeSdk#run(prompt:, system:, tools:, skills:, resume:, tool_handler:, on_event:)`; events are symbol-keyed hashes with `:type`; `tool_handler` returns `{ result:, is_error: }`; `run_over_session` drives `@sandbox.session_create/session_exec/session_input/session_command/session_logs_follow` — the exact Phase 2 contract; `SERVER = "rbrun"` matches the `client.ts` edit and the `mcp__rbrun__` prefix the driver builds.
 

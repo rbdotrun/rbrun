@@ -4,7 +4,7 @@
 
 **Goal:** Build the first provider sub-gem, `rbrun-sandbox` — a pure-Ruby gem exposing one normalized `exec / file / process-session` contract behind two adapters, `local` (offline host executor) and `daytona` (cloud, Faraday+async-http), selected by `Rbrun::Sandbox.new(provider:)`.
 
-**Architecture:** A standalone gem under `gems/rbrun-sandbox` that **depends on nothing in rbrun**. `Rbrun::Sandbox.new(provider:, config:, labels:)` resolves an adapter by constant lookup in its own namespace and hands it the explicit config; the adapter validates its own config (fail-fast). `local` runs real processes in a host directory (so the agent loop runs offline in Phase 3); `daytona` is a faithful port of insitix's `Daytona::Client` (the wire) + `Workspace` (the contract), normalized to shared value objects.
+**Architecture:** A standalone gem under `gems/rbrun-sandbox` that **depends on nothing in rbrun**. `Rbrun::Sandbox.new(provider:, config:, labels:)` resolves an adapter by constant lookup in its own namespace and hands it the explicit config; the adapter validates its own config (fail-fast). `local` runs real processes in a host directory (so the agent loop runs offline in Phase 3); `daytona` pairs `Daytona::Client` (the wire) with `Workspace` (the contract), normalized to shared value objects.
 
 **Tech Stack:** Ruby (pure gem, no Rails/ActiveSupport), Faraday + `async-http` + `async-http-faraday` + `faraday-multipart`, Minitest, Open3.
 
@@ -771,7 +771,7 @@ git commit -m "feat(sandbox): Local adapter — process sessions (spawn/stream/i
 
 - Produces: `Rbrun::Sandbox::Daytona::Client.new(api_key:, api_url:, dockerfile: nil, snapshot_name: nil, cpu: nil, memory: nil, disk: nil)` with `Client::Error` and the full wire surface: `find_or_create(labels)`, `find_by_labels`, `await_started`, `request_start`, `destroy(id)`, snapshot machinery (`snapshot_ref`, `ensure_snapshot`, `create_snapshot`, `snapshot_state`, `await_snapshot_active`), `exec(id, command, timeout:)`, `download(id, path)`, `create_session`, `session_exec`, `session_input`, `session_command`, `session_logs_follow`, `create_folder`, `upload(id, path, source)`.
 
-This is a **faithful port of the newer insiti `app/clients/daytona/client.rb`** (the snapshot-based one). Changes from the source: (1) credentials + **the snapshot Dockerfile and resources come from constructor kwargs** (`dockerfile`/`snapshot_name`/`cpu`/`memory`/`disk`), not `Rails.application.credentials` and not a hardcoded insiti image — **the host injects its own Dockerfile**; a minimal bun+shell `DEFAULT_DOCKERFILE` applies when none is given; (2) the insiti-specific office2text/base64 embedding is dropped (hosts add tooling in their own Dockerfile); (3) module namespace `Rbrun::Sandbox::Daytona`; (4) ActiveSupport idioms replaced with core Ruby (`blank?` → `nil?/empty?`, `.in?(arr)` → `arr.include?`); (5) `require "json"/"digest"/"cgi"` added. The box is a self-built, content-addressed Daytona **snapshot** (built server-side from the Dockerfile string, reused across turns).
+This is the snapshot-based `Daytona::Client`. Its design: (1) credentials + **the snapshot Dockerfile and resources come from constructor kwargs** (`dockerfile`/`snapshot_name`/`cpu`/`memory`/`disk`), never `Rails.application.credentials` and never a hardcoded image — **the host injects its own Dockerfile**; a minimal bun+shell `DEFAULT_DOCKERFILE` applies when none is given; (2) no office2text/base64 embedding — hosts add tooling in their own Dockerfile; (3) module namespace `Rbrun::Sandbox::Daytona`; (4) core Ruby only, no ActiveSupport (`nil?/empty?` not `blank?`, `arr.include?` not `.in?(arr)`); (5) `require "json"/"digest"/"cgi"` at the top. The box is a self-built, content-addressed Daytona **snapshot** (built server-side from the Dockerfile string, reused across turns).
 
 - [ ] **Step 1: Write the failing (network-free) test**
 
@@ -1272,7 +1272,7 @@ end
 Run: `(cd gems/rbrun-sandbox && bundle exec ruby -Ilib -Itest test/rbrun/sandbox/daytona_adapter_test.rb)`
 Expected: FAIL (adapter body is empty).
 
-- [ ] **Step 3: Implement the adapter (port of insitix `Workspace`, normalized)**
+- [ ] **Step 3: Implement the adapter (the normalized `Workspace` contract)**
 
 Replace `gems/rbrun-sandbox/lib/rbrun/sandbox/daytona.rb` with:
 

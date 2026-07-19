@@ -2,7 +2,7 @@ module Rbrun
   module Ui
     module NavItem
       # A single sidebar navigation row: leading lucide icon + label, with a real active state.
-      # Ported from insiti Primitives::NavItem. Active is auto-detected from the current request path
+      # Active is auto-detected from the current request path
       # (exact match via current_page?) unless an explicit active: is passed.
       #
       #   <%= component("nav_item", label: "Conversations", href: sessions_path, icon: "messages-square") %>

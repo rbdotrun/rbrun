@@ -4,7 +4,7 @@
 
 **Goal:** The working conversation UI — mandatory auth, the live broadcast/timeline engine, the ViewComponents (on Phase 7 primitives), controllers/jobs/routes, the 3 Stimulus controllers, a Worktree commit pane — so a logged-in user posts a message, watches the turn stream, approves a gated call, and sees the branch's commits.
 
-**Architecture:** Auth is mandatory (no `c.user` and no host `current_user` override ⇒ raise at boot; every controller requires a session). The turn runs in a job; the model broadcasts over `Turbo::StreamsChannel` — a `Session#broadcast_event` re-uses the `Timeline` segment computation to **append a new segment or replace one in place** (live == reload); `broadcast_status` swaps the composer + working indicator. The `Timeline`/`Segment` components render prose / internal / a tools accordion (with the approval footer on a `pending` gate). Ported ~1:1 from insitix, adapted `Chat→Session`, sandbox→`Worktree`, artifacts→a commit pane.
+**Architecture:** Auth is mandatory (no `c.user` and no host `current_user` override ⇒ raise at boot; every controller requires a session). The turn runs in a job; the model broadcasts over `Turbo::StreamsChannel` — a `Session#broadcast_event` re-uses the `Timeline` segment computation to **append a new segment or replace one in place** (live == reload); `broadcast_status` swaps the composer + working indicator. The `Timeline`/`Segment` components render prose / internal / a tools accordion (with the approval footer on a `pending` gate). The conversation aggregate is `Session`, the sandbox surface is a `Worktree`, and completed work surfaces as a commit pane.
 
 **Tech Stack:** turbo-rails 8, stimulus 3, ActionCable (async adapter for test/dev), ViewComponent (Phase 7 DSL), Tailwind v4 + bun, `redcarpet` (markdown), `lucide-rails`, Minitest.
 
@@ -14,7 +14,7 @@
 - **The turn runs in a JOB, never inline in a request** (a 30–60s turn dies with the HTTP request). Approvals + resumes enqueue jobs.
 - **Append-only log:** `run_turn`/`continue_turn!`/`resume_turn!` rescue `Exception` (for `Async::Cancel`) → `failed!`, never rolling back ingested rows.
 - **Live == reload:** broadcasts render segments from the *same* `Timeline` computation the page-load render uses (`broadcast_event` / `segment_locals_for`). Tokens are coalesced server-side — never per-token broadcast.
-- **Naming:** `rbrun_session_<id>` stream; `Rbrun::Conversation::*::Component`; Worktree commit pane replaces insiti's artifacts region.
+- **Naming:** `rbrun_session_<id>` stream; `Rbrun::Conversation::*::Component`; a Worktree commit pane is the completed-work region.
 - **Dogfood:** `lib/tasks/rbrun/dogfood/browser.rake`, headless, real turn; creds from `.env`.
 
 ---
@@ -201,7 +201,7 @@ git commit -m "feat(ui): mandatory auth — Authentication concern + login contr
 
 **Interfaces:** `Session#{broadcast_event,segment_locals_for,turns,timeline,open_turn_lead,continue_turn!,resume_turn!}` + private `broadcast_status/broadcast_composer/broadcast_working`; `SessionMessage#{decide_approval!,run_frozen_call!,visible?,broadcastable?,finalized?}` + broadcast callbacks + `RENDERED_EVENTS`/`BROADCAST_EVENTS`; `AgentTurn#{continue,resume}` + `resume_prompt` + `internal` rows.
 
-- [ ] **Step 1: `SessionMessage`** — add (ported from insitix `ChatMessage`, `chat`→`session`):
+- [ ] **Step 1: `SessionMessage`** — add:
 
 ```ruby
     RENDERED_EVENTS  = %w[text tool_use tool_result internal].freeze
@@ -258,9 +258,9 @@ git commit -m "feat(ui): mandatory auth — Authentication concern + login contr
     def broadcast_finalized_event = session.broadcast_event(self, created: false)
 ```
 
-- [ ] **Step 2: `Session`** — add `broadcast_event`/`segment_locals_for`/`timeline`/`turns`/`open_turn_lead`, `continue_turn!`/`resume_turn!` (mirror `run_turn`), and the private `broadcast_status`/`broadcast_composer`/`broadcast_working` (from insitix `Chat`, `chat`→`session`, drop rating/artifacts). Add `after_update_commit :broadcast_status, if: :saved_change_to_status?`. The commit pane broadcast: after `record_commits!`, `broadcast_replace_to "rbrun_session_#{id}", target: "commits_#{id}", partial: "rbrun/conversations/commits"` (Task 6). Keep the Phase 6 `run_turn` (it also records commits); wrap the `working!…done!/failed!` body identically in `continue_turn!`/`resume_turn!` calling `turn.continue(nudge)` / `turn.resume`.
+- [ ] **Step 2: `Session`** — add `broadcast_event`/`segment_locals_for`/`timeline`/`turns`/`open_turn_lead`, `continue_turn!`/`resume_turn!` (mirror `run_turn`), and the private `broadcast_status`/`broadcast_composer`/`broadcast_working` (no rating, no artifacts region). Add `after_update_commit :broadcast_status, if: :saved_change_to_status?`. The commit pane broadcast: after `record_commits!`, `broadcast_replace_to "rbrun_session_#{id}", target: "commits_#{id}", partial: "rbrun/conversations/commits"` (Task 6). Keep the Phase 6 `run_turn` (it also records commits); wrap the `working!…done!/failed!` body identically in `continue_turn!`/`resume_turn!` calling `turn.continue(nudge)` / `turn.resume`.
 
-- [ ] **Step 3: `AgentTurn`** — add `continue(nudge)` and `resume` (port from insitix; log an `internal` row, then `call_client(nudge)` / `call_client(resume_prompt)` without a user row; `resume_prompt` restates the last user message). `call_client` = the existing `run`'s runtime call factored so `run`/`continue`/`resume` share it.
+- [ ] **Step 3: `AgentTurn`** — add `continue(nudge)` and `resume`: log an `internal` row, then `call_client(nudge)` / `call_client(resume_prompt)` without a user row; `resume_prompt` restates the last user message. `call_client` = the existing `run`'s runtime call factored so `run`/`continue`/`resume` share it.
 
 - [ ] **Step 4: tests + commit** — unit-test with the FakeRuntime pattern (DI): a gated turn then `decide_approval!("approve")` runs the frozen tool and logs a `tool_result`; `turns`/`timeline` group correctly; `broadcast_event` is exercised via the segment computation (Task 4 covers rendering). Run `bin/rails test test/models/rbrun`.
 
@@ -282,18 +282,18 @@ git commit -am "feat(ui): conversation helpers — markdown, tool_body, approval
 
 ### Task 4: conversation ViewComponents
 
-Port `base`/`turn`/`timeline`/`segment` (+ erb) + `tools_validation/{base,default}` verbatim from insitix into `Rbrun::Conversation::*::Component < Rbrun::ApplicationViewComponent`, with these adaptations:
-- `Custom::Conversation::` → `Rbrun::Conversation::`; `chat` → `session`; `chat.id`/`chat.working?`/`chat.turns` unchanged in meaning.
-- **turn component:** drop the `attachments`, `artifacts`, and `rating` renders; replace the insiti logo `image_tag` with `<%= lucide_icon("sparkles", class: "size-5 text-default-600") %>`.
+Build `base`/`turn`/`timeline`/`segment` (+ erb) + `tools_validation/{base,default}` as `Rbrun::Conversation::*::Component < Rbrun::ApplicationViewComponent`, with these details:
+- Namespace `Rbrun::Conversation::`; the aggregate is `session`, driving `session.id`/`session.working?`/`session.turns`.
+- **turn component:** renders prose only — no `attachments`, `artifacts`, or `rating` renders; the header uses `<%= lucide_icon("sparkles", class: "size-5 text-default-600") %>`.
 - **base component:** `turbo_stream_from "rbrun_session_#{session.id}"`; keep the autoscroll viewport + `#conversation_<id>` + `#composer`; render `messages/form`. Append a `<div id="commits_<id>">` region (the commit pane, Task 6).
-- **segment/timeline:** the computation ports **unchanged** (`segments`/`results`/`open_at?`/`anchor?`/`segment_index_for`/`dom_id_for`/`steps`/`APPROVAL_BADGES`/`tool_hint`); `helpers.markdown`/`lucide_icon`/`class_names`/`pluralize`/`number_to_human_size`/`tool_body`/`tools_validation_component`/`approval_actions` resolve from Task 3 + lucide-rails + Rails.
+- **segment/timeline:** the segment computation (`segments`/`results`/`open_at?`/`anchor?`/`segment_index_for`/`dom_id_for`/`steps`/`APPROVAL_BADGES`/`tool_hint`); `helpers.markdown`/`lucide_icon`/`class_names`/`pluralize`/`number_to_human_size`/`tool_body`/`tools_validation_component`/`approval_actions` resolve from Task 3 + lucide-rails + Rails.
 - Components use plain `def initialize(...)` + `attr_reader` (no `option`), subclassing the DSL base only for `component()` + `erb_template`/sidecar.
-- The `_turn.html.erb`/`_segment.html.erb` partials render the components directly (drop insiti's `preset(...)`).
+- The `_turn.html.erb`/`_segment.html.erb` partials render the components directly (no `preset(...)` indirection).
 
 Test (`test/components/rbrun/timeline_test.rb`): build a `Session` + `SessionMessage` rows (user text, an assistant text, a tool_use + tool_result pair, a pending gate) and `render_inline` the `Timeline` — assert a prose block, a "1 action"/"2 actions" accordion, the tool name, and the approval form on the pending gate. Then `bin/rails test test/components`.
 
 ```bash
-git commit -am "feat(ui): conversation components — base, turn, timeline, segment, tools_validation (ported)"
+git commit -am "feat(ui): conversation components — base, turn, timeline, segment, tools_validation"
 ```
 
 ---
@@ -347,7 +347,7 @@ git commit -am "feat(dogfood): browser — a real conversation renders end to en
 
 **1. Spec coverage (Phase 8 contract):** MessagesController/ApprovalsController + atomic `decide_approval!` + job-resume (Tasks 2,5) ✓; 3 jobs (5) ✓; broadcast engine append/replace + `segment_locals_for` + `broadcast_status`/`composer`/`working` + coalesced tokens (2) ✓; timeline/segment/turn/base components on Phase 7 primitives (4) ✓; 3 Stimulus controllers (6) ✓; routes + login (mandatory auth) (1,5) ✓; Worktree commit pane (6) ✓; mounted in test/dummy (1) ✓; browser dogfood (7) ✓.
 
-**2. Placeholder scan:** Tasks reference verbatim insitix source (extracted) with named, mechanical adaptations (`Chat→Session`, namespace, drop artifacts/rating/attachments) — not placeholders. New code (auth, helpers, commit pane, config validate) is given in full.
+**2. Placeholder scan:** Tasks specify concrete components and behaviours with named structural choices (the `Session` aggregate, the `Rbrun::Conversation::` namespace, no artifacts/rating/attachments) — not placeholders. New code (auth, helpers, commit pane, config validate) is given in full.
 
 **3. Type/name consistency:** `rbrun_session_<id>` stream everywhere; `Session#broadcast_event(msg, created:)`/`segment_locals_for`/`turns`; `SessionMessage#decide_approval!`/`run_frozen_call!` (uses `ApplicationTool.find` + `in_session`); `Rbrun::Conversation::*::Component`; `current_tenant = current_user.tenant`; routes `login`/`sessions`/`approvals` match the controllers.
 

@@ -1,7 +1,7 @@
 module Rbrun
   module Ui
     module NavGroup
-      # A sidebar group heading. Ported from insiti Primitives::NavGroup. The box keeps the same fixed
+      # A sidebar group heading. The box keeps the same fixed
       # height in both rail states: expanded it shows the label; collapsed the label fades out and a
       # short 1px separator fades in at its place, so the rows below never move.
       #

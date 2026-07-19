@@ -1,4 +1,4 @@
-# rbrun — porting the insitix agentic runner into a Rails engine + provider sub-gems
+# rbrun — an agentic runner as a Rails engine + provider sub-gems
 
 **Date:** 2026-07-19
 **Status:** Design approved in principle; phases contracted. Per-phase plans written just-in-time.
@@ -7,21 +7,20 @@
 
 ## 1. Goal
 
-Port "the meat" of the insitix Claude SDK runner — the **agentic runner**, the **skill pattern**,
-and the **sandbox backend** — out of the `insitix` Rails app and into a reusable, mountable Rails
-engine (`rbrun`), decomposed into provider-based sub-gems.
+`rbrun` is a Claude SDK runner built as a reusable, mountable Rails engine, decomposed into
+provider-based sub-gems. Its core is "the meat": the **agentic runner**, the **skill pattern**, and
+the **sandbox backend**.
 
 `rbrun` is, ultimately, a **separate application** that happens to ship as a mountable engine purely
 for frictionless deployment into a host Rails app. It owns its own database, its own assets, and
 (optionally) its own auth. The engine mounts for deployment convenience; conceptually it is its own
 product.
 
-### What we are NOT porting
+### What is out of scope
 
-- insitix **domain** tools and skills (`search-data`, `search-contacts`, immo/enseigne/ville/candidat,
-  campaigns, OCR, etc.). Only the **generic** runner machinery + a few generic built-in tools.
-- `skills-lock.json` (a developer design-eng skill toolchain, unrelated to the runner — the runner
-  discovers skills by directory listing, never by lockfile).
+- **Domain-specific** tools and skills. rbrun ships only the **generic** runner machinery + a few
+  generic built-in tools; any host-app domain entities and their tools/skills are the host's concern.
+- A skills lockfile: the runner discovers skills by directory listing, never by lockfile.
 - RubyLLM as a hard dependency of the sub-gems. It stays, but **scoped to the engine's tool base only**.
 
 ---
@@ -69,9 +68,9 @@ engine rbrun ──▶ rbrun-runtime ──▶ rbrun-sandbox      rbrun-dns[futu
 ActiveRecord. Extracting them keeps each independently testable and usable on its own, with an
 explicit config hash, outside any Rails app.
 
-### 2.2 The key insight from the source
+### 2.2 The key insight
 
-**The agentic loop is not in Ruby.** In insitix it is a self-contained `client.ts` (Claude Agent SDK
+**The agentic loop is not in Ruby.** It is a self-contained `client.ts` (Claude Agent SDK
 `query()`) that runs _inside the sandbox_ as a detached Bun process. Ruby is three things only:
 
 1. **transport** — drives the loop over an NDJSON stdout/stdin bridge (a Daytona _process session_);
@@ -80,7 +79,7 @@ explicit config hash, outside any Rails app.
 
 Terminal state comes **only** from the runner's own `result`/`error` events, never from the
 transport (hard-won reconnect discipline: on stream drop, re-check the process exitCode; if nil,
-reconnect from the last byte offset). This is preserved verbatim.
+reconnect from the last byte offset).
 
 Builtins (`Read`/`Write`/`Edit`/`Glob`/`Grep`/`Bash`) run **inside the sandbox** by the SDK (this is
 how the agent edits files and runs `git`). App tools run **in Ruby**. The agent's work lives in the
@@ -89,8 +88,8 @@ git tools (see the Worktree model, Phase 6); rbrun records the commit SHAs.
 
 > **Terminology — three distinct "session" concepts, kept separate throughout:**
 >
-> - **`Session` / `SessionMessage`** (§8) — the conversation aggregate and its per-event rows (the
->   renamed `Chat`/`ChatMessage`). The user-facing thing.
+> - **`Session` / `SessionMessage`** (§8) — the conversation aggregate and its per-event rows. The
+>   user-facing thing.
 > - **sandbox process session** (§2.3, `session_exec`/`session_logs_follow`) — the transport
 >   primitive that drives one turn's detached `bun client.ts` over stdout/stdin.
 > - **`sdk_session_id`** — the Claude Agent SDK's own resume handle, persisted on a `Session` and
@@ -143,9 +142,8 @@ module Rbrun            # in the engine — reads config, injects it into the pu
 end
 ```
 
-**Normalized `Event`** (defined in `rbrun-runtime`, shape borrowed from
-`apps/__nvoi-full-anthropic/lib/provider.rb`): one struct for every runner, vendor specifics land in
-`raw`. Event types map insitix's NDJSON protocol: `session · token · assistant · tool_request ·
+**Normalized `Event`** (defined in `rbrun-runtime`): one struct for every runner, vendor specifics
+land in `raw`. Event types cover the NDJSON protocol: `session · token · assistant · tool_request ·
 builtin_tool_use · builtin_tool_result · needs_approval · result · error`. Each runner adapter
 implements `#to_canonical(raw_line)` so `codex`/`gemini` runners can slot in later without changing
 the host.
@@ -153,15 +151,14 @@ the host.
 ### 2.3b HTTP invariant (all outbound HTTP)
 
 **Every outbound HTTP call in every gem uses Faraday on an async-ready adapter** (`async-http`), never
-Typhoeus/libcurl — exactly as insitix's `Daytona::Client` does (libcurl is not fork-safe under
-Falcon; the official vendor SDKs that bundle it are deliberately avoided). This is a hard,
-cross-cutting rule: `rbrun-sandbox` (daytona), `rbrun-runtime` (any HTTP a runner adapter makes), and
-the future `rbrun-dns`/`rbrun-servers` all build their clients on Faraday + async-http. The one
-documented exception insitix makes — a **raw async-http** streaming read for `session_logs_follow`
-(the Faraday async adapter buffers the whole body, which deadlocks a follow that only closes on
-process exit) — is carried over verbatim in the daytona adapter.
+Typhoeus/libcurl (libcurl is not fork-safe under Falcon; the official vendor SDKs that bundle it are
+deliberately avoided). This is a hard, cross-cutting rule: `rbrun-sandbox` (daytona), `rbrun-runtime`
+(any HTTP a runner adapter makes), and the future `rbrun-dns`/`rbrun-servers` all build their clients
+on Faraday + async-http. There is one documented exception — a **raw async-http** streaming read for
+`session_logs_follow` (the Faraday async adapter buffers the whole body, which deadlocks a follow that
+only closes on process exit) — in the daytona adapter.
 
-### 2.4 Skill pattern (ported as-is, lives in `rbrun-runtime`)
+### 2.4 Skill pattern (lives in `rbrun-runtime`)
 
 A skill = a **folder** with a `SKILL.md` (YAML frontmatter `name`/`description` + markdown body,
 optional `references/`, `examples/`). Discovery is filesystem-only; **no Ruby or TS ever names a
@@ -359,9 +356,8 @@ through the config-aware constructor, confirm a missing required key fails fast.
 **Scope:** normalized sandbox contract (`exec/exec_stream/upload/read/exist?/glob/create_folder/
 session_create/session_exec/session_input/session_command/session_logs_follow/destroy!`) +
 `ExecResult` + `FileUpload`; `sandbox_provider` family registration; **`local`** adapter (real host/
-docker executor, from `apps/.../documentrun` Local provider) + **`daytona`** adapter (lifted from
-insitix `Daytona::Client`/`Workspace`: Faraday-on-async-http, label-addressed, raw async-http for
-`session_logs_follow`). Depends on Phase 1.
+docker executor) + **`daytona`** adapter (`Daytona::Client`/`Workspace`: Faraday-on-async-http,
+label-addressed, raw async-http for `session_logs_follow`). Depends on Phase 1.
 **Deliverables:** `rbrun-sandbox` gem; unit tests for pure logic; local-adapter integration test.
 **Dogfood gates (two files, each hardcoded):**
 
@@ -408,7 +404,7 @@ tenancy + generic built-ins (an identity tool + one simple demo tool); `Rbrun::A
 → persistence, with status transitions (`working`/`done`/`needs_approval`/`failed`) and gate freezing.
 Host apps register their own tools. Depends on Phase 4.
 **Deliverables:** tool + turn tests (Runtime stubbed for the Ruby half); config-seeded dev tenant.
-**Dogfood gates (insiti-style, through `Session#run_turn` — real turns):**
+**Dogfood gates (through `Session#run_turn` — real turns):**
 
 - `dogfood/session_turn.rake` — a real turn; ✓/✗ on tools called + reply + no tool errored.
 - `dogfood/gate.rake` — a `needs_approval!` tool actually **parks** the run (`status=needs_approval`,
@@ -443,17 +439,17 @@ confirm the commit landed on the branch (GitHub) and its SHA was recorded.
 
 ### Phase 7 — Component DSL + primitives + assets pipeline
 
-The design-system foundation the conversation UI (Phase 8) is built from — migrated from the
-`work/insiti` ViewComponent DSL; the `view_component` gem is imported, the DSL is reproduced here.
+The design-system foundation the conversation UI (Phase 8) is built from — a ViewComponent DSL; the
+`view_component` gem is imported and the DSL is defined here.
 
 **Scope:** `Rbrun::ApplicationViewComponent` base — `view_component-contrib` + `Dry::Initializer`
 (`option`/`param`) + `StyleVariants` (`style do … variants`) + `tailwind_merge` postprocess + inline
 `erb_template`; the `component("name", …)` string-render helper + Stimulus auto-wiring
 (`controller_name`/`merged_data`); the ~6 primitives the conversation UI needs (spinner, button,
 badge, card, code_block, tooltip); Tailwind **v4** config (with the `default-*` brand palette) + the
-**bun** build wiring output to `app/assets/builds/rbrun/`; `lucide-rails` icons. Drop insiti's
-`Dry::Effects.Reader(:current_user)` (make identity optional) and the domain `ApplicationHelper` (keep
-only `component`/`svg`). Depends on Phase 6.
+**bun** build wiring output to `app/assets/builds/rbrun/`; `lucide-rails` icons. Identity is optional
+(no `Dry::Effects.Reader(:current_user)`) and the `ApplicationHelper` keeps only `component`/`svg` (no
+domain helpers). Depends on Phase 6.
 **Deliverables:** the DSL base + primitives with component render tests; the Tailwind+bun build
 producing `app/assets/builds/rbrun/{rbrun.css,rbrun.js}`.
 **Dogfood gate — `dogfood/components.rake`:** render each primitive through the DSL (variants + a
@@ -489,15 +485,15 @@ turn, the branch's new commits render. ✓/✗ + screenshots.
 
 ---
 
-## 10. Portability notes (from the source map)
+## 10. Component layering (coupling map)
 
-- **Plain Ruby / portable as-is:** `Daytona::FileUpload`, insitix `client.ts` (domain-free), the
-  normalized `Event`/`Usage` structs, the convention-based `.new(provider:)` constant lookup.
-- **Portable with light deps (parameterize credentials/logger/root):** `Daytona::Client`/`Workspace`,
-  `ClaudeSdk::Runner` (its only AR touchpoint is `@chat.sandbox` + credentials → injected).
-- **Rewritten as engine host (was Rails/AR/Turbo-coupled):** `AgentTurn` (→ `on_event`/`tool_handler`
-  sink), `ApplicationTool`/`AgentTools`, `Worktree`/`Session`/`SessionMessage` (insiti's
-  `Chat`/`ChatMessage`; insiti's `Artifact*` is dropped — work is GitHub git history), controllers/jobs/channels.
+- **Plain Ruby / no framework coupling:** `Daytona::FileUpload`, the `client.ts` agent (domain-free),
+  the normalized `Event`/`Usage` structs, the convention-based `.new(provider:)` constant lookup.
+- **Plain Ruby with light deps (credentials/logger/root injected):** `Daytona::Client`/`Workspace`,
+  `ClaudeSdk::Runner` (its only AR touchpoint is the sandbox + credentials → injected).
+- **Engine host (Rails/AR/Turbo-coupled):** `AgentTurn` (the `on_event`/`tool_handler` sink),
+  `ApplicationTool`/`AgentTools`, `Worktree`/`Session`/`SessionMessage` (the conversation aggregate;
+  there is no `Artifact*` — work is GitHub git history), controllers/jobs/channels.
 
 ```
 

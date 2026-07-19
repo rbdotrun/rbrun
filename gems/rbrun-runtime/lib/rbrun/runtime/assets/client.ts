@@ -279,17 +279,16 @@ async function main(): Promise<void> {
   // The tools that EXIST for this agent. Without this the SDK exposes its whole built-in surface,
   // and two of them break us outright:
   //
-  //   Agent/Task — the agent delegates a build to a subagent, which runs in ITS OWN context with no
-  //     access to our stdio bridge. It can Read/Write/Bash, so the build SUCCEEDS, and then every
-  //     mcp__insitix__* call returns "Stream closed" — including save_artifact_version. The artifact
-  //     compiles to disk and can never be stored. That is exactly what happened on chat 76: two
-  //     builds, 454K and 375K on disk, versions=0.
+  //   Agent/Task — the agent delegates work to a subagent, which runs in ITS OWN context with no
+  //     access to our stdio bridge. It can Read/Write/Bash, so the work SUCCEEDS, and then every
+  //     mcp__rbrun__* call returns "Stream closed" — the tool result can never cross the bridge back,
+  //     so the work lands on disk but nothing is ever persisted through the runner.
   //   ScheduleWakeup — the agent schedules itself to poll subagents it should not have spawned.
   //
   // Trimming also keeps us under the SDK's tool-schema deferral: past some count it ships names
   // without schemas and the model must ToolSearch first, calling tools blind meanwhile (that is the
   // `enum_options: received undefined` we saw). 37 MCP tools + ~29 built-ins was far over; this is
-  // 37 + 7. insiti hit this and trimmed for the same reason.
+  // 37 + 7.
   const TOOLS = ["Skill", "Read", "Write", "Edit", "Glob", "Grep", "Bash"];
 
   let sessionEmitted = false;

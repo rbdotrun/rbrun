@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate the `work/insiti` ViewComponent DSL into rbrun — a base component class (`option`/`style`/`erb_template` + `tailwind_merge` + `component()` helper + Stimulus wiring) and the ~6 primitives the conversation UI (Phase 8) needs, plus the Tailwind-v4 + bun asset build.
+**Goal:** rbrun's ViewComponent DSL — a base component class (`option`/`style`/`erb_template` + `tailwind_merge` + `component()` helper + Stimulus wiring) and the ~6 primitives the conversation UI (Phase 8) needs, plus the Tailwind-v4 + bun asset build.
 
 **Architecture:** `Rbrun::ApplicationViewComponent < ViewComponentContrib::Base` installs the DSL: `Dry::Initializer` gives `option`/`param`; `StyleVariants` gives `style do … variants` maps resolved by `style(dim: val)`; a `postprocess_with { TailwindMerge }` makes any `css:` override win; components author inline via `erb_template`. A `component("name", …)` helper string-renders `Rbrun::Ui::Name::Component`. Primitives (spinner/button/badge/card/code_block/tooltip) subclass the base. Tailwind v4 (with a `default-*` brand palette) + the 3 future Stimulus controllers are built by bun into `app/assets/builds/rbrun/`.
 
@@ -10,8 +10,8 @@
 
 ## Global Constraints
 
-- **The `view_component` gem is imported; the DSL is reproduced.** Base = `ViewComponentContrib::Base` + `Dry::Initializer` + `StyleVariants` + `tailwind_merge`.
-- **Drop insiti's domain coupling:** no `Dry::Effects.Reader(:current_user)` (identity is optional), no domain `ApplicationHelper` — only a generic `component`/`svg` helper.
+- **The `view_component` gem is imported; the DSL is defined here.** Base = `ViewComponentContrib::Base` + `Dry::Initializer` + `StyleVariants` + `tailwind_merge`.
+- **No domain coupling:** no `Dry::Effects.Reader(:current_user)` (identity is optional), no domain `ApplicationHelper` — only a generic `component`/`svg` helper.
 - **Primitives are namespaced** `Rbrun::Ui::<Name>::Component`; `component("spinner", …)` resolves that. **`#name`/`controller_name`** derive the Stimulus id from the class name.
 - **`css:` on every primitive**, merged last via `tailwind_merge` (later utilities win).
 - **Assets:** bun builds Tailwind v4 (`default-*` palette) → `app/assets/builds/rbrun/rbrun.css` and the JS entry → `rbrun.js`; the engine registers the build path (Propshaft) + precompile. Bun is a dev/release dep; the built bundle ships in the gem.
@@ -67,7 +67,7 @@ Run `bundle install`.
 ```ruby
 module Rbrun
   # String-render helper: `component("spinner", size: :sm)` → render Rbrun::Ui::Spinner::Component.
-  # Nice DX from the insiti DSL; included in the base component and the engine's views.
+  # Nice DX; included in the base component and the engine's views.
   module ComponentHelper
     def component(name, *args, **kwargs, &block)
       klass = "Rbrun::Ui::#{name.to_s.camelize}::Component".constantize
@@ -139,7 +139,7 @@ require "tailwind_merge"
 require "dry/initializer"
 
 module Rbrun
-  # The component DSL, migrated from work/insiti. view_component is imported; this reproduces the
+  # The component DSL. view_component is imported; this defines the
   # authoring surface: option/param (Dry::Initializer) + style variants (StyleVariants) +
   # tailwind_merge (css: overrides win) + inline erb_template + the component() helper + Stimulus
   # auto-wiring. No Dry::Effects/current_user, no domain ApplicationHelper (see the spec).
@@ -185,7 +185,7 @@ Expected: PASS (3 runs, 0 failures).
 
 ```bash
 git add rbrun.gemspec app/helpers/rbrun/component_helper.rb app/components/rbrun/application_view_component.rb test/components/rbrun/dsl_test.rb Gemfile.lock
-git commit -m "feat(ui): migrate the component DSL — ApplicationViewComponent (option/style/erb_template + tailwind_merge + component helper)"
+git commit -m "feat(ui): the component DSL — ApplicationViewComponent (option/style/erb_template + tailwind_merge + component helper)"
 ```
 
 ---
