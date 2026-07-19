@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # Plays the client side of the NDJSON protocol for the loop test — a REAL detached process.
 # Emits session → assistant → tool_request, waits for the tool_response on stdin, then emits result.
 require "json"

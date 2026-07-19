@@ -4,26 +4,25 @@ require "rbrun/sandbox"
 require_relative "support"
 
 # Phase 2 dogfood — the DAYTONA sandbox, for real (live cloud box). Same contract as sandbox_local,
-# against a real Daytona sandbox. Credentials come from the dummy app's Rails credentials
-# (daytona.api_key / daytona.api_url) — a secret store, not a variable: dogfood is never parameterized.
-# Needs :environment to load credentials.
+# against a real Daytona sandbox. Credentials come from .env (a secret store, not a scenario variable:
+# dogfood is never parameterized).
 #
 #   bin/rails app:dogfood:sandbox_daytona
 
 namespace :dogfood do
   desc "Phase 2: the daytona sandbox runs the full contract for real (live cloud box)"
-  task sandbox_daytona: :environment do
+  task :sandbox_daytona do
     dog = Rbrun::Dogfood
-    creds = Rails.application.credentials.dig(:daytona) || {}
-    if creds[:api_key].to_s.empty?
-      abort "No daytona credentials. Set daytona.api_key / daytona.api_url via `bin/rails credentials:edit` in test/dummy."
-    end
+    dog.load_env!
+    api_key = ENV["DAYTONA_API_KEY"].to_s
+    api_url = ENV["DAYTONA_API_URL"].to_s
+    abort "Missing .env creds (DAYTONA_API_KEY / DAYTONA_API_URL)." if api_key.empty?
 
     # No dockerfile here → the client's DEFAULT_DOCKERFILE (bun+shell) builds the snapshot. A host
     # that needs more tooling passes config[:dockerfile] with its own image.
     box = Rbrun::Sandbox.new(
       provider: :daytona,
-      config: { api_key: creds[:api_key], api_url: creds[:api_url] },
+      config: { api_key: api_key, api_url: api_url },
       labels: { dogfood: "daytona" }
     )
 
