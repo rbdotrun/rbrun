@@ -9,6 +9,8 @@ Rbrun::Engine.routes.draw do
   resources :approvals, only: :update, param: :tool_use_id
   # Custom gate: ask_user submits its picks here (a custom_approval! tool → its own submit route).
   post "ask_user/:tool_use_id", to: "ask_user_responses#create", as: :ask_user_response
+  # Custom gate: workflow_create submits its Apply/Save/Cancel decision here.
+  post "workflow_decision/:tool_use_id", to: "workflow_decisions#create", as: :workflow_decision
 
   # Repo workspace switcher: the searchable result frame + the switch action.
   get  "repos",        to: "repositories#index",  as: :repos

@@ -1,0 +1,27 @@
+<div class="border-t border-slate-200 p-3">
+  <% if decided? %>
+    <p class="text-sm text-slate-700"><%= recap %></p>
+  <% else %>
+    <p class="mb-1 text-xs font-medium text-slate-500">Proposed workflow</p>
+    <p class="text-sm font-medium text-slate-800"><%= label %></p>
+    <% if goal.present? %><p class="mb-2 text-xs text-slate-500"><%= goal %></p><% end %>
+    <ol class="mb-3 flex flex-col gap-1 text-sm text-slate-700">
+      <% steps.each_with_index do |title, i| %>
+        <li class="flex items-baseline gap-2">
+          <span class="text-slate-400"><%= i + 1 %>.</span><span><%= title %></span>
+        </li>
+      <% end %>
+    </ol>
+    <div class="flex items-center gap-2">
+      <% %w[apply save cancel].each_with_index do |decision, i| %>
+        <%= form_with url: submit_path, method: :post, class: "inline" do %>
+          <button type="submit" name="decision" value="<%= decision %>"
+                  class="<%= i.zero? ? 'bg-default-600 text-white hover:bg-default-500' : 'text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50' %> inline-flex items-center rounded-md px-2 py-1 text-xs font-medium">
+            <%= decision.capitalize %>
+          </button>
+        <% end %>
+      <% end %>
+      <span class="ml-auto text-[11px] text-slate-400">Apply starts it here · Save keeps it in the library.</span>
+    </div>
+  <% end %>
+</div>
