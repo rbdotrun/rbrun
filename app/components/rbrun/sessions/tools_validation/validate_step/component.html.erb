@@ -1,0 +1,13 @@
+<div class="border-t border-slate-200 p-3">
+  <p class="text-xs font-medium text-slate-500">Step complete?</p>
+  <p class="text-sm font-medium text-slate-800"><%= step_title %></p>
+  <% if summary.present? %><p class="mb-2 text-xs text-slate-500"><%= summary %></p><% end %>
+  <% if decided? %>
+    <p class="text-sm text-slate-700"><%= approved? ? "Validated — step marked complete." : "Not yet — the agent will revise." %></p>
+  <% else %>
+    <div class="flex items-center gap-2 pt-1">
+      <%= approval_actions(tool_use_id) %>
+      <span class="ml-auto text-[11px] text-slate-400">Or ask for a change in the conversation.</span>
+    </div>
+  <% end %>
+</div>

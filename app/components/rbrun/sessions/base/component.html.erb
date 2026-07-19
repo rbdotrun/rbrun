@@ -25,6 +25,8 @@
     </button>
   </div>
 
+  <%= render "rbrun/sessions/workflow", session: session %>
+
   <div id="composer" class="flex-shrink-0 border-t border-slate-200">
     <div class="mx-auto w-full max-w-3xl p-4">
       <%= render "rbrun/messages/form", session: session, working: session.working? %>

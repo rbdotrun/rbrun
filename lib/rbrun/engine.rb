@@ -20,6 +20,8 @@ module Rbrun
     config.after_initialize do
       Rbrun.config.validate!
       Rbrun.register_tool(Rbrun::Tools::AskUser) # built-in custom gate (autoload ready here, not in initializers)
+      [ Rbrun::Tools::WorkflowCreate, Rbrun::Tools::ValidateStep, Rbrun::Tools::CancelWorkflow,
+        Rbrun::Tools::WorkflowSearch, Rbrun::Tools::UseWorkflow ].each { |t| Rbrun.register_tool(t) }
       Rbrun::ApplicationTool.validate_tool_approvals! # a half-built custom_approval! fails boot
       Rbrun::SkillSeeder.seed_at_boot!
       Rbrun::McpSeeder.seed_at_boot!
