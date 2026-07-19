@@ -24,5 +24,11 @@ module Rbrun
       tools << klass unless tools.include?(klass)
       klass
     end
+
+    # Host-set resolver → the acting tenant slug (used when built-in auth is off). Defaults to the
+    # single-tenant slug.
+    attr_writer :current_tenant_resolver
+
+    def current_tenant = @current_tenant_resolver&.call || Rbrun::Config::DEFAULT_TENANT
   end
 end
