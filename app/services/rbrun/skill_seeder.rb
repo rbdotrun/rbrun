@@ -29,19 +29,24 @@ module Rbrun
       new(tenant: tenant, authored: authored_from_config(config))
     end
 
-    # Boot hook (engine after_initialize): seed the self-host tenant from config, WARN-only — a
-    # divergence or issue is logged, never applied. No-ops when nothing is configured or the table
-    # isn't there yet (pre-migrate / no DB during setup).
+    # Boot hook (engine after_initialize): seed the self-host tenant from config. Fails LOUD on a
+    # genuine skill error (:issue — an unparseable/malformed source) so a broken skill can't slip in
+    # unnoticed, like the auth check. A :diverged skill only warns — raising would lock you out of the
+    # Skills panel you'd use to reconcile it. No-ops (silent) when nothing is configured or the DB /
+    # table isn't there yet (migrate/setup) — that's not an error.
     def self.seed_at_boot!
       return unless Rbrun.config.skills_path.present? || Rbrun.config.skills.any?
       return unless Rbrun::Skill.table_exists?
 
       from_config(Rbrun.config, tenant: Rbrun::Config::DEFAULT_TENANT).call.each do |r|
-        next unless %i[diverged issue].include?(r.status)
-
-        Rails.logger.warn("[rbrun] skill '#{r.slug}' #{r.status}: #{r.message}")
+        case r.status
+        when :issue
+          raise Rbrun::ConfigError, "skill '#{r.slug}' can't be seeded: #{r.message}"
+        when :diverged
+          Rails.logger.warn("[rbrun] skill '#{r.slug}' diverged from its source — reconcile in the Skills panel")
+        end
       end
-    rescue ActiveRecord::NoDatabaseError, ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => e
+    rescue ActiveRecord::NoDatabaseError, ActiveRecord::ConnectionNotEstablished => e
       Rails.logger.debug { "[rbrun] skill seed skipped (#{e.class})" }
     end
 

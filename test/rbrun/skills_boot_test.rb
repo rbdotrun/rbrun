@@ -14,6 +14,12 @@ class SkillsBootTest < ActiveSupport::TestCase
     assert skill&.current_version, "the boot-seeded skill has a current version"
   end
 
+  test "seed_at_boot! RAISES on a genuine skill error (unparseable source)" do
+    Rbrun.reset_config!
+    Rbrun.config.skill slug: "broken", name: "Broken", files: { "notes.txt" => "no SKILL.md here" }
+    assert_raises(Rbrun::ConfigError) { Rbrun::SkillSeeder.seed_at_boot! }
+  end
+
   test "seed_at_boot! warns but never applies a divergence" do
     Rbrun.reset_config!
     Rbrun.config.skill "diverge-skill", "# a\n"
