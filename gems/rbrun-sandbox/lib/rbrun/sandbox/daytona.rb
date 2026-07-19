@@ -2,6 +2,7 @@
 
 require "shellwords"
 require "tempfile"
+require "async"
 
 module Rbrun
   module Sandbox
@@ -82,6 +83,8 @@ module Rbrun
 
       def session_logs_follow(session_id, cmd_id, skip: 0, timeout: nil, &block)
         @client.session_logs_follow(id, session_id, cmd_id, skip: skip, timeout: timeout, &block)
+      rescue Async::TimeoutError => e
+        raise TimeoutError, "session #{session_id}/#{cmd_id} follow timed out (#{e.message})"
       end
 
       private
