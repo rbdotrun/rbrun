@@ -10,7 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_130001) do
+  create_table "rbrun_commits", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "message"
+    t.integer "session_id"
+    t.string "sha", null: false
+    t.datetime "updated_at", null: false
+    t.integer "worktree_id", null: false
+    t.index ["session_id"], name: "index_rbrun_commits_on_session_id"
+    t.index ["worktree_id", "sha"], name: "index_rbrun_commits_on_worktree_id_and_sha", unique: true
+    t.index ["worktree_id"], name: "index_rbrun_commits_on_worktree_id"
+  end
+
   create_table "rbrun_session_messages", force: :cascade do |t|
     t.string "approval_status"
     t.text "content"
@@ -38,5 +50,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_120001) do
     t.index ["tenant"], name: "index_rbrun_sessions_on_tenant"
   end
 
+  create_table "rbrun_worktrees", force: :cascade do |t|
+    t.string "base", default: "main", null: false
+    t.string "branch", null: false
+    t.datetime "created_at", null: false
+    t.string "repo", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.index ["tenant"], name: "index_rbrun_worktrees_on_tenant"
+  end
+
+  add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
+  add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
 end
