@@ -11,9 +11,16 @@ module Rbrun
              class_name: "Rbrun::SessionMessage", dependent: :destroy
     has_many :commits, class_name: "Rbrun::Commit", dependent: :nullify
 
+    belongs_to :workflow, class_name: "Rbrun::Workflow", optional: true
+    has_many :workflow_step_completions, class_name: "Rbrun::WorkflowStepCompletion", dependent: :destroy
+
     enum :status,
          { idle: "idle", working: "working", needs_approval: "needs_approval", done: "done", failed: "failed" },
          default: "idle"
+
+    enum :workflow_status,
+         { active: "active", completed: "completed", cancelled: "cancelled" },
+         prefix: :workflow_status, validate: { allow_nil: true }
 
     after_update_commit :broadcast_status, if: :saved_change_to_status?
 
@@ -64,6 +71,12 @@ module Rbrun
 
     # ── the timeline (source of truth for render + live broadcast) ──────
     def open_turn_lead = messages.where(role: "user", event_type: "text").order(:id).last
+
+    # Repaint just the task-progress band (its own target, independent of the composer swap).
+    def broadcast_workflow
+      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}",
+        target: "workflow_#{id}", partial: "rbrun/sessions/workflow", locals: { session: self })
+    end
 
     def timeline = messages.order(:id).select(&:visible?)
 
