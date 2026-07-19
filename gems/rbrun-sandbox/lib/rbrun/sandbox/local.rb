@@ -86,6 +86,72 @@ module Rbrun
         nil
       end
 
+      # ── process sessions ─────────────────────────────────────────────
+      # A long-lived detached process: spawn it with stdin piped and stdout+stderr merged to a log
+      # file; stream the log as it grows, write stdin, poll exit — the local mirror of Daytona's
+      # process-session transport the Runner drives.
+      def session_create(session_id)
+        @sessions[session_id] ||= {}
+        nil
+      end
+
+      def session_exec(session_id, command)
+        session = (@sessions[session_id] ||= {})
+        cmd_id  = "cmd-#{session.size + 1}"
+        log     = Tempfile.new([ "rbrun-local-session", ".log" ])
+        log.close
+        stdin_r, stdin_w = IO.pipe
+        pid = Process.spawn(command, in: stdin_r, out: log.path, err: %i[child out], chdir: workspace)
+        stdin_r.close
+        session[cmd_id] = { stdin: stdin_w, log: log.path, thread: Process.detach(pid) }
+        cmd_id
+      end
+
+      def session_input(session_id, cmd_id, data)
+        io = @sessions.fetch(session_id).fetch(cmd_id)[:stdin]
+        io.write(data)
+        io.flush
+        nil
+      end
+
+      def session_command(session_id, cmd_id)
+        thr = @sessions.fetch(session_id).fetch(cmd_id)[:thread]
+        { "exitCode" => (thr.alive? ? nil : thr.value.exitstatus) }
+      end
+
+      # Follow the command's merged output. `skip` bytes are dropped first (resume offset). Returns
+      # total bytes seen. Stops when the command exits and the log is fully read, or when the block
+      # returns truthy (the caller signalled terminal).
+      def session_logs_follow(session_id, cmd_id, skip: 0, timeout: nil)
+        entry    = @sessions.fetch(session_id).fetch(cmd_id)
+        seen     = 0
+        pos      = 0
+        deadline = timeout ? monotonic + timeout : nil
+        loop do
+          size  = File.size?(entry[:log]).to_i
+          chunk = size > pos ? IO.binread(entry[:log], nil, pos) : nil
+          if chunk && !chunk.empty?
+            pos  += chunk.bytesize
+            prev  = seen
+            seen += chunk.bytesize
+            emit  = chunk
+            if skip.positive? && seen <= skip
+              emit = ""
+            elsif skip.positive? && prev < skip
+              emit = chunk.byteslice(skip - prev..) || ""
+            end
+            break if !emit.empty? && yield(emit)
+          else
+            done = !entry[:thread].alive?
+            break if done && pos >= File.size?(entry[:log]).to_i
+            raise TimeoutError, "session #{session_id}/#{cmd_id} follow timed out" if deadline && monotonic > deadline
+
+            sleep 0.05
+          end
+        end
+        seen
+      end
+
       private
 
       def absolute(path)
