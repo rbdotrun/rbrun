@@ -336,10 +336,11 @@ behavior, and a phase is "valid" when its dogfood passes.
 
 ## 8. Phase contract
 
-Seven phases. Scope + dogfood gate are **fixed now**. Each phase's detailed plan is written
+Eight phases. Scope + dogfood gate are **fixed now**. Each phase's detailed plan is written
 just-in-time (via the writing-plans skill), executed, validated by its dogfood, then the next phase's
-plan is written. Numbering is 1–7. (The engine host was split from one oversized phase into three —
-Phases 4, 5, 6 — each independently testable; the UI is Phase 7.)
+plan is written. Numbering is 1–8. (The engine host was split from one oversized phase into three —
+Phases 4, 5, 6; the UI was split into the component-DSL/design-system foundation, Phase 7, and the
+conversation UI on top of it, Phase 8.)
 
 ### Phase 1 — Skeleton + config kernel + dogfood spine
 
@@ -440,12 +441,34 @@ on Phase 5.
 turn in a Session under it where the agent edits a file and `git commit`+`push`es via its tools, and
 confirm the commit landed on the branch (GitHub) and its SHA was recorded.
 
-### Phase 7 — Engine UI (controllers, jobs, channels, Turbo, bun bundle, auth screen)
+### Phase 7 — Component DSL + primitives + assets pipeline
 
-**Scope:** `MessagesController` / `ApprovalsController`, `AgentTurnJob`, ActionCable channels, Turbo
-Stream views (session timeline, approval footer, the Worktree's commit/diff view), bun-built CSS/JS in
-`app/assets/builds/rbrun/`, login screen (when auth is on), engine mounted + navigable in
-`test/dummy`. Depends on Phase 6.
+The design-system foundation the conversation UI (Phase 8) is built from — migrated from the
+`work/insiti` ViewComponent DSL; the `view_component` gem is imported, the DSL is reproduced here.
+
+**Scope:** `Rbrun::ApplicationViewComponent` base — `view_component-contrib` + `Dry::Initializer`
+(`option`/`param`) + `StyleVariants` (`style do … variants`) + `tailwind_merge` postprocess + inline
+`erb_template`; the `component("name", …)` string-render helper + Stimulus auto-wiring
+(`controller_name`/`merged_data`); the ~6 primitives the conversation UI needs (spinner, button,
+badge, card, code_block, tooltip); Tailwind **v4** config (with the `default-*` brand palette) + the
+**bun** build wiring output to `app/assets/builds/rbrun/`; `lucide-rails` icons. Drop insiti's
+`Dry::Effects.Reader(:current_user)` (make identity optional) and the domain `ApplicationHelper` (keep
+only `component`/`svg`). Depends on Phase 6.
+**Deliverables:** the DSL base + primitives with component render tests; the Tailwind+bun build
+producing `app/assets/builds/rbrun/{rbrun.css,rbrun.js}`.
+**Dogfood gate — `dogfood/components.rake`:** render each primitive through the DSL (variants + a
+`css:` override that tailwind-merges) and assert the HTML — proving the `option`/`style`/`erb_template`
+DSL and the `component()` helper work end to end.
+
+### Phase 8 — Engine UI (conversation, controllers, jobs, channels, Turbo, auth screen)
+
+**Scope:** `MessagesController` / `ApprovalsController` (atomic `decide_approval!`, resume via job),
+the three thin turn jobs, the broadcast engine (`Session#broadcast_event` → append-new-segment vs
+replace-in-place, `segment_locals_for`, `broadcast_status`/`_composer`/`_working`, the `SessionMessage`
+after-commit callbacks with tokens coalesced server-side), Turbo Stream views + the
+`timeline`/`segment`/`turn`/`base` components (built on Phase 7's primitives), the 3 Stimulus
+controllers (autoscroll, composer, sticky_details), routes, login screen (when auth is on), a Worktree
+commit/diff pane, engine mounted + navigable in `test/dummy`. Depends on Phase 7.
 **Deliverables:** working mounted UI; controller/system tests.
 **Dogfood gate — `dogfood/browser.rake`:** drive a real conversation in a headless browser: Turbo
 appends the turn, the working indicator shows, the approval footer appears and a decision resumes the
