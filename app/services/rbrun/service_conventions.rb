@@ -24,16 +24,20 @@ module Rbrun
       `request_secrets` FIRST to have the user provide them — you never see the values; they are injected
       into the services' environment for you.
 
-      ## Previewing is SEPARATE from running
+      ## Exposure is a three-step ladder — never skip or assume a step
 
-      Starting a service NEVER exposes it. A service's `port` is only what it binds to inside the box.
-      To let the user look at a service in their browser, that is a distinct, explicit decision:
+      1. RUN — starting a service runs a process INSIDE the box and exposes NOTHING. A `port` is only
+         what the process binds to internally; it is not a request to expose it.
+      2. PREVIEW (optional) — `preview_service(name)` / `stop_preview(name)`. Makes one running service
+         viewable by the USER, who must still be authenticated. Use it when they want to SEE something.
+      3. PUBLIC (optional) — `share_public(name)` / `stop_sharing(name)`. Makes it reachable by ANYONE
+         WITH THE LINK, no account. This needs the user's approval, so only propose it when they clearly
+         want to share with other people.
 
-      - `preview_service(name)` — expose one running service for preview (it must declare a port).
-      - `stop_preview(name)` — withdraw the preview; the service keeps running.
-
-      Only preview a service when the user wants to SEE it. Never preview a database, a queue, or a
-      worker. Both calls are declarative and stick across restarts.
+      Public strictly requires preview: `share_public` fails unless the service is previewed, and
+      `stop_preview` revokes any public link. NEVER preview or share a database, a queue, or a worker —
+      only something the user asked to look at or share. All of these are declarative and stick across
+      restarts.
     PROMPT
   end
 end
