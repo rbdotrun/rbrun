@@ -1,0 +1,51 @@
+<%# The worktree Services panel (sidebar, under the repo switcher). Rendered from DB rows only — no %>
+<%# sandbox calls — so it is safe to broadcast. Its own target = #services_panel_<worktree.id>. %>
+<div id="services_panel_<%= worktree.id %>">
+  <% runs = worktree.service_runs.order(:name).to_a %>
+  <% saved = Rbrun::RepoService.for_tenant(worktree.tenant).for_repo(worktree.repo) %>
+  <% if runs.any? || saved.any? %>
+    <div class="rounded-md border border-slate-200 bg-white group-data-[collapsed]/sidebar:hidden">
+      <div class="flex items-center gap-2 border-b border-slate-100 px-2.5 py-1.5">
+        <%= lucide_icon("server", class: "size-3.5 text-slate-400") %>
+        <span class="text-xs font-medium uppercase tracking-wide text-slate-400">Services</span>
+      </div>
+      <% if runs.any? %>
+        <ul class="flex flex-col">
+          <% runs.each do |run| %>
+            <li class="flex items-center gap-2 px-2.5 py-1.5 text-sm">
+              <span class="size-2 shrink-0 rounded-full <%= run.status_running? ? "bg-green-500" : (run.status_exited? ? "bg-red-400" : "bg-slate-300") %>"
+                    title="<%= run.status %>"></span>
+              <span class="truncate font-medium text-slate-700"><%= run.name %></span>
+              <% if run.port.present? %><span class="text-xs text-slate-400">:<%= run.port %></span><% end %>
+              <span class="ml-auto flex items-center gap-1">
+                <% if run.previewable? %>
+                  <%= link_to rbrun.open_service_path(run), target: "_blank", rel: "noopener",
+                        class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Open" do %>
+                    <%= lucide_icon("external-link", class: "size-3.5") %>
+                  <% end %>
+                <% end %>
+                <%= button_to rbrun.logs_service_path(run), method: :get,
+                      class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Logs", form: { data: { turbo_stream: true } } do %>
+                  <%= lucide_icon("scroll-text", class: "size-3.5") %>
+                <% end %>
+                <%= button_to rbrun.restart_service_path(run), method: :post,
+                      class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Restart" do %>
+                  <%= lucide_icon("rotate-cw", class: "size-3.5") %>
+                <% end %>
+                <%= button_to rbrun.stop_service_path(run), method: :post,
+                      class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Stop" do %>
+                  <%= lucide_icon("square", class: "size-3.5") %>
+                <% end %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% elsif saved.any? %>
+        <div class="px-2.5 py-2">
+          <%= button_to "Restart all", rbrun.restart_all_services_path(worktree_id: worktree.id), method: :post,
+                class: "w-full rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

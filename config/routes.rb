@@ -14,6 +14,17 @@ Rbrun::Engine.routes.draw do
   # Custom gate: request_secrets submits the secure form here (values → encrypted store, never the LLM).
   post "secrets/:tool_use_id", to: "secrets#create", as: :secrets_submission
 
+  # Repo services: operate the worktree's running services from the sidebar panel.
+  resources :services, only: [] do
+    member do
+      get  :open   # 302 → the live app (new tab)
+      get  :logs   # open the logs drawer
+      post :restart
+      post :stop
+    end
+  end
+  post "services/restart_all", to: "services#restart_all", as: :restart_all_services
+
   # Repo workspace switcher: the searchable result frame + the switch action.
   get  "repos",        to: "repositories#index",  as: :repos
   post "repos/switch", to: "repositories#switch", as: :switch_repo

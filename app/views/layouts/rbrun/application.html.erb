@@ -18,6 +18,12 @@
       <%# Repo switcher — the searchable command-menu (filled in T5). %>
       <%= render "layouts/rbrun/repo_switcher" %>
 
+      <%# Repo services panel — worktree state, live via the worktree stream, seen from every session. %>
+      <% if current_worktree %>
+        <%= turbo_stream_from "rbrun_worktree_#{current_worktree.id}" %>
+        <%= render "rbrun/services/panel", worktree: current_worktree %>
+      <% end %>
+
       <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden" id="sidebar-nav">
         <%= component("nav_item", label: "Conversations", href: rbrun.sessions_path, icon: "messages-square") %>
       </nav>
@@ -44,5 +50,7 @@
 
     <main class="min-h-0 min-w-0 flex-1 overflow-hidden"><%= yield %></main>
   </div>
+  <%# Slot the service logs drawer replaces (Turbo Stream). %>
+  <div id="service_drawer"></div>
 </body>
 </html>

@@ -8,6 +8,7 @@ import MenuController from "./controllers/menu_controller";
 import SidebarController from "./controllers/sidebar_controller";
 import CommandController from "./controllers/command_controller";
 import WorkflowController from "./controllers/workflow_controller";
+import DrawerController from "./controllers/drawer_controller";
 
 const application = Application.start();
 application.register("autoscroll", AutoscrollController);
@@ -18,4 +19,5 @@ application.register("menu", MenuController);
 application.register("sidebar", SidebarController);
 application.register("command", CommandController);
 application.register("workflow", WorkflowController);
+application.register("drawer", DrawerController);
 window.RbrunStimulus = application;

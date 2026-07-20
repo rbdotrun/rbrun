@@ -40,6 +40,22 @@ module Rbrun
       run
     end
 
+    # Recent output of a service. A live server never closes its stream, so follow with a short bounded
+    # window and return the trailing `lines`. Shared by repo_services_logs and the Logs drawer.
+    def tail(run, lines: 200)
+      return "" if run.process_session.blank? || run.cmd_id.blank?
+
+      out = +""
+      begin
+        @sandbox.session_logs_follow(run.process_session, run.cmd_id, skip: 0, timeout: 3) { |chunk| out << chunk; false }
+      rescue Rbrun::Sandbox::TimeoutError
+        # bounded read — a live service never closes the stream; return what accumulated.
+      rescue StandardError
+        # best-effort: a stale/missing handle (sandbox gone, session reaped) reads as no output, never a crash.
+      end
+      out.lines.last(lines.to_i.clamp(1, 5000)).join
+    end
+
     # A present exitCode ⇒ the process ended. Cheap; called on panel load / status / recheck.
     def refresh_status(run)
       return run if run.status_stopped? || run.cmd_id.blank? || run.process_session.blank?

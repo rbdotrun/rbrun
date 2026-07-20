@@ -14,16 +14,8 @@ module Rbrun
         return error("no such service: #{name}") unless run
         return error("service #{name} has no process handle") if run.process_session.blank? || run.cmd_id.blank?
 
-        out = +""
-        begin
-          session.worktree.sandbox.session_logs_follow(run.process_session, run.cmd_id, skip: 0, timeout: 3) do |chunk|
-            out << chunk
-            false
-          end
-        rescue Rbrun::Sandbox::TimeoutError
-          # bounded read — a live service never closes the stream; we return whatever accumulated.
-        end
-        { "data" => { "name" => name, "logs" => out.lines.last(tail.to_i.clamp(1, 5000)).join } }
+        logs = Rbrun::ServiceSupervisor.new(worktree: session.worktree).tail(run, lines: tail.to_i)
+        { "data" => { "name" => name, "logs" => logs } }
       end
     end
   end

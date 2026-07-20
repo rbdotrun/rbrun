@@ -1,0 +1,24 @@
+<%# Slide-over drawer with a bounded snapshot of the service's output. Replaces the layout's %>
+<%# #service_drawer slot; close clears it. %>
+<div id="service_drawer">
+  <div class="fixed inset-0 z-40" data-controller="drawer">
+    <div class="absolute inset-0 bg-slate-900/20" data-action="click->drawer#close"></div>
+    <div class="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-white shadow-xl">
+      <div class="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5">
+        <%= lucide_icon("scroll-text", class: "size-4 text-slate-400") %>
+        <span class="text-sm font-medium text-slate-800"><%= run.name %></span>
+        <% if run.port.present? %><span class="text-xs text-slate-400">:<%= run.port %></span><% end %>
+        <span class="ml-auto flex items-center gap-1">
+          <%= button_to rbrun.logs_service_path(run), method: :get, title: "Refresh",
+                class: "rounded p-1 text-slate-400 hover:bg-slate-100", form: { data: { turbo_stream: true } } do %>
+            <%= lucide_icon("refresh-cw", class: "size-4") %>
+          <% end %>
+          <button type="button" data-action="drawer#close" class="rounded p-1 text-slate-400 hover:bg-slate-100" title="Close">
+            <%= lucide_icon("x", class: "size-4") %>
+          </button>
+        </span>
+      </div>
+      <pre id="service_<%= run.id %>_logs" class="flex-1 overflow-auto whitespace-pre-wrap break-words bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100"><%= logs.presence || "No output yet." %></pre>
+    </div>
+  </div>
+</div>
