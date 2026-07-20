@@ -72,4 +72,10 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Remote dev-host deploy (bin/dev): allow the preview domain through Rails' host authorization, which in
+  # development otherwise permits only localhost. Covers dev.rb.run and every <token>-preview.<domain>.
+  if ENV["RBRUN_PREVIEW_DOMAIN"].present?
+    config.hosts << ".#{ENV['RBRUN_PREVIEW_DOMAIN']}"
+  end
 end
