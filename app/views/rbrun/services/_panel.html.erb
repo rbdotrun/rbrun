@@ -18,10 +18,21 @@
               <span class="truncate font-medium text-slate-700"><%= run.name %></span>
               <% if run.port.present? %><span class="text-xs text-slate-400">:<%= run.port %></span><% end %>
               <span class="ml-auto flex items-center gap-1">
+                <%# Previewing is a SEPARATE decision from running: Open only appears once the service is %>
+                <%# actually previewed. A port alone means it merely CAN be previewed. %>
                 <% if run.previewable? %>
                   <%= link_to rbrun.open_service_path(run), target: "_blank", rel: "noopener",
-                        class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Open" do %>
+                        class: "rounded p-1 text-green-600 hover:bg-slate-100", title: "Open preview" do %>
                     <%= lucide_icon("external-link", class: "size-3.5") %>
+                  <% end %>
+                  <%= button_to rbrun.stop_preview_service_path(run), method: :post,
+                        class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Stop previewing" do %>
+                    <%= lucide_icon("eye-off", class: "size-3.5") %>
+                  <% end %>
+                <% elsif run.port.present? %>
+                  <%= button_to rbrun.preview_service_path(run), method: :post,
+                        class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Preview this service" do %>
+                    <%= lucide_icon("eye", class: "size-3.5") %>
                   <% end %>
                 <% end %>
                 <%= button_to rbrun.logs_service_path(run), method: :get,

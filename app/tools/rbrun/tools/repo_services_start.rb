@@ -13,6 +13,8 @@ module Rbrun
         then starts the declared set fresh; saves the set for reuse. Give each service a short `name`, its
         `command`, and a `port` ONLY when it serves HTTP. Use plain command execution (not this) for
         one-shot commands like build/test/migrate.
+        Starting a service does NOT expose it: `port` is only what the process binds to INSIDE the box.
+        Making a service viewable in a browser is a separate, explicit call to `preview_service`.
         Example: { "services": [ { "name": "web", "command": "bin/rails s -p 3000", "port": 3000 },
                                   { "name": "css", "command": "bin/rails tailwindcss:watch" } ] }
       TXT

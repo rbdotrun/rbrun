@@ -35,6 +35,31 @@ module Rbrun
 
     def status = @worktree.service_runs.map { |r| @sup.refresh_status(r) }
 
+    # ── preview: a SEPARATE, declarative, reversible decision (never implied by starting) ──────────
+    # Declare a service previewed and resolve its URL now. Returns the run, or an error symbol:
+    # :unknown (no such service) · :no_port (declares no port) · :unsupported (provider can't preview).
+    def preview(name)
+      definition = saved(name)
+      run = find(name)
+      return :unknown unless definition || run
+      return :no_port if (run&.port || definition&.port).blank?
+      return :unsupported unless @worktree.previews_supported?
+
+      definition&.update!(previewed: true)
+      run ? resolve_preview(run) : :not_running
+    end
+
+    # Withdraw the declaration and forget the resolved link.
+    def stop_preview(name)
+      definition = saved(name)
+      run = find(name)
+      return :unknown unless definition || run
+
+      definition&.update!(previewed: false)
+      run&.update!(url: nil, token: nil)
+      run || :not_running
+    end
+
     # Re-launch the repo's saved services (the panel's "Restart all") in this worktree.
     def restart_saved
       saved = Rbrun::RepoService.for_tenant(@worktree.tenant).for_repo(@worktree.repo)
@@ -80,11 +105,16 @@ module Rbrun
         run.destroy
         raise
       end
-      resolve_preview(run)
+      # Starting a service NEVER exposes it. A URL is resolved only when the service was already
+      # DECLARED previewed (RepoService#previewed) — honouring a prior explicit decision, never implying
+      # one. A port is just what the process binds to inside the box.
+      declared_previewed?(svc.name) ? resolve_preview(run) : run
     end
 
-    # A port-bearing service gets its preview URL — only when the provider supports it (graceful degrade
-    # on a proxy-less sandbox: it still runs + logs, just no Open).
+    def declared_previewed?(name) = saved(name)&.previewed?
+
+    # Resolve the provider's preview URL for a running, port-bearing service. Only ever called for a
+    # service explicitly declared previewed.
     def resolve_preview(run)
       return run unless run.port.present? && @worktree.previews_supported?
 
@@ -98,5 +128,9 @@ module Rbrun
     end
 
     def find(name) = @worktree.service_runs.find_by(name: name)
+
+    def saved(name)
+      Rbrun::RepoService.for_tenant(@worktree.tenant).for_repo(@worktree.repo).find_by(name: name)
+    end
   end
 end

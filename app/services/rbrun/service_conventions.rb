@@ -23,6 +23,17 @@ module Rbrun
       migrate. If a service needs secrets (API keys, RAILS_MASTER_KEY, DB passwords), call
       `request_secrets` FIRST to have the user provide them — you never see the values; they are injected
       into the services' environment for you.
+
+      ## Previewing is SEPARATE from running
+
+      Starting a service NEVER exposes it. A service's `port` is only what it binds to inside the box.
+      To let the user look at a service in their browser, that is a distinct, explicit decision:
+
+      - `preview_service(name)` — expose one running service for preview (it must declare a port).
+      - `stop_preview(name)` — withdraw the preview; the service keeps running.
+
+      Only preview a service when the user wants to SEE it. Never preview a database, a queue, or a
+      worker. Both calls are declarative and stick across restarts.
     PROMPT
   end
 end

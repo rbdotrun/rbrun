@@ -24,13 +24,43 @@ module Rbrun
       assert_equal %w[web worker], runs.map(&:name)
       assert runs.all?(&:status_running?)
 
+      # STARTING NEVER EXPOSES — a port is only what the process binds to inside the box.
       web = runs.find { |r| r.name == "web" }
-      assert web.previewable?
-      assert_equal "http://localhost:4321", web.url
+      refute web.previewable?, "start must not resolve a preview"
+      assert_nil web.url
       refute runs.find { |r| r.name == "worker" }.previewable?, "no port ⇒ not previewable"
 
       saved = Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b")
       assert_equal %w[web worker], saved.map(&:name)
+    end
+
+    test "preview is a separate, declarative decision — and survives a restart" do
+      start!
+      web = @worktree.service_runs.find_by(name: "web")
+      refute web.previewable?
+
+      @launcher.preview("web")
+      assert web.reload.previewable?
+      assert_equal "http://localhost:4321", web.url
+      assert Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b").find_by(name: "web").previewed?
+
+      # the declaration lives on the DEFINITION, so a reset-and-relaunch keeps it previewed
+      start!
+      assert @worktree.service_runs.find_by(name: "web").previewable?, "preview declaration survives a restart"
+
+      @launcher.stop_preview("web")
+      refute @worktree.service_runs.find_by(name: "web").previewable?
+      refute Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b").find_by(name: "web").previewed?
+
+      # and once withdrawn, a restart does NOT re-expose it
+      start!
+      refute @worktree.service_runs.find_by(name: "web").previewable?
+    end
+
+    test "preview refuses a service with no port, and an unknown service" do
+      start!
+      assert_equal :no_port, @launcher.preview("worker")
+      assert_equal :unknown, @launcher.preview("nope")
     end
 
     test "start is idempotent — a second start does not duplicate runs" do

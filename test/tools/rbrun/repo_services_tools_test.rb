@@ -18,8 +18,18 @@ module Rbrun
       ])
       assert_equal "web", res.dig("data", "services", 0, "name")
       assert_equal "running", res.dig("data", "services", 0, "status")
-      assert_equal "http://localhost:4322", res.dig("data", "services", 0, "url")
+      # STARTING NEVER EXPOSES: a port is only what the process binds to inside the box.
+      assert_nil res.dig("data", "services", 0, "url"), "start must not resolve a preview"
       assert @worktree.service_runs.find_by(name: "web").status_running?
+
+      # Previewing is a separate, explicit decision.
+      preview = tool(Rbrun::Tools::PreviewService).execute(name: "web")
+      assert_equal "http://localhost:4322", preview.dig("data", "url")
+      assert preview.dig("data", "previewed")
+
+      stopped = tool(Rbrun::Tools::StopPreview).execute(name: "web")
+      refute stopped.dig("data", "previewed")
+      assert_nil @worktree.service_runs.find_by(name: "web").url
 
       manifest = Rbrun::ApplicationTool.manifest.index_by { |e| e["name"] }
       assert manifest["repo_services_start"]["needs_approval"]

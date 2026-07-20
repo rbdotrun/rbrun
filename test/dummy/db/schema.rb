@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_180000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -58,6 +58,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_170000) do
     t.string "name", null: false
     t.integer "port"
     t.integer "position", default: 0, null: false
+    t.boolean "previewed", default: false, null: false
     t.string "repo", null: false
     t.string "tenant", null: false
     t.datetime "updated_at", null: false

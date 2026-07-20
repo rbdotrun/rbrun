@@ -21,6 +21,8 @@ Rbrun::Engine.routes.draw do
       get  :logs   # open the logs drawer
       post :restart
       post :stop
+      post :preview      # expose this service for preview (separate from running it)
+      post :stop_preview # withdraw the preview; the service keeps running
     end
   end
   post "services/restart_all", to: "services#restart_all", as: :restart_all_services

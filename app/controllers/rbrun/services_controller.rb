@@ -3,7 +3,7 @@ module Rbrun
   # ServiceLauncher (whose DB writes trigger the panel broadcast); `open` sends the browser to the live
   # app; `logs` opens the drawer with a bounded tail. All tenant-scoped to the viewer.
   class ServicesController < Rbrun::ApplicationController
-    before_action :set_run, only: %i[open logs restart stop]
+    before_action :set_run, only: %i[open logs restart stop preview stop_preview]
 
     # Send the browser to the live app. VERIFIED against Daytona: the preview token is HEADER-ONLY
     # (x-daytona-preview-token → 200), which a browser tab can never send. Passing it as a query param
@@ -28,6 +28,17 @@ module Rbrun
 
     def stop
       launcher.stop(name: @run.name)
+      head :no_content
+    end
+
+    # Previewing is a separate, explicit, reversible decision from running the service.
+    def preview
+      launcher.preview(@run.name)
+      head :no_content
+    end
+
+    def stop_preview
+      launcher.stop_preview(@run.name)
       head :no_content
     end
 
