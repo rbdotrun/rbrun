@@ -1,0 +1,100 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# DEV EXPOSURE — makes a laptop-hosted rbrun reachable so previews (and, later, Daytona webhooks) work.
+# Standalone and idempotent: it find-or-creates a Cloudflare tunnel, points a hostname's CNAME at it, and
+# prints TUNNEL_TOKEN so you can `cloudflared tunnel run --token <token>`. It stores nothing — the token
+# is always re-fetched, so re-running converges and prints the same token.
+#
+# This is DEV tooling, NOT a product feature and NOT a consumer of rbrun-dns (that family is for users to
+# put their OWN domain on their previews).
+#
+#   bin/setup                      # uses RBRUN_TUNNEL_HOST + PORT from .env (defaults below)
+#
+# Requires in .env: CLOUDFLARE_API_KEY (a token with Account:Cloudflare Tunnel:Edit + Zone:DNS:Edit,
+# Zone:Read), CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_ZONE_ID.
+
+require "net/http"
+require "json"
+require "securerandom"
+require "base64"
+
+ROOT = File.expand_path("..", __dir__)
+
+def load_env!
+  path = File.join(ROOT, ".env")
+  return unless File.exist?(path)
+
+  File.foreach(path) do |line|
+    line = line.strip
+    next if line.empty? || line.start_with?("#")
+
+    k, _, v = line.partition("=")
+    ENV[k.strip] ||= v.strip.gsub(/\A["']|["']\z/, "")
+  end
+end
+
+load_env!
+
+TOKEN   = ENV.fetch("CLOUDFLARE_API_KEY")     { abort "Missing CLOUDFLARE_API_KEY in .env" }
+ACCOUNT = ENV.fetch("CLOUDFLARE_ACCOUNT_ID")  { abort "Missing CLOUDFLARE_ACCOUNT_ID in .env" }
+ZONE    = ENV.fetch("CLOUDFLARE_ZONE_ID")     { abort "Missing CLOUDFLARE_ZONE_ID in .env" }
+HOST    = ENV.fetch("RBRUN_TUNNEL_HOST", "rbrun-dev.rb.run")
+PORT    = ENV.fetch("PORT", "3009")
+NAME    = ENV.fetch("RBRUN_TUNNEL_NAME", "rbrun-dev")
+API     = "https://api.cloudflare.com/client/v4"
+
+def cf(method, path, body = nil)
+  uri = URI("#{API}#{path}")
+  klass = { get: Net::HTTP::Get, post: Net::HTTP::Post, put: Net::HTTP::Put, patch: Net::HTTP::Patch }.fetch(method)
+  req = klass.new(uri)
+  req["Authorization"] = "Bearer #{TOKEN}"
+  req["Content-Type"]  = "application/json"
+  req.body = JSON.generate(body) if body
+
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(req) }
+  parsed = JSON.parse(res.body) rescue {}
+  unless parsed["success"]
+    abort "Cloudflare #{method.upcase} #{path} failed: #{Array(parsed["errors"]).map { |e| e["message"] }.join('; ')}"
+  end
+  parsed["result"]
+end
+
+# 1. Find-or-create the tunnel (remotely-managed, token-run).
+existing = cf(:get, "/accounts/#{ACCOUNT}/cfd_tunnel?name=#{NAME}&is_deleted=false")
+tunnel = Array(existing).first
+if tunnel
+  warn "→ tunnel '#{NAME}' exists (#{tunnel['id']})"
+else
+  secret = Base64.strict_encode64(SecureRandom.random_bytes(35))
+  tunnel = cf(:post, "/accounts/#{ACCOUNT}/cfd_tunnel", { name: NAME, tunnel_secret: secret, config_src: "cloudflare" })
+  warn "→ created tunnel '#{NAME}' (#{tunnel['id']})"
+end
+tunnel_id = tunnel["id"]
+
+# 2. Ingress config: this host → the local rbrun, everything else 404. PUT is declarative (idempotent).
+cf(:put, "/accounts/#{ACCOUNT}/cfd_tunnel/#{tunnel_id}/configurations", {
+     config: { ingress: [ { hostname: HOST, service: "http://localhost:#{PORT}" }, { service: "http_status:404" } ] }
+   })
+warn "→ ingress: #{HOST} → http://localhost:#{PORT}"
+
+# 3. Upsert the CNAME → <tunnel>.cfargotunnel.com, proxied.
+content = "#{tunnel_id}.cfargotunnel.com"
+record  = Array(cf(:get, "/zones/#{ZONE}/dns_records?name=#{HOST}&type=CNAME")).first
+if record
+  cf(:patch, "/zones/#{ZONE}/dns_records/#{record['id']}", { type: "CNAME", name: HOST, content: content, proxied: true })
+  warn "→ CNAME updated: #{HOST} → #{content}"
+else
+  cf(:post, "/zones/#{ZONE}/dns_records", { type: "CNAME", name: HOST, content: content, proxied: true })
+  warn "→ CNAME created: #{HOST} → #{content}"
+end
+
+# 4. Fetch (never store) the run token.
+token = cf(:get, "/accounts/#{ACCOUNT}/cfd_tunnel/#{tunnel_id}/token")
+
+warn "\n#{'═' * 64}"
+warn "  rbrun is exposed at: https://#{HOST}   (→ localhost:#{PORT})"
+warn "  Run the tunnel with:"
+warn "    cloudflared tunnel run --token $TUNNEL_TOKEN"
+warn "#{'═' * 64}\n"
+puts "TUNNEL_TOKEN=#{token}"
