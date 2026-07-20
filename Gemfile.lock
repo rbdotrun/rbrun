@@ -20,6 +20,15 @@ PATH
       view_component-contrib
 
 PATH
+  remote: gems/rbrun-dns
+  specs:
+    rbrun-dns (0.1.0)
+      async (>= 2.0)
+      async-http (>= 0.60)
+      async-http-faraday (>= 0.12)
+      faraday (~> 2.0)
+
+PATH
   remote: gems/rbrun-runtime
   specs:
     rbrun-runtime (0.1.0)
@@ -412,6 +421,7 @@ DEPENDENCIES
   propshaft
   puma
   rbrun!
+  rbrun-dns!
   rbrun-runtime!
   rbrun-sandbox!
   rubocop-rails-omakase
