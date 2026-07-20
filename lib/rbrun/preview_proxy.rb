@@ -38,16 +38,16 @@ module Rbrun
     private
 
     def serve(request, token)
-      service = Rbrun::RepoService.find_by(preview_token: token)
-      return not_found unless service
+      exposure = Rbrun::ServiceExposure.find_by(preview_token: token)
+      return not_found unless exposure
 
-      run = service.live_run
+      run = exposure.live_run # the running service in THIS worktree's sandbox — unambiguous
       return unavailable unless run&.url.present?
 
       # Level gate. Public ⇒ anyone. Private ⇒ an rbrun session is required (a teammate needs an rbrun
       # account, not a Daytona one). NOTE: for the private path across subdomains, the session cookie must
       # be scoped to ".<domain>" — otherwise the preview host never sees it. Public needs no session.
-      return require_login unless service.shared_public? || authenticated?(request)
+      return require_login unless exposure.shared_public? || authenticated?(request)
 
       relay(request, run)
     end
@@ -67,16 +67,34 @@ module Rbrun
       upstream = connection.run_request(request.request_method.downcase.to_sym, url, body, forward_headers(request, run))
 
       headers = upstream.headers.reject { |k, _| HOP_BY_HOP.include?(k.to_s.downcase) }
+      confine_cookies!(headers, request.host)
       [ upstream.status, headers, [ upstream.body.to_s ] ]
     end
 
-    # The provider preview token is attached HERE, server-side, and never reaches the client.
+    # The provider preview token is attached HERE, server-side, and never reaches the client. Cookies flow
+    # untouched (the app authenticates its own users); the app is told it is on HTTPS so its Secure/
+    # SameSite session cookies are set and sent.
     def forward_headers(request, run)
-      headers = { "x-daytona-preview-token" => run.token.to_s }
+      headers = {
+        "x-daytona-preview-token" => run.token.to_s,
+        "x-forwarded-proto" => "https",
+        "x-forwarded-host" => request.host,
+        "cookie" => request.get_header("HTTP_COOKIE").to_s
+      }
       headers["content-type"] = request.content_type if request.content_type.present?
       accept = request.get_header("HTTP_ACCEPT")
       headers["accept"] = accept if accept.present?
-      headers
+      headers.reject { |_, v| v.to_s.empty? }
+    end
+
+    # A proxied app's Set-Cookie must not widen its Domain past its own preview host — else it would bleed
+    # across previews and the rbrun app itself. Strip any Domain attribute so the cookie stays host-only.
+    def confine_cookies!(headers, _host)
+      key = headers.keys.find { |k| k.to_s.casecmp?("set-cookie") }
+      return unless key
+
+      cookies = Array(headers[key])
+      headers[key] = cookies.map { |c| c.to_s.gsub(/;\s*Domain=[^;]*/i, "") }
     end
 
     def connection

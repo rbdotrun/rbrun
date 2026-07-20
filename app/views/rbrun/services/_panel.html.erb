@@ -3,7 +3,7 @@
 <div id="services_panel_<%= worktree.id %>">
   <% runs = worktree.service_runs.order(:name).to_a %>
   <% saved = Rbrun::RepoService.for_tenant(worktree.tenant).for_repo(worktree.repo) %>
-  <% shared = saved.where(shared_public: true).map(&:name) %>
+  <% exposures = worktree.service_exposures.index_by(&:name) %>
   <% if runs.any? || saved.any? %>
     <div class="rounded-md border border-slate-200 bg-white group-data-[collapsed]/sidebar:hidden">
       <div class="flex items-center gap-2 border-b border-slate-100 px-2.5 py-1.5">
@@ -21,13 +21,14 @@
               <span class="ml-auto flex items-center gap-1">
                 <%# Previewing is a SEPARATE decision from running: Open only appears once the service is %>
                 <%# actually previewed. A port alone means it merely CAN be previewed. %>
-                <% if run.previewable? %>
-                  <%= link_to rbrun.open_service_path(run), target: "_blank", rel: "noopener",
+                <% exp = exposures[run.name] %>
+                <% if exp&.previewed? && run.url.present? %>
+                  <%= link_to exp.preview_url, target: "_blank", rel: "noopener",
                         class: "rounded p-1 text-green-600 hover:bg-slate-100", title: "Open preview" do %>
                     <%= lucide_icon("external-link", class: "size-3.5") %>
                   <% end %>
                   <%# Level 3 — only offered once previewed. Public state is shown loudly, never quietly. %>
-                  <% if shared.include?(run.name) %>
+                  <% if exp.shared_public? %>
                     <%= button_to rbrun.stop_sharing_service_path(run), method: :post,
                           class: "rounded p-1 text-amber-600 hover:bg-amber-50", title: "Public — anyone with the link. Click to stop sharing." do %>
                       <%= lucide_icon("globe", class: "size-3.5") %>

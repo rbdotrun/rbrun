@@ -34,32 +34,45 @@ module Rbrun
       assert_equal %w[web worker], saved.map(&:name)
     end
 
-    test "preview is a separate, declarative decision — and survives a restart" do
+    test "preview is a separate, declarative decision — per worktree — and survives a restart" do
       start!
-      web = @worktree.service_runs.find_by(name: "web")
-      refute web.previewable?
+      refute @launcher.previewed?("web")
 
-      @launcher.preview("web")
-      assert web.reload.previewable?
-      assert_equal "http://localhost:4321", web.url
-      assert Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b").find_by(name: "web").previewed?
+      exp = @launcher.preview("web")
+      assert_instance_of Rbrun::ServiceExposure, exp
+      assert @launcher.previewed?("web")
+      assert exp.preview_token.present?
+      assert_equal "http://localhost:4321", @worktree.service_runs.find_by(name: "web").url, "upstream resolved onto the run"
 
-      # the declaration lives on the DEFINITION, so a reset-and-relaunch keeps it previewed
+      # the declaration lives on the EXPOSURE (per worktree), so a reset-and-relaunch keeps it previewed
+      token = exp.preview_token
       start!
-      assert @worktree.service_runs.find_by(name: "web").previewable?, "preview declaration survives a restart"
+      assert @launcher.previewed?("web"), "preview declaration survives a restart"
+      assert_equal token, @launcher.exposure("web").preview_token, "the token is stable across the reset"
 
       @launcher.stop_preview("web")
-      refute @worktree.service_runs.find_by(name: "web").previewable?
-      refute Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b").find_by(name: "web").previewed?
+      refute @launcher.previewed?("web")
 
-      # and once withdrawn, a restart does NOT re-expose it
       start!
-      refute @worktree.service_runs.find_by(name: "web").previewable?
+      refute @launcher.previewed?("web"), "a restart does not re-expose a withdrawn preview"
+    end
+
+    test "two worktrees of one repo get DISTINCT preview tokens (no cross-worktree ambiguity)" do
+      start!
+      t1 = @launcher.preview("web").preview_token
+
+      wt2 = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
+      l2  = Rbrun::ServiceLauncher.new(worktree: wt2)
+      l2.start([ { "name" => "web", "command" => "sh -c 'sleep 30'", "port" => 4321 } ])
+      t2 = l2.preview("web").preview_token
+
+      refute_equal t1, t2, "each worktree's service is addressed independently"
+    ensure
+      wt2&.sandbox&.destroy!
     end
 
     test "public STRICTLY requires previewed — and stop_preview revokes the share" do
       start!
-      # level 3 is refused while only level 1 holds
       assert_equal :not_previewed, @launcher.share_public("web")
       refute @launcher.shared?("web")
 
@@ -69,7 +82,6 @@ module Rbrun
       @launcher.share_public("web")
       assert @launcher.shared?("web"), "sharing twice is idempotent"
 
-      # withdrawing level 2 must cascade — (public && !previewed) is unreachable
       @launcher.stop_preview("web")
       refute @launcher.shared?("web"), "stop_preview revokes the public share"
     end
@@ -81,7 +93,7 @@ module Rbrun
       @launcher.stop_sharing("web")
 
       refute @launcher.shared?("web")
-      assert @worktree.service_runs.find_by(name: "web").previewable?, "still previewed"
+      assert @launcher.previewed?("web"), "still previewed"
       assert @worktree.service_runs.find_by(name: "web").status_running?, "still running"
     end
 

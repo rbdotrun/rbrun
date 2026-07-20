@@ -12,9 +12,8 @@ module Rbrun
       Rbrun.config.preview_domain = "rb.run"
 
       @worktree = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
-      @svc = Rbrun::RepoService.create!(tenant: "rbrun", repo: "a/b", name: "web", command: "x",
-                                        port: 3000, previewed: true, shared_public: true)
-      @token = @svc.ensure_preview_token!
+      @exp = @worktree.service_exposures.create!(name: "web", previewed: true, shared_public: true)
+      @token = @exp.ensure_preview_token!
       @run = @worktree.service_runs.create!(name: "web", command: "x", port: 3000, status: "running",
                                             url: UPSTREAM, token: "provider-secret")
       host! "#{@token}-preview.rb.run"
@@ -61,7 +60,7 @@ module Rbrun
     end
 
     test "a PRIVATE (previewed, not shared) preview refuses an anonymous visitor" do
-      @svc.update!(shared_public: false)
+      @exp.update!(shared_public: false)
       get "/"
       assert_response :forbidden
       assert_includes response.body, "private"

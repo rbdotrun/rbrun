@@ -5,14 +5,13 @@ module Rbrun
   class ServicesController < Rbrun::ApplicationController
     before_action :set_run, only: %i[open logs restart stop preview stop_preview share_public stop_sharing]
 
-    # Send the browser to the live app. VERIFIED against Daytona: the preview token is HEADER-ONLY
-    # (x-daytona-preview-token → 200), which a browser tab can never send. Passing it as a query param
-    # does NOT authenticate — the proxy 307s to its own login and the token is ignored. So we redirect to
-    # the bare URL and let the proxy authenticate the viewer's own provider session.
+    # Send the browser to the engine's own preview edge (<token>-preview.<domain>), which proxies to the
+    # sandbox with the provider token attached server-side. Not the provider URL.
     def open
-      return head(:not_found) unless @run.previewable?
+      exp = launcher.exposure(@run.name)
+      return head(:not_found) unless exp&.preview_url.present?
 
-      redirect_to @run.url, allow_other_host: true
+      redirect_to exp.preview_url, allow_other_host: true
     end
 
     def logs

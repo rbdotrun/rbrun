@@ -20,7 +20,7 @@ module Rbrun
         when :no_port     then error("service #{name} declares no port — nothing to preview")
         when :unsupported then error("this sandbox provider cannot publish a port")
         when :not_running then error("service #{name} is not running — start it first")
-        else { "data" => { "name" => result.name, "port" => result.port, "url" => result.url, "previewed" => true } }
+        else { "data" => { "name" => name, "url" => result.preview_url, "previewed" => true } }
         end
       end
     end
