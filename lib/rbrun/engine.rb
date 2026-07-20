@@ -10,7 +10,7 @@ module Rbrun
     # The host's asset pipeline (Propshaft) serves it; the host never runs bun.
     # Never let a submitted secret leak into logs — the request_secrets form posts secrets[...] values.
     initializer "rbrun.filter_parameters" do |app|
-      app.config.filter_parameters += [ :secrets, :value ]
+      app.config.filter_parameters += [ :secrets, :value, :token ]
     end
 
     initializer "rbrun.assets" do |app|
