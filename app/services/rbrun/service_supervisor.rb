@@ -18,7 +18,7 @@ module Rbrun
       secrets = Rbrun::RepoSecret.for_tenant(@worktree.tenant).for_repo(@worktree.repo)
       body = secrets.map { |s| "export #{s.key}=#{Shellwords.escape(s.value.to_s)}" }.join("\n")
       script = "mkdir -p #{ws}/.rbrun && (umask 177; cat > #{ws}/.rbrun/env) <<'RBRUN_ENV'\n#{body}\nRBRUN_ENV"
-      @sandbox.exec("sh -lc #{Shellwords.escape(script)}")
+      @sandbox.exec("sh -c #{Shellwords.escape(script)}")
     end
 
     # Start run.command as a managed session: cd into the workspace, source the secret env, record the
@@ -28,14 +28,14 @@ module Rbrun
       @sandbox.session_create(sess)
       wrapped = "cd #{ws} && mkdir -p .rbrun && set -a; [ -f .rbrun/env ] && . .rbrun/env; set +a; " \
                 "echo $$ > .rbrun/#{pidfile(run)}; exec #{run.command}"
-      cmd_id = @sandbox.session_exec(sess, "sh -lc #{Shellwords.escape(wrapped)}")
+      cmd_id = @sandbox.session_exec(sess, "sh -c #{Shellwords.escape(wrapped)}")
       run.update!(process_session: sess, cmd_id: cmd_id, status: "running", exit_code: nil, log_offset: 0)
       run
     end
 
     # Kill by pidfile (plain exec, universal to every adapter). Idempotent.
     def stop(run)
-      @sandbox.exec("sh -lc #{Shellwords.escape("kill $(cat #{ws}/.rbrun/#{pidfile(run)} 2>/dev/null) 2>/dev/null; true")}")
+      @sandbox.exec("sh -c #{Shellwords.escape("kill $(cat #{ws}/.rbrun/#{pidfile(run)} 2>/dev/null) 2>/dev/null; true")}")
       run.update!(status: "stopped")
       run
     end

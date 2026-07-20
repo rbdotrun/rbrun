@@ -14,8 +14,8 @@ module Rbrun
     validates :name, :command, presence: true
 
     after_create_commit  :broadcast_panel
-    after_update_commit   :broadcast_panel
-    after_destroy_commit  :broadcast_panel
+    after_update_commit  :broadcast_panel
+    after_destroy_commit :broadcast_panel
 
     # A service is previewable when it serves an HTTP port AND the provider resolved a public URL.
     def previewable? = port.present? && url.present?
