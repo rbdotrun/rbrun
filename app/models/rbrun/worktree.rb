@@ -16,6 +16,10 @@ module Rbrun
     # The branch's checkout, shared by every Session under this Worktree. Addressed by the worktree id.
     def sandbox = @sandbox ||= Rbrun.sandbox(tenant: tenant, labels: { worktree: id.to_s })
 
+    # Preview capability probe (no registry): true when this worktree's sandbox provider can publish a
+    # port. The UI gates the Open ↗ affordance on this; the launcher gates preview resolution on it.
+    def previews_supported? = sandbox.respond_to?(:preview_url)
+
     # Clone the repo into the sandbox and spin the branch off base — using the config github_pat. Run
     # once, when the worktree is first used.
     def provision!
