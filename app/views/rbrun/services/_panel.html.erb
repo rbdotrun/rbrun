@@ -3,6 +3,7 @@
 <div id="services_panel_<%= worktree.id %>">
   <% runs = worktree.service_runs.order(:name).to_a %>
   <% saved = Rbrun::RepoService.for_tenant(worktree.tenant).for_repo(worktree.repo) %>
+  <% shares = worktree.public_shares.index_by(&:name) %>
   <% if runs.any? || saved.any? %>
     <div class="rounded-md border border-slate-200 bg-white group-data-[collapsed]/sidebar:hidden">
       <div class="flex items-center gap-2 border-b border-slate-100 px-2.5 py-1.5">
@@ -24,6 +25,18 @@
                   <%= link_to rbrun.open_service_path(run), target: "_blank", rel: "noopener",
                         class: "rounded p-1 text-green-600 hover:bg-slate-100", title: "Open preview" do %>
                     <%= lucide_icon("external-link", class: "size-3.5") %>
+                  <% end %>
+                  <%# Level 3 — only offered once previewed. Public state is shown loudly, never quietly. %>
+                  <% if (share = shares[run.name]) %>
+                    <%= button_to rbrun.stop_sharing_service_path(run), method: :post,
+                          class: "rounded p-1 text-amber-600 hover:bg-amber-50", title: "Public — anyone with the link. Click to stop sharing." do %>
+                      <%= lucide_icon("globe", class: "size-3.5") %>
+                    <% end %>
+                  <% else %>
+                    <%= button_to rbrun.share_public_service_path(run), method: :post,
+                          class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Share publicly (anyone with the link)" do %>
+                      <%= lucide_icon("globe", class: "size-3.5") %>
+                    <% end %>
                   <% end %>
                   <%= button_to rbrun.stop_preview_service_path(run), method: :post,
                         class: "rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", title: "Stop previewing" do %>
@@ -49,6 +62,14 @@
                 <% end %>
               </span>
             </li>
+            <% if (share = shares[run.name]) %>
+              <li class="flex items-center gap-1.5 px-2.5 pb-1.5 -mt-0.5">
+                <%= lucide_icon("globe", class: "size-3 shrink-0 text-amber-600") %>
+                <span class="truncate text-[11px] text-amber-700" title="Public — anyone with this link, no account">
+                  <%= rbrun.public_preview_path(token: share.token) %>
+                </span>
+              </li>
+            <% end %>
           <% end %>
         </ul>
       <% elsif saved.any? %>

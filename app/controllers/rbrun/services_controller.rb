@@ -3,7 +3,7 @@ module Rbrun
   # ServiceLauncher (whose DB writes trigger the panel broadcast); `open` sends the browser to the live
   # app; `logs` opens the drawer with a bounded tail. All tenant-scoped to the viewer.
   class ServicesController < Rbrun::ApplicationController
-    before_action :set_run, only: %i[open logs restart stop preview stop_preview]
+    before_action :set_run, only: %i[open logs restart stop preview stop_preview share_public stop_sharing]
 
     # Send the browser to the live app. VERIFIED against Daytona: the preview token is HEADER-ONLY
     # (x-daytona-preview-token → 200), which a browser tab can never send. Passing it as a query param
@@ -42,6 +42,19 @@ module Rbrun
       head :no_content
     end
 
+    # Level 3 — anyone with the link. Requires previewed; the launcher refuses otherwise.
+    def share_public
+      launcher.share_public(@run.name)
+      broadcast_panel
+      head :no_content
+    end
+
+    def stop_sharing
+      launcher.stop_sharing(@run.name)
+      broadcast_panel
+      head :no_content
+    end
+
     def restart_all
       worktree = worktrees.find(params[:worktree_id])
       Rbrun::ServiceLauncher.new(worktree: worktree).restart_saved
@@ -49,6 +62,14 @@ module Rbrun
     end
 
     private
+
+    # Sharing writes PublicShare rows, which have no broadcast callback of their own (only ServiceRun
+    # does), so repaint the panel explicitly after a share/revoke.
+    def broadcast_panel
+      wt = @run.worktree
+      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_worktree_#{wt.id}",
+        target: "services_panel_#{wt.id}", partial: "rbrun/services/panel", locals: { worktree: wt })
+    end
 
     def worktrees = Rbrun::Worktree.for_tenant(current_tenant)
     def set_run   = @run = Rbrun::ServiceRun.for_tenant(current_tenant).find(params[:id])

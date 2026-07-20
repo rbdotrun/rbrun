@@ -27,6 +27,8 @@ Rbrun::Engine.routes.draw do
       post :stop
       post :preview      # expose this service for preview (separate from running it)
       post :stop_preview # withdraw the preview; the service keeps running
+      post :share_public # level 3: anyone with the link (requires previewed)
+      post :stop_sharing # revoke the public link
     end
   end
   post "services/restart_all", to: "services#restart_all", as: :restart_all_services

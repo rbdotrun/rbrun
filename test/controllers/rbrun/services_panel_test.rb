@@ -24,6 +24,31 @@ module Rbrun
       assert_select "a[href=?]", "/rbrun/services/#{@worktree.service_runs.find_by(name: 'worker').id}/open", false
     end
 
+    test "Share publicly is offered ONLY once previewed, and public state is shown loudly" do
+      run = @worktree.service_runs.create!(name: "web", command: "x", port: 3000, status: "running")
+
+      # level 1 only — no share button at all
+      get "/rbrun/c/#{@session.id}"
+      assert_select "form[action=?]", "/rbrun/services/#{run.id}/share_public", false
+
+      # level 2 — now it is offered
+      run.update!(url: "http://localhost:3000")
+      get "/rbrun/c/#{@session.id}"
+      assert_select "form[action=?]", "/rbrun/services/#{run.id}/share_public"
+
+      # level 3 — the public link is surfaced and the action flips to revoke
+      share = @worktree.public_shares.create!(name: "web")
+      get "/rbrun/c/#{@session.id}"
+      assert_select "form[action=?]", "/rbrun/services/#{run.id}/stop_sharing"
+      assert_select "#services_panel_#{@worktree.id}", /#{Regexp.escape(share.token[0, 12])}/
+    end
+
+    test "share_public refuses a service that is not previewed" do
+      run = @worktree.service_runs.create!(name: "web", command: "x", port: 3000, status: "running")
+      post "/rbrun/services/#{run.id}/share_public"
+      assert_nil @worktree.public_shares.find_by(name: "web"), "public requires previewed"
+    end
+
     test "no worktree in context → no panel" do
       get "/rbrun/c" # index, no @session
       assert_response :success
