@@ -44,10 +44,17 @@ module Rbrun
     private
 
     def normalize(services)
-      Array(services).map do |s|
-        s = s.transform_keys(&:to_s)
-        Service.new(s["name"].to_s.strip, s["command"].to_s.strip, s["port"].presence&.to_i)
-      end.reject { |s| s.name.empty? || s.command.empty? }
+      Array(services).filter_map { |s| coerce_service(s) }.reject { |s| s.name.empty? || s.command.empty? }
+    end
+
+    # Tolerate a stray String element (a JSON blob) as well as a Hash — the client schema should send
+    # objects, but never crash the start on a malformed element.
+    def coerce_service(raw)
+      raw = (JSON.parse(raw) rescue nil) if raw.is_a?(String)
+      return nil unless raw.is_a?(Hash)
+
+      s = raw.transform_keys(&:to_s)
+      Service.new(s["name"].to_s.strip, s["command"].to_s.strip, s["port"].presence&.to_i)
     end
 
     def stop_all
@@ -76,6 +83,10 @@ module Rbrun
 
       link = @worktree.sandbox.preview_url(run.port)
       run.update!(url: link.url, token: link.token)
+      run
+    rescue StandardError => e
+      # A preview hiccup must not fail the service start — it still runs and logs, just without an Open.
+      Rails.logger.warn("[rbrun] preview_url(#{run.port}) failed: #{e.message}")
       run
     end
 

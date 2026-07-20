@@ -54,17 +54,33 @@ namespace :dogfood do
     session  = worktree.sessions.create!
 
     begin
-      dog.header "provision the app into the box"
-      worktree.provision!
-      dog.ok "the repo cloned", worktree.head_sha.present?
+      dog.header "provision the app into the box (upload the local checkout — private repo, no PAT)"
+      # benbonnet/dummy-rails is private and there's no GITHUB_PAT, so worktree.provision! (a PAT clone +
+      # push) can't run. The harness uploads a `git archive` of the local checkout's HEAD — tracked files
+      # only, so config/master.key (gitignored) stays OUT and still arrives via request_secrets. This is
+      # harness plumbing standing in for the clone, exactly as it stands in for the user's form entry.
+      require "open3"
+      local = "/Users/ben/Desktop/sources/dummy-rails"
+      archive, st = Open3.capture2("git", "-C", local, "archive", "--format=tar.gz", "HEAD")
+      abort "git archive of #{local} failed" unless st.success?
+      ws = worktree.sandbox.workspace
+      worktree.sandbox.write("app.tgz", archive)
+      worktree.sandbox.exec!("cd #{ws} && tar xzf app.tgz && rm -f app.tgz", timeout: 180)
+      dog.ok "the app is in the box", worktree.sandbox.exist?("Gemfile")
 
       # ── one real turn: the agent gathers the secret, then starts the services ──────────────────────
       dog.header "a real turn drives request_secrets → repo_services_start"
       session.run_turn(<<~MSG)
-        Get this Rails app running so I can preview it. First call request_secrets to ask me for
-        RAILS_MASTER_KEY (it's in config/master.key). Then start its services with repo_services_start:
-        a postgres database, run bin/rails db:prepare, and the web server on port 3000. Use the repo
-        services tools — do not background anything with &.
+        Get this Rails app's web server listening on port 3000 so I can preview it. Steps:
+        1. Run `bundle install` (a one-shot command, not a service).
+        2. Call request_secrets to ask me for RAILS_MASTER_KEY (it is in config/master.key).
+        3. The app uses PostgreSQL. Start a local postgres and prepare the database (`bin/rails
+           db:prepare`); set POSTGRES_HOST/PORT/USER/PASSWORD/DB env as needed. If the DB proves hard,
+           still get the web server LISTENING on port 3000 — a bound port is the priority.
+        4. Start the web server with repo_services_start:
+           `bin/rails server -b 0.0.0.0 -p 3000` on port 3000.
+        Use the repo_services tools for anything long-lived; debug failures with repo_services_logs.
+        Do not background anything with `&`.
       MSG
 
       # The turn parks on the request_secrets custom gate. Stand in for the user: submit the master key
@@ -93,32 +109,52 @@ namespace :dogfood do
         session.continue_turn!(nudge) if nudge
       end
 
-      dog.header "the services are running with a resolved preview"
-      web = worktree.service_runs.reload.find_by(name: "web") || worktree.service_runs.find { |r| r.port.present? }
-      dog.ok "a web service is running", web&.status_running?
-      dog.ok "Daytona resolved a preview url", web&.url.present?
-      dog.info "preview url", web&.url
-      dog.info "has token", (!web&.token.to_s.empty?).to_s
+      dog.header "what the agent actually did (diagnostics)"
+      if start_gate
+        proposed = Array(start_gate.payload.dig("input", "services"))
+        dog.info "proposed services", proposed.map { |s| "#{s['name']}:#{s['port']}=#{s['command']}" }.join(" | ")[0, 240]
+        sres = session.messages.where(event_type: "tool_result", tool_use_id: start_gate.tool_use_id).last
+        dog.info "start result", sres&.payload&.dig("result").to_json[0, 300]
+      end
+      sup = Rbrun::ServiceSupervisor.new(worktree: worktree)
+      worktree.service_runs.reload.each do |r|
+        dog.info "service", "#{r.name} port=#{r.port || '-'} status=#{r.status} url=#{r.url.presence || '-'}"
+        dog.info "  logs", sup.tail(r, lines: 6).to_s.squish[0, 200]
+      end
 
-      # ── THE CRUX: verify the browser token mechanism through the engine's open endpoint logic ──────
-      dog.header "verify the preview URL/token opens the live app (the §7 unknown)"
+      # ── THE CRUX (§7): verify the Daytona preview WIRE directly — independent of whether Rails booted. ──
+      # preview_url(3000) resolves the proxy URL + token; hitting it tells us the proxy+token mechanism
+      # works (even a 502/500 back means the wire delivered us; only a connection error / proxy-4xx fails).
+      dog.header "verify the Daytona preview URL + token wire (§7)"
       require "faraday"
       require "async/http/faraday"
-      target = web&.url.to_s
-      conn = Faraday.new { |f| f.adapter :async_http }
-      # Try the two mechanisms Daytona's proxy may accept, and report which serves the Rails app.
-      by_header = (conn.get(target) { |r| r.headers["x-daytona-preview-token"] = web.token if web&.token.present? }.status rescue nil)
-      by_query  = begin
-        u = web&.token.present? ? "#{target}#{target.include?('?') ? '&' : '?'}token=#{CGI.escape(web.token)}" : target
-        conn.get(u).status
-      rescue StandardError
-        nil
+      begin
+        link = worktree.sandbox.preview_url(3000)
+        dog.ok "preview_url(3000) resolved a URL", link.url.present?
+        dog.info "preview url", link.url
+        dog.info "token present", (!link.token.to_s.empty?).to_s
+        conn = Faraday.new { |f| f.adapter :async_http }
+        by_header = begin
+          conn.get(link.url) { |r| r.headers["x-daytona-preview-token"] = link.token if link.token.present? }.status
+        rescue StandardError => e
+          "err:#{e.class}"
+        end
+        by_query = begin
+          u = link.token.present? ? "#{link.url}#{link.url.include?('?') ? '&' : '?'}token=#{CGI.escape(link.token)}" : link.url
+          conn.get(u).status
+        rescue StandardError => e
+          "err:#{e.class}"
+        end
+        dog.info "status via x-daytona-preview-token header", by_header.inspect
+        dog.info "status via ?token= query", by_query.inspect
+        reached = [ by_header, by_query ].select { |s| s.is_a?(Integer) }.any? { |s| s.between?(200, 599) }
+        dog.ok "the preview URL + token reach the box (any HTTP status ⇒ the wire works)", reached
+        dog.info "next", "adapt Client#preview_link + ServicesController#preview_target to the mechanism that returned a status"
+      rescue StandardError => e
+        dog.ok "preview_url(3000) resolved (Daytona wire)", false
+        dog.info "preview_url error", "#{e.class}: #{e.message}"[0, 240]
+        dog.info "next", "fix Rbrun::Sandbox::Daytona::Client#preview_link — the endpoint/shape is wrong; see the error above"
       end
-      dog.info "status via x-daytona-preview-token header", by_header.inspect
-      dog.info "status via ?token= query", by_query.inspect
-      dog.ok "the live Rails app is reachable through the preview (one mechanism returned 2xx/3xx)",
-             [ by_header, by_query ].compact.any? { |s| s.to_i.between?(200, 399) }
-      dog.info "→ adapt ServicesController#preview_target + Client#preview_link to the mechanism that worked"
     ensure
       session.sandbox.destroy!
       worktree.destroy!

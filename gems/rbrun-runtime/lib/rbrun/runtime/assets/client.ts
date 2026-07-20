@@ -51,6 +51,10 @@ const SKILLS = existsSync(SKILLS_DIR)
 interface ManifestItems {
   type: string;
   enum?: string[];
+  // For object items: the shape of each element, so an array-of-objects param is modeled faithfully
+  // instead of collapsing to an array of strings.
+  properties?: Record<string, { type: string; description?: string }>;
+  required?: string[];
 }
 interface ManifestParam {
   name: string;
@@ -179,6 +183,24 @@ function zodItem(items: ManifestItems): z.ZodTypeAny {
       return z.number();
     case "boolean":
       return z.boolean();
+    case "object": {
+      // An array of objects: model the element shape from `properties` so the model sends objects
+      // (not strings). Without properties, fall back to an open object.
+      if (!items.properties) return z.record(z.string(), z.unknown());
+      const shape: Record<string, z.ZodTypeAny> = {};
+      for (const [key, prop] of Object.entries(items.properties)) {
+        let t: z.ZodTypeAny =
+          prop.type === "integer" || prop.type === "number"
+            ? z.number()
+            : prop.type === "boolean"
+              ? z.boolean()
+              : z.string();
+        if (prop.description) t = t.describe(prop.description);
+        if (!items.required?.includes(key)) t = t.optional();
+        shape[key] = t;
+      }
+      return z.object(shape);
+    }
     default:
       return z.string();
   }

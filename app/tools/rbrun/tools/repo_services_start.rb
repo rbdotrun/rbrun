@@ -17,7 +17,16 @@ module Rbrun
                                   { "name": "css", "command": "bin/rails tailwindcss:watch" } ] }
       TXT
 
-      parameter :services, type: "array", items: -> { { "type" => "object" } },
+      parameter :services, type: "array",
+                items: -> {
+                  { "type" => "object",
+                    "properties" => {
+                      "name"    => { "type" => "string",  "description" => "short service name (e.g. web, worker, db)" },
+                      "command" => { "type" => "string",  "description" => "the command to run" },
+                      "port"    => { "type" => "integer", "description" => "the HTTP port — ONLY if it serves HTTP" }
+                    },
+                    "required" => %w[name command] }
+                },
                 description: "the services to run: [{ name, command, port? }]", required: true
 
       def execute(services:)

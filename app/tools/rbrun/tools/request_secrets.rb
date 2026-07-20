@@ -18,7 +18,17 @@ module Rbrun
                            "hint": "from config/master.key" } ] }
       TXT
 
-      parameter :secrets, type: "array", items: -> { { "type" => "object" } },
+      parameter :secrets, type: "array",
+                items: -> {
+                  { "type" => "object",
+                    "properties" => {
+                      "key"      => { "type" => "string",  "description" => "the ENV var name (e.g. RAILS_MASTER_KEY)" },
+                      "label"    => { "type" => "string",  "description" => "a short human label for the field" },
+                      "required" => { "type" => "boolean", "description" => "whether the user must provide it" },
+                      "hint"     => { "type" => "string",  "description" => "where to find it / what it is" }
+                    },
+                    "required" => %w[key label] }
+                },
                 description: "the secrets to request: [{ key, label, required?, hint? }]", required: true
     end
   end
