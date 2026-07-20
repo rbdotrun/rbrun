@@ -164,6 +164,59 @@ namespace :dogfood do
       dog.ok "…and the declaration is recorded on the saved definition", !!saved_web.call&.previewed?
       dog.ok "the service is still running (preview did not disturb it)", web&.status_running?
 
+      # ── PHASE 3: public is a THIRD step — anyone with the link, gated by approval. ─────────────────
+      dog.header "phase 3 — a third turn asks the agent to share it publicly (gated)"
+      session.run_turn("Now share the web service publicly so anyone with the link can open it, even without an account.")
+      drive.call
+      shared_call = session.messages.where(event_type: "tool_use").any? { |m| m.payload["name"] == "share_public" }
+      launcher = Rbrun::ServiceLauncher.new(worktree: worktree)
+      share = launcher.share_for("web")
+      dog.ok "the agent called share_public", shared_call
+      dog.ok "share_public is a GATED tool (approval was required)", Rbrun::Tools::SharePublic.needs_approval?
+      dog.ok "a public share exists for web", share.present?
+
+      # SCOPING — the whole point: only the shared service has a route.
+      dog.ok "postgres has NO public share", launcher.share_for("db").nil?
+      dog.ok "the job worker has NO public share", launcher.share_for("jobs").nil?
+      dog.ok "exactly ONE service is shared", worktree.public_shares.count == 1
+
+      # THE BOX ITSELF WAS NEVER OPENED: the raw provider preview URL still demands provider auth.
+      if web&.url.present?
+        anon_final = begin
+          c = Faraday.new { |f| f.adapter :async_http }
+          u = web.url
+          8.times do
+            r = c.get(u)
+            loc = r.headers["location"]
+            break unless loc && r.status.between?(300, 399)
+
+            u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
+          end
+          u
+        rescue StandardError
+          nil
+        end
+        dog.ok "the SANDBOX is still private (raw provider url ⇒ provider login)",
+               anon_final.to_s.match?(/auth0|login/)
+      end
+
+      if share
+        puts "\n╔══════════════════════════════════════════════════════════════════"
+        puts "║  PUBLIC LINK (served by rbrun's own edge — no account needed):"
+        puts "║  #{Rbrun::Engine.routes.url_helpers.public_preview_path(token: share.token)}"
+        puts "║  (mount it under your rbrun host, e.g. http://localhost:3000/rbrun/p/…)"
+        puts "╚══════════════════════════════════════════════════════════════════\n"
+      end
+
+      dog.header "revocation"
+      launcher.stop_sharing("web")
+      dog.ok "stop_sharing revokes the link", launcher.share_for("web").nil?
+      launcher.preview("web")
+      launcher.share_public("web")
+      dog.ok "re-sharing mints a share again", launcher.share_for("web").present?
+      launcher.stop_preview("web")
+      dog.ok "stop_preview CASCADES — the public share is revoked too", launcher.share_for("web").nil?
+
       dog.header "what the agent actually did (diagnostics)"
       if start_gate
         proposed = Array(start_gate.payload.dig("input", "services"))
