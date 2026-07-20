@@ -12,9 +12,16 @@ module Rbrun
     has_many :service_runs, class_name: "Rbrun::ServiceRun", dependent: :destroy
 
     before_validation :assign_branch, on: :create
+    before_validation :assign_sandbox_provider, on: :create
 
     # The branch's checkout, shared by every Session under this Worktree. Addressed by the worktree id.
-    def sandbox = @sandbox ||= Rbrun.sandbox(tenant: tenant, labels: { worktree: id.to_s })
+    #
+    # The PROVIDER IS PERSISTED (sandbox_provider), not taken from the ambient process config: a worktree
+    # is bound to the backend hosting its box, so loading this row in ANY process (web, job, rake, runner)
+    # resolves the SAME box. Without it the row silently resolved to whatever that process defaulted to —
+    # quietly creating a new empty box instead of finding the real one. If the process can't build that
+    # provider (missing credentials), this now fails LOUDLY rather than drifting to another backend.
+    def sandbox = @sandbox ||= Rbrun.sandbox(sandbox_provider&.to_sym, tenant: tenant, labels: { worktree: id.to_s })
 
     # Preview capability probe (no registry): true when this worktree's sandbox provider can publish a
     # port. The UI gates the Open ↗ affordance on this; the launcher gates preview resolution on it.
@@ -48,5 +55,10 @@ module Rbrun
     private
 
     def assign_branch = self.branch ||= "rbrun/wt-#{SecureRandom.hex(4)}"
+
+    # Record the backend this worktree's box is created on, so every later process resolves the same one.
+    def assign_sandbox_provider
+      self.sandbox_provider ||= Rbrun.config(tenant).sandbox_provider[:default]&.to_s
+    end
   end
 end

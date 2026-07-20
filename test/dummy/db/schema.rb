@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_170000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -183,6 +183,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_120000) do
     t.string "branch", null: false
     t.datetime "created_at", null: false
     t.string "repo", null: false
+    t.string "sandbox_provider"
     t.string "tenant", null: false
     t.datetime "updated_at", null: false
     t.index ["tenant"], name: "index_rbrun_worktrees_on_tenant"
