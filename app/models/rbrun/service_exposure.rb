@@ -21,10 +21,20 @@ module Rbrun
       preview_token
     end
 
-    def preview_host = preview_token.present? ? Rbrun::PreviewDomain.host_for(preview_token) : nil
+    def preview_host
+      return nil if preview_token.blank?
 
-    # The user-facing preview URL (the engine's own edge). nil until a token is minted.
-    def preview_url = preview_host && "https://#{preview_host}"
+      Rbrun::PreviewDomain.host_for(preview_token)
+    end
+
+    # The user-facing preview URL. The host-provided edge URL wins (control plane owns the edge);
+    # otherwise the engine's own single-label host. nil until one exists.
+    def preview_url
+      return edge_url if edge_url.present?
+      return nil if preview_host.nil?
+
+      "https://#{preview_host}"
+    end
 
     private
 

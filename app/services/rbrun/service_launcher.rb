@@ -49,8 +49,14 @@ module Rbrun
 
       exp = exposure!(name)
       exp.update!(previewed: true)
-      exp.ensure_preview_token!
-      resolve_upstream(run) if run # the proxy's upstream — NOT the user-facing URL
+      if Rbrun.preview_edge
+        # The HOST owns the edge (control plane): it returns the URL; the engine creates no DNS, resolves
+        # no upstream, and serves no proxy.
+        exp.update!(edge_url: Rbrun.preview_edge.expose(run)) if run
+      else
+        exp.ensure_preview_token!
+        resolve_upstream(run) if run # the proxy's upstream — NOT the user-facing URL
+      end
       exp
     end
 
@@ -61,7 +67,8 @@ module Rbrun
       return :unknown unless exp || run
 
       stop_sharing(name)
-      exp&.update!(previewed: false)
+      Rbrun.preview_edge&.revoke(run) if run
+      exp&.update!(previewed: false, edge_url: nil)
       run&.update!(url: nil, token: nil)
       exp || :not_running
     end
