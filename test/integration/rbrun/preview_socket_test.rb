@@ -60,7 +60,7 @@ module Rbrun
       request = ActionDispatch::Request.new(env.merge("HTTP_UPGRADE" => "websocket"))
       run = Struct.new(:url).new("https://box/")
 
-      status, = Rbrun::PreviewProxy.new(->(_) {}).send(:upgrade, request, run)
+      status, = Rbrun::PreviewProxy.new(->(_) { }).send(:upgrade, request, run)
       assert_equal 503, status
       refute hijacked, "must not hijack the socket when over the cap"
     ensure
