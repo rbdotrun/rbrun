@@ -71,43 +71,76 @@ namespace :dogfood do
       # ── one real turn: the agent gathers the secret, then starts the services ──────────────────────
       dog.header "a real turn drives request_secrets → repo_services_start"
       session.run_turn(<<~MSG)
-        Get this Rails app's web server listening on port 3000 so I can preview it. Steps:
-        1. Run `bundle install` (a one-shot command, not a service).
-        2. Call request_secrets to ask me for RAILS_MASTER_KEY (it is in config/master.key).
-        3. The app uses PostgreSQL. Start a local postgres and prepare the database (`bin/rails
-           db:prepare`); set POSTGRES_HOST/PORT/USER/PASSWORD/DB env as needed. If the DB proves hard,
-           still get the web server LISTENING on port 3000 — a bound port is the priority.
-        4. Start the web server with repo_services_start:
-           `bin/rails server -b 0.0.0.0 -p 3000` on port 3000.
-        Use the repo_services tools for anything long-lived; debug failures with repo_services_logs.
-        Do not background anything with `&`.
+        Get this Rails app's web server serving on port 3000 so I can open a preview. Work in this order.
+        Use your bash tool for one-shot setup, and repo_services_start for the long-lived db + web.
+
+        1. `bundle install`
+        2. Call request_secrets to ask me for RAILS_MASTER_KEY (label it clearly). After I provide it,
+           config/master.key will be present.
+        3. Bring up PostgreSQL (the app uses solid_queue/cache/cable → several databases). Recipe for
+           this Debian box, as the `daytona` user:
+             - `initdb -D $HOME/pgdata`
+             - make local TCP trust: append to $HOME/pgdata/pg_hba.conf:
+                 `host all all 127.0.0.1/32 trust` and `host all all ::1/128 trust`
+             - start it as a service via repo_services_start, name "db":
+                 `postgres -D /home/daytona/pgdata -p 5432 -c listen_addresses=localhost`
+             - create the role+db the app expects (host localhost, port 5432, user `daytona`):
+                 `createdb -h localhost -p 5432 rails_dummy_development` (and let db:prepare make the rest)
+        4. `POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=daytona bin/rails db:prepare`
+           (this creates rails_dummy_development and the _cache/_queue/_cable databases).
+        5. Start the web server as a service via repo_services_start, name "web", port 3000:
+             `POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=daytona bin/rails server -b 0.0.0.0 -p 3000`
+        6. Use repo_services_logs on "web" to confirm it booted and is listening; if it crash-loops, read
+           the logs and fix, then repo_services_restart it.
+
+        Do not background anything with `&`. Priority: the web server LISTENING on port 3000.
       MSG
 
-      # The turn parks on the request_secrets custom gate. Stand in for the user: submit the master key
-      # through the SAME path the SecretsController takes (validate → encrypt+store → keys-only resume).
-      secrets_gate = session.messages.approval_pending.where(event_type: "tool_use").find { |m| m.payload.dig("name") == "request_secrets" }
-      dog.ok "the agent asked for secrets (request_secrets parked)", secrets_gate.present?
-      if secrets_gate
-        spec = Rbrun::SecretsFormSpec.new(secrets_gate.payload["input"])
-        submitted = { "RAILS_MASTER_KEY" => rails_master_key }
-        dog.ok "the submission validates against the frozen spec", spec.errors(submitted).empty?
-        Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = rails_master_key }
-        secrets_gate.update!(approval_status: "answered")
-        session.messages.create!(role: "tool", event_type: "tool_result", tool_use_id: secrets_gate.tool_use_id,
-          content: { "stored_keys" => %w[RAILS_MASTER_KEY] }.to_json,
-          payload: { "tool_use_id" => secrets_gate.tool_use_id, "result" => { "stored_keys" => %w[RAILS_MASTER_KEY] }, "is_error" => false })
-        result_json = session.messages.where(event_type: "tool_result", tool_use_id: secrets_gate.tool_use_id).last.payload.to_json
-        dog.ok "the master key NEVER appears in the tool_result", !result_json.include?(rails_master_key)
-        session.continue_turn!(spec.stored_recap(%w[RAILS_MASTER_KEY]))
-      end
+      # Drive the agent to completion, standing in for the user at EACH gate as it parks: submit the
+      # secrets form (validate → encrypt+store → keys-only resume) and approve each repo_services_start.
+      # The agent works iteratively (postgres → db:prepare via its own bash → web), so we loop.
+      saw_secrets = saw_start = checked = false
+      start_gate = nil
+      20.times do
+        session.reload
+        break if session.done? || session.failed?
 
-      # The turn then parks on the repo_services_start approval gate. Approve it (runs the launcher).
-      start_gate = session.reload.messages.approval_pending.where(event_type: "tool_use").find { |m| m.payload.dig("name") == "repo_services_start" }
-      dog.ok "the agent proposed services (repo_services_start parked for approval)", start_gate.present?
-      if start_gate
-        nudge = start_gate.decide_approval!("approve") # runs ServiceLauncher#start via run_frozen_call!
-        session.continue_turn!(nudge) if nudge
+        gate = session.messages.approval_pending.where(event_type: "tool_use").order(:id).last
+        break unless gate
+
+        if gate.payload["name"] == "request_secrets"
+          saw_secrets = true
+          spec = Rbrun::SecretsFormSpec.new(gate.payload["input"])
+          unless checked
+            dog.ok "the secrets submission validates against the frozen spec", spec.errors("RAILS_MASTER_KEY" => rails_master_key).empty?
+          end
+          Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = rails_master_key }
+          # The web service gets RAILS_MASTER_KEY via injected env (.rbrun/env). But the agent's own bash
+          # one-shots (bundle, db:prepare) don't — so also drop the conventional master.key file the app
+          # reads natively. This is what "the user provided the secret" materially means for the app.
+          worktree.sandbox.write("config/master.key", rails_master_key)
+          gate.update!(approval_status: "answered")
+          session.messages.create!(role: "tool", event_type: "tool_result", tool_use_id: gate.tool_use_id,
+            content: { "stored_keys" => %w[RAILS_MASTER_KEY] }.to_json,
+            payload: { "tool_use_id" => gate.tool_use_id, "result" => { "stored_keys" => %w[RAILS_MASTER_KEY] }, "is_error" => false })
+          unless checked
+            result_json = session.messages.where(event_type: "tool_result", tool_use_id: gate.tool_use_id).last.payload.to_json
+            dog.ok "the master key NEVER appears in the tool_result", !result_json.include?(rails_master_key)
+          end
+          checked = true
+          session.continue_turn!(spec.stored_recap(%w[RAILS_MASTER_KEY]))
+        else # repo_services_start (or any other needs_approval gate) → approve, runs the launcher
+          if gate.payload["name"] == "repo_services_start"
+            saw_start = true
+            start_gate ||= gate
+          end
+          nudge = gate.decide_approval!("approve")
+          session.continue_turn!(nudge) if nudge
+        end
       end
+      dog.ok "the agent asked for secrets (request_secrets)", saw_secrets
+      dog.ok "the agent started services (repo_services_start approved)", saw_start
+      dog.ok "the turn reached a terminal state", session.reload.done? || session.failed?
 
       dog.header "what the agent actually did (diagnostics)"
       if start_gate
@@ -149,17 +182,42 @@ namespace :dogfood do
         dog.info "status via ?token= query", by_query.inspect
         reached = [ by_header, by_query ].select { |s| s.is_a?(Integer) }.any? { |s| s.between?(200, 599) }
         dog.ok "the preview URL + token reach the box (any HTTP status ⇒ the wire works)", reached
-        dog.info "next", "adapt Client#preview_link + ServicesController#preview_target to the mechanism that returned a status"
+
+        # The browser-openable URL: token as a query param (the proxy 307-redirects a browser through its
+        # auth handshake). Follow it server-side to report the final status the user will see.
+        open_url = link.token.present? ? "#{link.url}#{link.url.include?('?') ? '&' : '?'}token=#{CGI.escape(link.token)}" : link.url
+        # Follow the proxy's 307 auth handshake manually (no extra gem) to report the status a browser sees.
+        final = begin
+          status = nil
+          u = open_url
+          6.times do
+            resp = conn.get(u)
+            status = resp.status
+            loc = resp.headers["location"]
+            break unless loc && status.between?(300, 399)
+
+            u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
+          end
+          status
+        rescue StandardError => e
+          "err:#{e.class}"
+        end
+        dog.ok "the live app answers a browser request (200)", final == 200
+        dog.info "final status (redirects followed)", final.inspect
+
+        puts "\n╔══════════════════════════════════════════════════════════════════"
+        puts "║  OPEN THIS IN YOUR BROWSER TO VALIDATE (box auto-stops in ~5 min):"
+        puts "║  #{open_url}"
+        puts "╚══════════════════════════════════════════════════════════════════\n"
       rescue StandardError => e
         dog.ok "preview_url(3000) resolved (Daytona wire)", false
         dog.info "preview_url error", "#{e.class}: #{e.message}"[0, 240]
         dog.info "next", "fix Rbrun::Sandbox::Daytona::Client#preview_link — the endpoint/shape is wrong; see the error above"
       end
     ensure
-      session.sandbox.destroy!
-      worktree.destroy!
-      Rbrun::RepoSecret.for_tenant(tenant).for_repo(repo).delete_all
-      Rbrun::RepoService.for_tenant(tenant).for_repo(repo).delete_all
+      # KEEP THE BOX ALIVE so the printed preview URL actually works — Daytona auto-stops it after 5
+      # idle minutes (AUTO_STOP_MINUTES), which is the validation window. No manual destroy.
+      dog.info "sandbox", "left running for validation (auto-stops in ~5 min)"
     end
   end
 end

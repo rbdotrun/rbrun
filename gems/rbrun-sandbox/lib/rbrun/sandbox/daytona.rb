@@ -84,7 +84,16 @@ module Rbrun
       end
 
       # ── process sessions (delegate, injecting our own box id) ──────────
-      def session_create(session_id) = @client.create_session(id, session_id)
+      # IDEMPOTENT BY CONTRACT (Local uses `||=`): a 409 means the session is already there, which is
+      # success for a caller that just wants it to exist. Without this, relaunching a service under its
+      # own deterministic session name (restart, or an idempotent re-start) fails forever on Daytona.
+      def session_create(session_id)
+        @client.create_session(id, session_id)
+      rescue Client::Error => e
+        raise Error, e.message unless e.message.include?("409")
+
+        nil
+      end
       def session_exec(session_id, command) = @client.session_exec(id, session_id, command)
       def session_input(session_id, cmd_id, data) = @client.session_input(id, session_id, cmd_id, data)
       def session_command(session_id, cmd_id) = @client.session_command(id, session_id, cmd_id)

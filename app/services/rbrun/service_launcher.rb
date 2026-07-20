@@ -72,7 +72,14 @@ module Rbrun
 
     def launch_one(svc)
       run = @worktree.service_runs.create!(name: svc.name, command: svc.command, port: svc.port, status: "starting")
-      @sup.launch(run)
+      begin
+        @sup.launch(run)
+      rescue StandardError
+        # Never leave a zombie row (status "starting", no process handle) — it makes logs/restart
+        # report nonsense for a service that was never actually launched.
+        run.destroy
+        raise
+      end
       resolve_preview(run)
     end
 
