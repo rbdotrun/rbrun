@@ -8,18 +8,19 @@
 
 A repo runs on several **services** — `bin/rails s`, `bin/vite dev`, `bundle exec sidekiq`,
 `redis-server`, `postgres`. The agent can already start these with raw shell; the point of this feature
-is **soft instrumentation**: a small tool contract the agent is *instructed* to use for long-lived
+is **soft instrumentation**: a small tool contract the agent is _instructed_ to use for long-lived
 processes, so rbrun holds each one's process handle and can show **status + logs**, and — for a service
-that listens on an HTTP port — a **preview** the user opens in a tab. A service *happens to be
-previewable*; preview is a facet, not the primary thing.
+that listens on an HTTP port — a **preview** the user opens in a tab. A service _happens to be
+previewable_; preview is a facet, not the primary thing.
 
 Two layers, mirroring the workflows design:
+
 - **The run** (live, worktree-scoped): what's running now — status, logs, previews.
 - **The library** (saved, per-repo): the repo's declared services, reusable — "restart all" re-launches
   the set in a fresh sandbox.
 
 **The supervision mechanism is a swappable backend.** v1 supervises via managed sandbox
-process-sessions + pidfiles; systemd units or docker-compose could implement the *same five tools* later
+process-sessions + pidfiles; systemd units or docker-compose could implement the _same five tools_ later
 without changing one thing the agent sees. The tool contract is the seam.
 
 ## 1. The tool contract (the foundation everything builds on)
@@ -27,13 +28,13 @@ without changing one thing the agent sees. The tool contract is the seam.
 Five tools, the compose/foreman verb set. Registered as engine built-ins (like the workflow tools).
 Only `repo_services_start` is gated. Results are string-keyed (`{ "data" => … }` / `{ "error" => … }`).
 
-| Tool | Params | Gate | Semantics |
-|---|---|---|---|
-| **`repo_services_start`** | `services: [{name, command, port?}]` | **`needs_approval!`** — one gate for the whole set | **Idempotent reset** ("kill all and restart"): stop every service running in this worktree, then start the declared set fresh. **Upserts** the set as the repo's saved services. Resolves the preview URL for each port-bearing service. |
-| **`repo_services_restart`** | `name:` | ungated | Surgical stuck-recovery: kill that one + start it again from its saved command. |
-| **`repo_services_stop`** | `name:` (omit ⇒ all) | ungated | Stop one, or all, in this worktree. |
-| **`repo_services_status`** | — | ungated (read) | Each service `{ name, command, port, status, url }` — so **the agent knows** what's running / exited / stuck, the same truth rbrun renders. |
-| **`repo_services_logs`** | `name:`, `tail: 200` | ungated (read) | The **debug** primitive — recent output of one service. |
+| Tool                        | Params                               | Gate                                               | Semantics                                                                                                                                                                                                                                |
+| --------------------------- | ------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`repo_services_start`**   | `services: [{name, command, port?}]` | **`needs_approval!`** — one gate for the whole set | **Idempotent reset** ("kill all and restart"): stop every service running in this worktree, then start the declared set fresh. **Upserts** the set as the repo's saved services. Resolves the preview URL for each port-bearing service. |
+| **`repo_services_restart`** | `name:`                              | ungated                                            | Surgical stuck-recovery: kill that one + start it again from its saved command.                                                                                                                                                          |
+| **`repo_services_stop`**    | `name:` (omit ⇒ all)                 | ungated                                            | Stop one, or all, in this worktree.                                                                                                                                                                                                      |
+| **`repo_services_status`**  | —                                    | ungated (read)                                     | Each service `{ name, command, port, status, url }` — so **the agent knows** what's running / exited / stuck, the same truth rbrun renders.                                                                                              |
+| **`repo_services_logs`**    | `name:`, `tail: 200`                 | ungated (read)                                     | The **debug** primitive — recent output of one service.                                                                                                                                                                                  |
 
 - **Idempotency is structural.** `start` = tear-down-then-bring-up (predictable reset, no "already
   running" branch); `restart(name)` = kick one stuck service. Re-running either always converges. This
@@ -44,7 +45,7 @@ Only `repo_services_start` is gated. Results are string-keyed (`{ "data" => … 
 
 ## 2. Soft convention — the system prompt
 
-The tools are not a cage: the agent *can* background anything. It uses them because the **main agent
+The tools are not a cage: the agent _can_ background anything. It uses them because the **main agent
 system prompt instructs it to**, and because it gets logs+status back. The engine appends a
 service-conventions block to the turn's system prompt — in `Rbrun::AgentTurn#call_client`, `system:
 [Rbrun.config(tenant).system_prompt, Rbrun::ServiceConventions::PROMPT].join("\n\n")` — so it applies
@@ -69,6 +70,7 @@ upserts these; the panel's **Restart all** reads them.
 
 Worktree-scoped. `belongs_to :worktree`; `include Rbrun::Tenanted` (inherited from the worktree on
 create, like `Session`). `Worktree has_many :service_runs, dependent: :destroy`. Columns:
+
 - `name`, `command`, `port` (snapshotted at launch, so a run is self-contained).
 - `status` — string enum `{ starting, running, exited, stopped }`, prefix `:status`; `exit_code` (int, nullable).
 - `url`, `token` (the preview link for a port-bearing service; nil otherwise or on a proxy-less provider).
@@ -81,6 +83,7 @@ create, like `Session`). `Worktree has_many :service_runs, dependent: :destroy`.
 
 All four lifecycle ops go through the sandbox transport **both adapters already have** — no new
 sandbox-contract method:
+
 - **Launch** (`start` / `restart`): `sandbox.session_create(process_session)` then `session_exec` of
   `sh -c 'cd <workspace> && mkdir -p .rbrun && echo $$ > .rbrun/svc-<name>.pid; exec <command>'` → store
   `cmd_id`, mark `running`. The pidfile makes it stoppable independently of the transport.
@@ -99,8 +102,9 @@ a single swap, and neither the tools nor the UI change.
 ## 5. Preview = the port facet (multi-provider capability)
 
 The **only** provider-optional piece. Capability-by-method-presence, matching rbrun's no-registry ethos:
+
 - An adapter that can publish a port defines `preview_url(port) → Rbrun::Sandbox::PreviewLink(url:,
-  token:)`. `Daytona` implements it (proxy link, via `Client#preview_link`); `Local` implements it as
+token:)`. `Daytona` implements it (proxy link, via `Client#preview_link`); `Local` implements it as
   `http://localhost:{port}`; a proxy-less provider **omits** it.
 - `Worktree#previews_supported? = sandbox.respond_to?(:preview_url)`. At launch, a port-bearing service
   resolves `preview_url(port)` → stores `url` + `token` **only when supported**; otherwise it still runs
@@ -136,33 +140,72 @@ into a browser-openable request, by whichever mechanism Daytona's proxy honors (
 cookie-setting redirect on the preview domain). **Determining that mechanism is the #1 dogfood
 verification.** The token is stored server-side, never rendered into page HTML.
 
-## 8. Wiring summary (this build)
+## 8. Secrets — the agent gathers env the user must provide
 
-`Rbrun::RepoService` + `Rbrun::ServiceRun` models + migration + `Worktree has_many :service_runs` +
-`previews_supported?`; `PreviewLink` value object + `Daytona#preview_url`/`Client#preview_link` +
-`Local#preview_url`; `Rbrun::ServiceSupervisor` + `Rbrun::ServiceLauncher`; the five `repo_services_*`
-tools (built-ins) + the `repo_services_start` gate card; `Rbrun::ServiceConventions::PROMPT` +
-its append in `AgentTurn`; `ServicesController` (open/stop/restart/restart_all) + routes +
-`ServiceLogTailJob`; the sidebar Services panel + `current_worktree` helper + worktree Turbo stream +
-the logs drawer (Stimulus). No new gate mechanics — `repo_services_start` rides `needs_approval!` /
-`ApprovalsController`.
+A real app needs secrets to run (`dummy-rails` needs `RAILS_MASTER_KEY`; a Postgres password, etc.). The
+agent gathers them from the user through a **secure form** — built on the exact `ask_user`
+custom-approval machinery — with one **hard security line: the values never reach the LLM.**
 
-## 9. Out of scope (v1)
+- **Tool** `request_secrets` — **`custom_approval! submit: :secrets_submission`** (sibling of `ask_user`;
+  the run parks on a custom gate). The agent declares the KEYS it needs, never values:
+  `request_secrets(secrets: [{ key: "RAILS_MASTER_KEY", label: "Rails master key", required: true,
+  hint: "from config/master.key" }])`.
+- **Read-model** `Rbrun::SecretsFormSpec` — mirrors `AskUserFormSpec` (keys, labels, required;
+  `errors(submitted)` = required present + no unknown keys, the trust boundary) — but its **`recap` lists
+  only the KEY NAMES set, never a value**.
+- **Card** `Rbrun::Sessions::ToolsValidation::RequestSecrets::Component` — a **password input** per
+  declared key (the existing component DSL / `component("button")`, mirroring the ask_user card).
+  Boot-enforced (card + `:secrets_submission` route), exactly like `ask_user`.
+- **Submit** `Rbrun::SecretsController` (`ResolvesGate`) — validates against the frozen spec, **encrypts +
+  stores** each value as `Rbrun::RepoSecret`, records a tool_result of **key names only**, resumes with a
+  keys-only nudge ("Stored RAILS_MASTER_KEY. Continue."). Values never enter the payload, the timeline, or
+  the nudge.
+- **Storage** `Rbrun::RepoSecret` — `tenant` + `repo` + `key` + `value` (`encrypts :value`, ActiveRecord
+  encryption). **Repo-scoped** (fill once, reused across worktrees/sessions). Unique `[tenant, repo, key]`.
+- **Injection** — `ServiceSupervisor`, at launch, writes the repo's secrets to `<workspace>/.rbrun/env`
+  (chmod 600) and sources it in the launch wrapper (`set -a; . .rbrun/env; set +a`). Secrets reach the
+  sandbox (the app needs them) but **never the conversation/LLM**.
+- **No leaks** — `secrets` added to Rails `filter_parameters`; the frozen tool_use payload stores only the
+  declaration (keys/labels), values arrive solely in the submit POST → straight to encrypted storage.
+
+Stated plainly: **the agent asks WHICH secrets it needs; the user provides them; rbrun stores + injects
+them; the agent only ever learns the KEYS were set — never a value.**
+
+## 9. Wiring summary (this build)
+
+`Rbrun::RepoService` + `Rbrun::ServiceRun` + `Rbrun::RepoSecret` models + migration + `Worktree has_many
+:service_runs` + `previews_supported?`; `PreviewLink` value object + `Daytona#preview_url`/
+`Client#preview_link` + `Local#preview_url`; `Rbrun::ServiceSupervisor` (secrets-injecting) +
+`Rbrun::ServiceLauncher`; the five `repo_services_*` tools + `request_secrets` (built-ins) + the
+`repo_services_start` gate card + the `request_secrets` secure card; `Rbrun::SecretsFormSpec` +
+`SecretsController` + `:secrets_submission` route; `Rbrun::ServiceConventions::PROMPT` + its append in
+`AgentTurn`; `ServicesController` (open/stop/restart/restart_all) + routes + `ServiceLogTailJob`; the
+sidebar Services panel + `current_worktree` helper + worktree Turbo stream + the logs drawer (Stimulus).
+`request_secrets` rides `custom_approval!`; `repo_services_start` rides `needs_approval!` — no new gate
+mechanics.
+
+## 10. Out of scope (v1)
 
 A proactive `running→exited` poller (v1 detects on load/recheck/status); in-app iframe embedding
 (new-tab only); a manual "define arbitrary service" UI form (the agent tool + Restart-all cover it);
 service dependency ordering (start in parallel — apps retry-connect); systemd/compose supervision
 backends (the tool contract is built to allow them, they aren't built now); log persistence after the
-sandbox is torn down (live tail only).
+sandbox is torn down (live tail only); a repo-declared services/secrets manifest (the agent reads
+`Procfile.dev` etc. and declares the set itself — a manifest convention is a later north-star).
 
-## 10. Dogfoods (acceptance gate)
+## 11. Dogfoods (acceptance gate)
 
-- **`repo_services_local`** (offline, no cloud): `repo_services_start` a trivial HTTP server
-  (`python -m http.server` / a `bun` one-liner) plus a non-HTTP "worker"; assert the panel rows go
-  `running`, the HTTP one's `url` is `http://localhost:PORT` and actually serves, `repo_services_logs`
-  tails real output, `repo_services_restart` re-launches a stuck one, `repo_services_stop` kills it and
-  flips `stopped`, and a second `repo_services_start` is idempotent (kill-all + fresh). Proves the tool
-  contract, supervision, idempotency, logs, status, and the preview facet end-to-end — no Daytona.
-- **`preview_daytona`** (live, `.env` creds — present): the HTTP path on Daytona, **specifically
-  verifying the proxy `preview_url` shape and the browser token mechanism** through `services/:id/open`.
-  This closes §7's open question.
+- **`repo_services_local`** (offline, no cloud): drives the whole tool contract + secrets injection on
+  the `Local` adapter. `request_secrets` → submit a `MY_SECRET` through the secure flow (asserting the
+  value never appears in the tool_result/nudge — only the key). `repo_services_start` a service whose
+  command echoes `$MY_SECRET` to prove **injection**, plus an HTTP one (a `bun`/`python -m http.server`);
+  assert rows go `running`, the HTTP `url` is `http://localhost:PORT` and serves, `repo_services_logs`
+  tails real output (including the injected secret's *effect*, not the value in our logs), a stuck one
+  `repo_services_restart`s, `repo_services_stop` flips `stopped`, and a second `start` is idempotent.
+- **`preview_daytona`** (live, `.env` creds — present) — the **real** end-to-end on `benbonnet/dummy-rails`:
+  provision a ruby+node+postgres sandbox (custom Dockerfile), `request_secrets` → submit
+  `RAILS_MASTER_KEY` (read from the local checkout's `config/master.key` — the harness stands in for the
+  user), `repo_services_start` postgres + `bin/rails server -p 3000` (+ a one-shot `db:prepare`), and
+  **verify the proxy `preview_url` shape and the browser token mechanism** through `services/:id/open`
+  against the live Rails app. This closes §7's open question. **Built in this pass but NOT run — fired
+  separately.**
