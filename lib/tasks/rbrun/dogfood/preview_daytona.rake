@@ -68,11 +68,53 @@ namespace :dogfood do
       worktree.sandbox.exec!("cd #{ws} && tar xzf app.tgz && rm -f app.tgz", timeout: 180)
       dog.ok "the app is in the box", worktree.sandbox.exist?("Gemfile")
 
-      # ── one real turn: the agent gathers the secret, then starts the services ──────────────────────
-      dog.header "a real turn drives request_secrets → repo_services_start"
+      # ── the gate driver: stand in for the user at EACH gate as it parks (reused by both phases) ────
+      saw_secrets = saw_start = checked = false
+      start_gate = nil
+      drive = lambda do
+        25.times do
+          session.reload
+          break if session.done? || session.failed?
+
+          gate = session.messages.approval_pending.where(event_type: "tool_use").order(:id).last
+          break unless gate
+
+          if gate.payload["name"] == "request_secrets"
+            saw_secrets = true
+            spec = Rbrun::SecretsFormSpec.new(gate.payload["input"])
+            unless checked
+              dog.ok "the secrets submission validates against the frozen spec", spec.errors("RAILS_MASTER_KEY" => rails_master_key).empty?
+            end
+            Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = rails_master_key }
+            # The web service gets RAILS_MASTER_KEY via injected env (.rbrun/env). But the agent's own bash
+            # one-shots (bundle, db:prepare) don't — so also drop the conventional master.key file.
+            worktree.sandbox.write("config/master.key", rails_master_key)
+            gate.update!(approval_status: "answered")
+            session.messages.create!(role: "tool", event_type: "tool_result", tool_use_id: gate.tool_use_id,
+              content: { "stored_keys" => %w[RAILS_MASTER_KEY] }.to_json,
+              payload: { "tool_use_id" => gate.tool_use_id, "result" => { "stored_keys" => %w[RAILS_MASTER_KEY] }, "is_error" => false })
+            unless checked
+              result_json = session.messages.where(event_type: "tool_result", tool_use_id: gate.tool_use_id).last.payload.to_json
+              dog.ok "the master key NEVER appears in the tool_result", !result_json.include?(rails_master_key)
+            end
+            checked = true
+            session.continue_turn!(spec.stored_recap(%w[RAILS_MASTER_KEY]))
+          else # repo_services_start (or any other needs_approval gate) → approve, runs the launcher
+            if gate.payload["name"] == "repo_services_start"
+              saw_start = true
+              start_gate ||= gate
+            end
+            nudge = gate.decide_approval!("approve")
+            session.continue_turn!(nudge) if nudge
+          end
+        end
+      end
+
+      # ── PHASE 1: run the services. Starting must NOT expose anything. ──────────────────────────────
+      dog.header "phase 1 — a real turn brings the services up (NO preview)"
       session.run_turn(<<~MSG)
-        Get this Rails app's web server serving on port 3000 so I can open a preview. Work in this order.
-        Use your bash tool for one-shot setup, and repo_services_start for the long-lived db + web.
+        Get this Rails app running so I can work with it. Work in this order.
+        Use your bash tool for one-shot setup, and repo_services_start for the long-lived services.
 
         1. `bundle install`
         2. Call request_secrets to ask me for RAILS_MASTER_KEY (label it clearly). After I provide it,
@@ -88,59 +130,39 @@ namespace :dogfood do
                  `createdb -h localhost -p 5432 rails_dummy_development` (and let db:prepare make the rest)
         4. `POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=daytona bin/rails db:prepare`
            (this creates rails_dummy_development and the _cache/_queue/_cable databases).
-        5. Start the web server as a service via repo_services_start, name "web", port 3000:
-             `POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=daytona bin/rails server -b 0.0.0.0 -p 3000`
-        6. Use repo_services_logs on "web" to confirm it booted and is listening; if it crash-loops, read
-           the logs and fix, then repo_services_restart it.
+        5. Start the remaining services via repo_services_start (ONE call, all services together):
+             - "web", port 3000:
+               `POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=daytona bin/rails server -b 0.0.0.0 -p 3000`
+             - "jobs": `bin/jobs`   (the solid_queue worker)
+        6. Use repo_services_logs to confirm they booted; if one crash-loops, read the logs, fix it, and
+           repo_services_restart it.
 
         Do not background anything with `&`. Priority: the web server LISTENING on port 3000.
+        DO NOT preview anything in this turn — just get the services running.
       MSG
 
-      # Drive the agent to completion, standing in for the user at EACH gate as it parks: submit the
-      # secrets form (validate → encrypt+store → keys-only resume) and approve each repo_services_start.
-      # The agent works iteratively (postgres → db:prepare via its own bash → web), so we loop.
-      saw_secrets = saw_start = checked = false
-      start_gate = nil
-      20.times do
-        session.reload
-        break if session.done? || session.failed?
-
-        gate = session.messages.approval_pending.where(event_type: "tool_use").order(:id).last
-        break unless gate
-
-        if gate.payload["name"] == "request_secrets"
-          saw_secrets = true
-          spec = Rbrun::SecretsFormSpec.new(gate.payload["input"])
-          unless checked
-            dog.ok "the secrets submission validates against the frozen spec", spec.errors("RAILS_MASTER_KEY" => rails_master_key).empty?
-          end
-          Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = rails_master_key }
-          # The web service gets RAILS_MASTER_KEY via injected env (.rbrun/env). But the agent's own bash
-          # one-shots (bundle, db:prepare) don't — so also drop the conventional master.key file the app
-          # reads natively. This is what "the user provided the secret" materially means for the app.
-          worktree.sandbox.write("config/master.key", rails_master_key)
-          gate.update!(approval_status: "answered")
-          session.messages.create!(role: "tool", event_type: "tool_result", tool_use_id: gate.tool_use_id,
-            content: { "stored_keys" => %w[RAILS_MASTER_KEY] }.to_json,
-            payload: { "tool_use_id" => gate.tool_use_id, "result" => { "stored_keys" => %w[RAILS_MASTER_KEY] }, "is_error" => false })
-          unless checked
-            result_json = session.messages.where(event_type: "tool_result", tool_use_id: gate.tool_use_id).last.payload.to_json
-            dog.ok "the master key NEVER appears in the tool_result", !result_json.include?(rails_master_key)
-          end
-          checked = true
-          session.continue_turn!(spec.stored_recap(%w[RAILS_MASTER_KEY]))
-        else # repo_services_start (or any other needs_approval gate) → approve, runs the launcher
-          if gate.payload["name"] == "repo_services_start"
-            saw_start = true
-            start_gate ||= gate
-          end
-          nudge = gate.decide_approval!("approve")
-          session.continue_turn!(nudge) if nudge
-        end
-      end
+      drive.call
       dog.ok "the agent asked for secrets (request_secrets)", saw_secrets
       dog.ok "the agent started services (repo_services_start approved)", saw_start
       dog.ok "the turn reached a terminal state", session.reload.done? || session.failed?
+
+      web = worktree.service_runs.reload.find_by(name: "web")
+      saved_web = -> { Rbrun::RepoService.for_tenant(tenant).for_repo(repo).find_by(name: "web") }
+      dog.ok "the web service is running", web&.status_running?
+      # THE POINT: a service is a process inside the box. Running it exposes NOTHING.
+      dog.ok "STARTING DID NOT EXPOSE IT — no preview url", web.present? && web.url.blank?
+      dog.ok "…and it is not declared previewed", !saved_web.call&.previewed?
+
+      # ── PHASE 2: previewing is a SEPARATE, explicit decision. ──────────────────────────────────────
+      dog.header "phase 2 — a second turn asks the agent to preview it"
+      session.run_turn("Now make the web service previewable so I can open it in my browser. Use the preview tool.")
+      drive.call
+      previewed = session.messages.where(event_type: "tool_use").any? { |m| m.payload["name"] == "preview_service" }
+      web = worktree.service_runs.reload.find_by(name: "web")
+      dog.ok "the agent called preview_service", previewed
+      dog.ok "PREVIEWING RESOLVED A URL", web&.url.present?
+      dog.ok "…and the declaration is recorded on the saved definition", !!saved_web.call&.previewed?
+      dog.ok "the service is still running (preview did not disturb it)", web&.status_running?
 
       dog.header "what the agent actually did (diagnostics)"
       if start_gate
@@ -155,64 +177,37 @@ namespace :dogfood do
         dog.info "  logs", sup.tail(r, lines: 6).to_s.squish[0, 200]
       end
 
-      # ── THE CRUX (§7): verify the Daytona preview WIRE directly — independent of whether Rails booted. ──
-      # preview_url(3000) resolves the proxy URL + token; hitting it tells us the proxy+token mechanism
-      # works (even a 502/500 back means the wire delivered us; only a connection error / proxy-4xx fails).
-      dog.header "verify the Daytona preview URL + token wire (§7)"
+      # ── the preview the AGENT resolved actually reaches the running app ────────────────────────────
+      # The token is header-only (a browser tab can't send it), so that is how we verify reachability
+      # here; the URL we hand a human is the bare one, which their own provider session authenticates.
+      dog.header "the resolved preview reaches the live app"
       require "faraday"
       require "async/http/faraday"
-      begin
-        link = worktree.sandbox.preview_url(3000)
-        dog.ok "preview_url(3000) resolved a URL", link.url.present?
-        dog.info "preview url", link.url
-        dog.info "token present", (!link.token.to_s.empty?).to_s
+      if web&.url.present?
         conn = Faraday.new { |f| f.adapter :async_http }
-        by_header = begin
-          conn.get(link.url) { |r| r.headers["x-daytona-preview-token"] = link.token if link.token.present? }.status
+        status = begin
+          conn.get(web.url) { |r| r.headers["x-daytona-preview-token"] = web.token if web.token.present? }.status
         rescue StandardError => e
           "err:#{e.class}"
         end
-        by_query = begin
-          u = link.token.present? ? "#{link.url}#{link.url.include?('?') ? '&' : '?'}token=#{CGI.escape(link.token)}" : link.url
-          conn.get(u).status
-        rescue StandardError => e
-          "err:#{e.class}"
-        end
-        dog.info "status via x-daytona-preview-token header", by_header.inspect
-        dog.info "status via ?token= query", by_query.inspect
-        reached = [ by_header, by_query ].select { |s| s.is_a?(Integer) }.any? { |s| s.between?(200, 599) }
-        dog.ok "the preview URL + token reach the box (any HTTP status ⇒ the wire works)", reached
+        dog.info "GET preview url (token header)", status.inspect
+        dog.ok "the live Rails app answers 200 through the preview", status == 200
 
-        # The browser-openable URL: token as a query param (the proxy 307-redirects a browser through its
-        # auth handshake). Follow it server-side to report the final status the user will see.
-        open_url = link.token.present? ? "#{link.url}#{link.url.include?('?') ? '&' : '?'}token=#{CGI.escape(link.token)}" : link.url
-        # Follow the proxy's 307 auth handshake manually (no extra gem) to report the status a browser sees.
-        final = begin
-          status = nil
-          u = open_url
-          6.times do
-            resp = conn.get(u)
-            status = resp.status
-            loc = resp.headers["location"]
-            break unless loc && status.between?(300, 399)
-
-            u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
-          end
-          status
-        rescue StandardError => e
-          "err:#{e.class}"
+        anon = begin
+          conn.get(web.url).status
+        rescue StandardError
+          nil
         end
-        dog.ok "the live app answers a browser request (200)", final == 200
-        dog.info "final status (redirects followed)", final.inspect
+        dog.info "anonymous (no token)", anon.inspect
+        dog.ok "the box is NOT publicly open (anonymous is not served)", anon != 200
 
         puts "\n╔══════════════════════════════════════════════════════════════════"
         puts "║  OPEN THIS IN YOUR BROWSER TO VALIDATE (box auto-stops in ~5 min):"
-        puts "║  #{open_url}"
+        puts "║  #{web.url}"
         puts "╚══════════════════════════════════════════════════════════════════\n"
-      rescue StandardError => e
-        dog.ok "preview_url(3000) resolved (Daytona wire)", false
-        dog.info "preview_url error", "#{e.class}: #{e.message}"[0, 240]
-        dog.info "next", "fix Rbrun::Sandbox::Daytona::Client#preview_link — the endpoint/shape is wrong; see the error above"
+      else
+        dog.ok "a preview url was resolved", false
+        dog.info "next", "the agent did not preview the web service — check the phase 2 transcript"
       end
     ensure
       # KEEP THE BOX ALIVE so the printed preview URL actually works — Daytona auto-stops it after 5
