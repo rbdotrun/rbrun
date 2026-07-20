@@ -40,12 +40,12 @@ module Rbrun
       assert_nil @launcher.exposure("web").preview_url
     end
 
-    test "PreviewDomain.ensure! no-ops while the host owns the edge" do
+    test "PreviewDomain.expose! no-ops while the host owns the edge" do
       calls = []
       dns = Object.new.tap { |o| o.define_singleton_method(:upsert) { |**kw| calls << kw } }
       Rbrun.config.preview_domain = "rb.run"
       Rbrun.config.preview_target = "t.cfargotunnel.com"
-      Rbrun::PreviewDomain.ensure!(dns: dns)
+      Rbrun::PreviewDomain.expose!("abc", dns: dns)
       assert_empty calls
     ensure
       Rbrun.config.preview_domain = nil

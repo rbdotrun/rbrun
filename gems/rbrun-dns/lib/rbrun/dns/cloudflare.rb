@@ -25,7 +25,28 @@ module Rbrun
       def find(name:, type: nil)
         params = { "name" => name }
         params["type"] = type if type
-        record_from(list("/zones/#{@zone_id}/dns_records", params).first)
+        record_from(fetch_page("/zones/#{@zone_id}/dns_records", params).first)
+      end
+
+      # Every record in the zone, optionally narrowed to a type and/or a host suffix (the suffix filter is
+      # applied client-side, so it is adapter-portable). Pages through the whole zone. The Sentinel uses
+      # this to see what actually exists at the edge and reconcile it against the DB.
+      def list(type: nil, name_suffix: nil)
+        params = { "per_page" => 100 }
+        params["type"] = type if type
+        out = []
+        page = 1
+        loop do
+          params["page"] = page
+          result = request(:get, "/zones/#{@zone_id}/dns_records", nil, params)
+          batch = Array(result["result"])
+          out.concat(batch.map { |raw| record_from(raw) })
+          total_pages = result.dig("result_info", "total_pages").to_i
+          break if batch.empty? || page >= [ total_pages, 1 ].max
+
+          page += 1
+        end
+        name_suffix ? out.select { |r| r.name.to_s.end_with?(name_suffix) } : out
       end
 
       # Create the record if absent, or PATCH it in place if present — so re-running converges and never
@@ -61,7 +82,7 @@ module Rbrun
                    content: raw["content"], proxied: !!raw["proxied"])
       end
 
-      def list(path, params)
+      def fetch_page(path, params)
         Array(request(:get, path, nil, params)["result"])
       end
 

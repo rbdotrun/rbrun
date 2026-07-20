@@ -5,9 +5,10 @@ module Rbrun
     # A DNS double at the ENGINE seam (Rbrun.dns injection point) — not a fake HTTP client. Records the
     # one call the engine makes.
     class RecordingDns
-      attr_reader :calls
-      def initialize = @calls = []
+      attr_reader :calls, :removed
+      def initialize = (@calls = []; @removed = [])
       def upsert(**kw) = (@calls << kw) && Rbrun::Dns::Record.new(id: "r1", **kw)
+      def remove(name:, type: nil) = (@removed << name) && true
     end
 
     setup do
@@ -34,31 +35,36 @@ module Rbrun
     test "ensure! no-ops when previews are unconfigured" do
       Rbrun.config.preview_domain = nil
       dns = RecordingDns.new
-      Rbrun::PreviewDomain.ensure!(dns: dns)
+      Rbrun::PreviewDomain.expose!("abc", dns: dns)
       assert_empty dns.calls
     end
 
-    test "ensure! upserts exactly ONE wildcard CNAME when configured" do
+    test "expose! creates THIS host's record; unexpose! deletes it" do
       Rbrun.config.preview_domain = "rb.run"
       Rbrun.config.preview_target = "tid.cfargotunnel.com"
       dns = RecordingDns.new
-      Rbrun::PreviewDomain.ensure!(dns: dns)
+      Rbrun::PreviewDomain.expose!("abc", dns: dns)
 
       assert_equal 1, dns.calls.size
       call = dns.calls.first
-      assert_equal "*.rb.run", call[:name]
+      assert_equal "abc-preview.rb.run", call[:name]
       assert_equal "CNAME", call[:type]
       assert_equal "tid.cfargotunnel.com", call[:content]
       assert call[:proxied]
+
+      Rbrun::PreviewDomain.unexpose!("abc", dns: dns)
+      assert_equal [ "abc-preview.rb.run" ], dns.removed
     end
 
-    test "ensure! no-ops when the host owns the edge (preview_edge set)" do
+    test "expose!/unexpose! no-op when the host owns the edge (preview_edge set)" do
       Rbrun.config.preview_domain = "rb.run"
       Rbrun.config.preview_target = "tid.cfargotunnel.com"
       Rbrun.preview_edge = Object.new # host owns the data path
       dns = RecordingDns.new
-      Rbrun::PreviewDomain.ensure!(dns: dns)
+      Rbrun::PreviewDomain.expose!("abc", dns: dns)
+      Rbrun::PreviewDomain.unexpose!("abc", dns: dns)
       assert_empty dns.calls
+      assert_empty dns.removed
     end
   end
 end

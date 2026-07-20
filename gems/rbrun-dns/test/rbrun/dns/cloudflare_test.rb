@@ -67,6 +67,28 @@ class CloudflareTest < Minitest::Test
     refute build.remove(name: "gone.rb.run")
   end
 
+  def test_list_pages_the_whole_zone_and_filters_by_suffix
+    stub_request(:get, records_url).with(query: hash_including("page" => "1", "per_page" => "100"))
+      .to_return_json(body: { success: true, result_info: { total_pages: 2 }, result: [
+        { id: "p1", name: "aaa-preview.rb.run", type: "CNAME", content: "t", proxied: true },
+        { id: "p2", name: "www.rb.run",         type: "CNAME", content: "t", proxied: true }
+      ] })
+    stub_request(:get, records_url).with(query: hash_including("page" => "2", "per_page" => "100"))
+      .to_return_json(body: { success: true, result_info: { total_pages: 2 }, result: [
+        { id: "p3", name: "bbb-preview.rb.run", type: "CNAME", content: "t", proxied: false }
+      ] })
+
+    records = build.list(name_suffix: "-preview.rb.run")
+    assert_equal %w[aaa-preview.rb.run bbb-preview.rb.run], records.map(&:name).sort
+  end
+
+  def test_list_passes_the_type_filter_through
+    req = stub_request(:get, records_url).with(query: hash_including("type" => "CNAME", "page" => "1"))
+      .to_return_json(body: { success: true, result_info: { total_pages: 1 }, result: [] })
+    assert_empty build.list(type: "CNAME")
+    assert_requested req
+  end
+
   def test_api_error_raises_loud
     stub_request(:get, records_url).with(query: hash_including("name" => "a.rb.run"))
       .to_return_json(body: { success: false, errors: [ { message: "Invalid zone" } ], result: nil }, status: 403)

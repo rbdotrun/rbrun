@@ -5,9 +5,10 @@
 **Goal:** the engine owns its preview edge — a DNS capability users point their own domain at, and a
 Worker-less proxy serving levels 2 and 3 under it. Retires the provider's box-wide public switch.
 
-**Architecture:** `rbrun-dns` (pure gem, constant-lookup adapters) + one wildcard record + a Rack-level
-Host-matching proxy (HTTP relay + `rack.hijack` WebSockets, capped) + a set-once host DI seam so the
-control plane can own the edge instead.
+**Architecture:** `rbrun-dns` (pure gem, constant-lookup adapters) + ONE DNS record PER SHARED PREVIEW
+(created on expose, deleted on stop; a Sentinel job reaps escapes) + a Rack-level Host-matching proxy
+(HTTP relay + `rack.hijack` WebSockets, capped) + a set-once host DI seam so the control plane can own the
+edge instead.
 
 ## Global Constraints
 
@@ -15,7 +16,9 @@ control plane can own the edge instead.
   Faraday on `async-http`, every record tenant-scoped.
 - **Invariant #10 gets rewritten (third time)** — it currently forbids proxying and mandates the provider
   switch. Code and doc must not disagree at any commit.
-- Single-label hosts only (free Universal SSL). ONE wildcard record — never per-share.
+- Single-label hosts only (free Universal SSL). ONE record PER SHARED PREVIEW — created on expose, deleted
+  on stop; a wildcard CNAME does NOT route through a Cloudflare tunnel, so per-host is also required, not
+  merely tidier. A Sentinel recurring job reconciles escapes (the DB is the source of truth).
 - The preview token is attached server-side and never reaches a browser.
 - The WS cap is non-negotiable: exceeding it refuses the upgrade, never degrades the app.
 - No fakes: gem tested against a stubbed wire (WebMock), engine against real objects.
@@ -52,14 +55,16 @@ end
 - [ ] **Step 2** `Record = Data.define(:id, :name, :type, :content, :proxied)`.
 - [ ] **Step 3** `Cloudflare` — Faraday on `:async_http`; fails fast without `api_token`/`zone_id`.
   `#find` → `GET /zones/{zone}/dns_records?name=&type=`; `#upsert` → find then `POST` or `PATCH`
-  (`/zones/{zone}/dns_records[/{id}]`); `#remove` → `DELETE`. All return `Record`/bool.
+  (`/zones/{zone}/dns_records[/{id}]`); `#remove` → `DELETE`; `#list(type:, name_suffix:)` → page the zone
+  (`per_page`+`page` until `result_info.total_pages`), filter by suffix client-side. All return `Record`/`[Record]`/bool.
 - [ ] **Step 4** tests via WebMock against the real adapter: create-when-absent, patch-when-present
-  (assert it PATCHes, not duplicates), find-miss → nil, remove, and fail-fast on missing creds.
+  (assert it PATCHes, not duplicates), find-miss → nil, remove, `list` pages + filters by suffix, `list`
+  passes the type filter, and fail-fast on missing creds.
 - [ ] **Step 5** gem suite green. **Commit.**
 
 ---
 
-### Task 2: engine wiring — `Rbrun.dns` + wildcard ensure
+### Task 2: engine wiring — `Rbrun.dns` + per-share `PreviewDomain`
 
 **Files:** `lib/rbrun.rb`, `lib/rbrun/config.rb`, `app/services/rbrun/preview_domain.rb`,
 `lib/rbrun/engine.rb`; test `test/services/rbrun/preview_domain_test.rb`
@@ -67,11 +72,15 @@ end
 - [ ] **Step 1** `Rbrun.dns(provider = nil, tenant: nil, **opts)` beside `Rbrun.sandbox` — `require
   "rbrun/dns"`, `build(Rbrun::Dns, config(tenant).dns_provider, provider:, **opts)`.
 - [ ] **Step 2** config accessors: `preview_domain`, `preview_target`, `preview_max_sockets` (default 5).
-- [ ] **Step 3** `Rbrun::PreviewDomain` — `.host_for(token)` → `"#{token}-preview.#{preview_domain}"`;
-  `.ensure!` upserts `*.<preview_domain>` → `preview_target` (CNAME, proxied). No-ops without config.
-- [ ] **Step 4** call `PreviewDomain.ensure!` from `after_initialize`, guarded + warn-only (never fail boot).
-- [ ] **Step 5** tests: host_for shape; ensure! no-ops unconfigured; ensure! upserts once when configured
-  (inject a stub DNS double — the *engine* seam, not a fake HTTP client). **Commit.**
+- [ ] **Step 3** `Rbrun::PreviewDomain` — `.host_for(token)`/`.suffix`/`.token_from_host(host)`;
+  `.expose!(token)` upserts `<token>-preview.<domain>` → `preview_target` (CNAME, proxied);
+  `.unexpose!(token)` removes it. Both no-op without config or when `Rbrun.preview_edge` is set; both are
+  best-effort (rescue + warn — the Sentinel reconciles).
+- [ ] **Step 4** NO boot-time DNS: `preview`/`stop_preview` in `ServiceLauncher` drive `expose!`/`unexpose!`
+  (see Task 2.5). `after_initialize` creates no records.
+- [ ] **Step 5** tests: host_for shape; expose!/unexpose! no-op unconfigured + when preview_edge set;
+  expose! upserts THIS host, unexpose! removes it (inject a recording DNS double — the *engine* seam, not a
+  fake HTTP client). **Commit.**
 
 ---
 
@@ -155,10 +164,27 @@ tests updated.
 
 - [ ] **Step 1** `Rbrun.preview_edge` accessor (set-once host DI, defaults nil).
 - [ ] **Step 2** launcher: when set, `preview`/`share_public` call `expose(run)` and store its URL;
-  `stop_preview`/`stop_sharing` call `revoke(run)`. When set, `PreviewDomain.ensure!` no-ops and the
-  middleware declines (host app owns the path).
+  `stop_preview`/`stop_sharing` call `revoke(run)`. When set, `PreviewDomain.expose!`/`unexpose!` no-op and
+  the middleware declines (host app owns the path).
 - [ ] **Step 3** tests: with a seam object set, no DNS call is made, the stored URL is the host's, and
   revoke fires on both withdrawals. **Commit.**
+
+---
+
+### Task 6.5: the Sentinel — reconcile the edge to the DB
+
+**Files:** `app/services/rbrun/preview_sentinel.rb`, `app/jobs/rbrun/preview_sentinel_job.rb`;
+tests `test/services/rbrun/preview_sentinel_test.rb`, `test/jobs/rbrun/preview_sentinel_job_test.rb`
+
+- [ ] **Step 1** `Rbrun::PreviewSentinel.reconcile!(dns: nil)` — no-op when `Rbrun.preview_edge` set or DNS
+  unconfigured. Desired = every `previewed` exposure with a token → `host_for(token)`, ALL tenants
+  (unscoped). Actual = `dns.list(type: "CNAME", name_suffix: PreviewDomain.suffix)`. Reap actual∉desired
+  (`remove`); restore desired∉actual (`upsert` → `preview_target`, proxied). Return `{removed:, created:}`.
+- [ ] **Step 2** `Rbrun::PreviewSentinelJob < ApplicationJob#perform` delegates and logs non-empty counts.
+  Cadence is the HOST's (a solid_queue recurring entry) — the engine ships no scheduler.
+- [ ] **Step 3** service tests at the Rbrun.dns seam (recording DNS double): reaps an orphan, restores a
+  missing host, leaves a matched host alone, spans tenants; no-ops when preview_edge set / unconfigured.
+  Job test: real no-op path (unconfigured test env ⇒ skip) runs cleanly; enqueuable. **Commit.**
 
 ---
 
@@ -187,7 +213,9 @@ tests updated.
 
 - Enforcement is real now (no route ⇒ unreachable), so the dogfood asserts 404 on unshared hosts rather
   than merely "no flag set".
-- One wildcard record ⇒ no per-share DNS lifetime, no leak on missed revocation.
+- One record PER shared preview (created on expose, deleted on stop) ⇒ per-service enforcement is real and
+  a wildcard-that-can't-route-through-a-tunnel is avoided; the Sentinel reaps escaped records so a missed
+  revocation self-heals — the DB is the source of truth, DNS a reconciled projection.
 - `rack.hijack` verified identical on Puma + Falcon ⇒ one implementation, cap is config not code.
 - The seam is checked in both directions: set ⇒ no DNS/no proxy; unset ⇒ engine owns it.
 - Invariant #10 is rewritten in the same commit that changes the behaviour (Task 5), never left lying.

@@ -28,4 +28,6 @@ test:
 # ensure the database is located in a persisted volume.
 production:
   <<: *default
-  # database: path/to/persistent/storage/production.sqlite3
+  # Relative to Rails.root (test/dummy). Kamal mounts a persistent named volume here so the DB survives
+  # redeploys.
+  database: storage/production.sqlite3

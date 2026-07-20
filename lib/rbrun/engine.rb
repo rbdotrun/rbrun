@@ -45,17 +45,8 @@ module Rbrun
       Rbrun::ApplicationTool.validate_tool_approvals! # a half-built custom_approval! fails boot
       Rbrun::SkillSeeder.seed_at_boot!
       Rbrun::McpSeeder.seed_at_boot!
-
-      # Upsert the preview wildcard DNS — warn-only, like the seeders: a DNS hiccup or missing
-      # credentials must never take the app down; previews are then simply unavailable.
-      if Rbrun::PreviewDomain.configured?
-        begin
-          Rbrun::PreviewDomain.ensure!
-          Rails.logger.info("[rbrun] preview wildcard ensured: #{Rbrun::PreviewDomain.wildcard}")
-        rescue StandardError => e
-          Rails.logger.warn("[rbrun] preview domain not ensured (#{e.class}: #{e.message}) — previews unavailable")
-        end
-      end
+      # No boot-time DNS: preview records are created per-share on expose, deleted on stop, and a Sentinel
+      # reconciles leftovers.
     end
   end
 end

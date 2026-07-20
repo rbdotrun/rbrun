@@ -54,7 +54,8 @@ module Rbrun
         # no upstream, and serves no proxy.
         exp.update!(edge_url: Rbrun.preview_edge.expose(run)) if run
       else
-        exp.ensure_preview_token!
+        token = exp.ensure_preview_token!
+        Rbrun::PreviewDomain.expose!(token) # create THIS preview host's DNS record
         resolve_upstream(run) if run # the proxy's upstream — NOT the user-facing URL
       end
       exp
@@ -67,7 +68,11 @@ module Rbrun
       return :unknown unless exp || run
 
       stop_sharing(name)
-      Rbrun.preview_edge&.revoke(run) if run
+      if Rbrun.preview_edge
+        Rbrun.preview_edge.revoke(run) if run
+      else
+        Rbrun::PreviewDomain.unexpose!(exp&.preview_token) # delete THIS preview host's DNS record
+      end
       exp&.update!(previewed: false, edge_url: nil)
       run&.update!(url: nil, token: nil)
       exp || :not_running

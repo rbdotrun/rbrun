@@ -22,7 +22,10 @@ module Rbrun
       @auth_managed_at_runtime = false
       @skills_path             = nil
       @preview_domain          = nil # e.g. "rb.run"; hosts are <token>-preview.<preview_domain>. nil ⇒ previews off.
-      @preview_target          = nil # what the wildcard CNAME points at (e.g. a tunnel's cfargotunnel.com host)
+      @preview_target          = nil # THE RBRUN APP'S OWN PUBLIC ORIGIN (e.g. "app.example.com") — each
+                                     # <token>-preview host CNAMEs here so requests land back on this app,
+                                     # whose PreviewProxy relays them into the sandbox. NEVER a tunnel: the
+                                     # app is already public, so previews need no new ingress, only DNS.
       @preview_max_sockets     = 5   # concurrent hijacked WebSocket upgrades (Puma pins a thread each)
       @users                   = []
       @skills                  = []

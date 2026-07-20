@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+#
+# bin/deploy — provision a Hetzner box and deploy rbrun onto it with Kamal, idempotently.
+#
+# Every external touch converges on repeat (invariant #11): the SSH key, the server, the DNS record, and
+# the SECRET_KEY_BASE are all find-or-create / upsert; kamal deploy is itself idempotent. Re-running after
+# a partial failure picks up where it left off and never duplicates a resource.
+#
+# Required env (or .env at the repo root — sourced automatically for laptop runs):
+#   HETZNER_API_TOKEN        Hetzner Cloud API token (provisions the box)
+#   CLOUDFLARE_API_KEY       Cloudflare token: Zone:DNS:Edit + Zone:Read (the app DNS + previews)
+#   CLOUDFLARE_ZONE_ID       the rb.run zone
+#   KAMAL_REGISTRY_USERNAME  container registry user (image is pushed here, the box pulls it)
+#   KAMAL_REGISTRY_PASSWORD  registry token/password (never printed)
+# App-runtime secrets, passed through to the container (see config/deploy.yml env.secret):
+#   DAYTONA_API_KEY, ANTHROPIC_OAUTH_TOKEN
+#
+# Optional knobs (sensible defaults): RBRUN_SERVER_NAME, RBRUN_SERVER_TYPE, RBRUN_SERVER_IMAGE,
+#   RBRUN_SERVER_LOCATION, RBRUN_APP_HOST, KAMAL_REGISTRY_SERVER (default ghcr.io), KAMAL_IMAGE_NAMESPACE.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT"
+
+log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+fail() { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; exit 1; }
+
+# --- knobs ---------------------------------------------------------------
+SERVER_NAME="${RBRUN_SERVER_NAME:-rbrun-dev}"
+SERVER_TYPE="${RBRUN_SERVER_TYPE:-cx23}"   # 2 vCPU / 4 GB / 40 GB, x86 (amd64 build target), ~EUR 6.59/mo
+SERVER_IMAGE="${RBRUN_SERVER_IMAGE:-ubuntu-24.04}"
+SERVER_LOCATION="${RBRUN_SERVER_LOCATION:-fsn1}"
+SSH_KEY_NAME="${RBRUN_SSH_KEY_NAME:-rbrun-deploy}"
+SSH_KEY_FILE="${RBRUN_SSH_KEY_FILE:-$ROOT/.deploy/id_ed25519}"
+APP_HOST="${RBRUN_APP_HOST:-dev.rb.run}"
+export RBRUN_APP_HOST="$APP_HOST"
+
+# --- 1. load .env (laptop); CI injects the same vars, so this is a no-op there ---
+ENV_FILE="${ENV_FILE:-$ROOT/.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  log "sourcing env file: $ENV_FILE"
+  set -a; # shellcheck disable=SC1090
+  source "$ENV_FILE"; set +a
+fi
+
+# --- 2. preconditions ----------------------------------------------------
+for c in kamal docker hcloud ssh curl ruby ssh-keygen; do
+  command -v "$c" >/dev/null || fail "missing required binary: $c"
+done
+: "${HETZNER_API_TOKEN:?required — Hetzner Cloud API token}"
+: "${CLOUDFLARE_API_KEY:?required — Cloudflare token (Zone:DNS:Edit + Zone:Read)}"
+: "${CLOUDFLARE_ZONE_ID:?required — Cloudflare zone id for rb.run}"
+: "${KAMAL_REGISTRY_USERNAME:?required — container registry username (default registry ghcr.io)}"
+: "${KAMAL_REGISTRY_PASSWORD:?required — container registry password/token}"
+
+# hcloud reads its token from HCLOUD_TOKEN; our .env names it HETZNER_API_TOKEN.
+export HCLOUD_TOKEN="$HETZNER_API_TOKEN"
+export KAMAL_REGISTRY_USERNAME KAMAL_REGISTRY_PASSWORD
+export CLOUDFLARE_API_KEY CLOUDFLARE_ZONE_ID
+export DAYTONA_API_KEY="${DAYTONA_API_KEY:-}" ANTHROPIC_OAUTH_TOKEN="${ANTHROPIC_OAUTH_TOKEN:-}"
+
+# --- 3. SECRET_KEY_BASE: generate-or-reuse, persist idempotently into .env ---
+if [[ -z "${SECRET_KEY_BASE:-}" ]]; then
+  if grep -q '^SECRET_KEY_BASE=' "$ENV_FILE" 2>/dev/null; then
+    SECRET_KEY_BASE="$(grep '^SECRET_KEY_BASE=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+  else
+    SECRET_KEY_BASE="$(ruby -rsecurerandom -e 'print SecureRandom.hex(64)')"
+    printf '\nSECRET_KEY_BASE=%s\n' "$SECRET_KEY_BASE" >> "$ENV_FILE"
+    log "generated SECRET_KEY_BASE and stored it in .env (stable across redeploys)"
+  fi
+fi
+export SECRET_KEY_BASE
+
+# --- 4. SSH key: create locally if absent (gitignored), register in Hetzner (find-or-create) ---
+if [[ ! -f "$SSH_KEY_FILE" ]]; then
+  log "generating deploy SSH key -> $SSH_KEY_FILE"
+  mkdir -p "$(dirname "$SSH_KEY_FILE")" && chmod 700 "$(dirname "$SSH_KEY_FILE")"
+  ssh-keygen -t ed25519 -N '' -C 'rbrun-deploy' -f "$SSH_KEY_FILE" >/dev/null
+fi
+if hcloud ssh-key describe "$SSH_KEY_NAME" >/dev/null 2>&1; then
+  log "ssh key '$SSH_KEY_NAME' already registered in Hetzner"
+else
+  log "registering ssh key '$SSH_KEY_NAME' in Hetzner"
+  hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key-from-file "${SSH_KEY_FILE}.pub" >/dev/null
+fi
+
+# --- 5. server: find-or-create ------------------------------------------
+FRESH=0
+if hcloud server describe "$SERVER_NAME" >/dev/null 2>&1; then
+  log "server '$SERVER_NAME' exists — reusing"
+else
+  log "creating server '$SERVER_NAME' ($SERVER_TYPE / $SERVER_IMAGE / $SERVER_LOCATION)"
+  hcloud server create --name "$SERVER_NAME" --type "$SERVER_TYPE" --image "$SERVER_IMAGE" \
+    --location "$SERVER_LOCATION" --ssh-key "$SSH_KEY_NAME" >/dev/null
+  FRESH=1
+fi
+SERVER_IP="$(hcloud server ip "$SERVER_NAME")"
+[[ -n "$SERVER_IP" ]] || fail "could not resolve public IP for '$SERVER_NAME'"
+export DEPLOY_SERVER_IP="$SERVER_IP"
+log "server IP: $SERVER_IP"
+
+# --- 6. wait for SSH -----------------------------------------------------
+log "waiting for SSH on $SERVER_IP"
+for i in $(seq 1 60); do
+  if ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -i "$SSH_KEY_FILE" "root@$SERVER_IP" true 2>/dev/null; then
+    log "SSH is up"
+    break
+  fi
+  [[ "$i" -eq 60 ]] && fail "SSH never came up on $SERVER_IP"
+  sleep 5
+done
+
+# --- 7. DNS: upsert A record APP_HOST -> SERVER_IP -----------------------
+# DNS-only (proxied=false) so kamal-proxy's Let's Encrypt HTTP-01 challenge reaches the box directly.
+# PUT replaces type+content, so a prior CNAME (e.g. an old tunnel record) converges to the A cleanly.
+log "upserting DNS: $APP_HOST A -> $SERVER_IP (proxied=false)"
+CF_HOST="$APP_HOST" CF_IP="$SERVER_IP" ruby <<'RUBY' || fail "DNS upsert failed"
+require "net/http"; require "json"; require "uri"
+tok  = ENV.fetch("CLOUDFLARE_API_KEY"); zone = ENV.fetch("CLOUDFLARE_ZONE_ID")
+host = ENV.fetch("CF_HOST");            ip   = ENV.fetch("CF_IP")
+base = "https://api.cloudflare.com/client/v4/zones/#{zone}/dns_records"
+def cf(method, url, tok, body = nil)
+  uri   = URI(url)
+  klass = { get: Net::HTTP::Get, post: Net::HTTP::Post, put: Net::HTTP::Put }.fetch(method)
+  req = klass.new(uri); req["Authorization"] = "Bearer #{tok}"; req["Content-Type"] = "application/json"
+  req.body = JSON.generate(body) if body
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+  j = JSON.parse(res.body) rescue {}
+  abort "cloudflare #{method}: #{Array(j["errors"]).map { |e| e["message"] }.join("; ")}" unless j["success"]
+  j["result"]
+end
+rec     = Array(cf(:get, "#{base}?name=#{host}", tok)).first
+desired = { type: "A", name: host, content: ip, proxied: false, ttl: 120 }
+if rec
+  cf(:put, "#{base}/#{rec["id"]}", tok, desired); puts "  updated #{host} -> #{ip}"
+else
+  cf(:post, base, tok, desired); puts "  created #{host} -> #{ip}"
+end
+RUBY
+
+# --- 8. Kamal ------------------------------------------------------------
+# First run bootstraps Docker + kamal-proxy then deploys (setup); later runs are incremental (deploy).
+if [[ "$FRESH" -eq 1 ]]; then
+  log "first deploy — kamal setup (bootstrap Docker + proxy, build, push, boot)"
+  kamal setup
+else
+  log "kamal deploy"
+  kamal deploy
+fi
+
+# --- 9. done -------------------------------------------------------------
+log "deploy complete"
+echo
+echo "  app:     https://$APP_HOST"
+echo "  server:  $SERVER_IP  ($SERVER_NAME @ $SERVER_LOCATION)"
+echo "  ssh:     ssh -i $SSH_KEY_FILE root@$SERVER_IP"
+echo "  logs:    kamal logs -f"
+echo
+echo "  preview_target is $APP_HOST — public previews created by the app resolve straight here."
