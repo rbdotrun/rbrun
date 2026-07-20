@@ -62,3 +62,34 @@ These are deliberate, hard-won decisions from the design phase. Do not "improve"
 - `app/`, `db/`, `config/` — the engine host (models, tools, UI) — populated in Phases 4–5.
 - `lib/tasks/rbrun/dogfood/` — dogfood scenarios + `support.rb`.
 - `test/dummy/` — the host app the engine boots against for tests and dogfood.
+
+## Remote dev environment (`bin/dev`)
+
+A single public Hetzner box (`cx23`, `fsn1`) that runs the dummy host app **and** hosts a Claude Code
+session, so development happens on a box that is genuinely internet-reachable (the only way previews are
+real). **Not Kamal, not Docker** — a Kamal variant lived here briefly and was moved to `../insitix`; here we
+spin a box and run `bin/dev` on it. Three scripts, all **idempotent** (every external touch is
+find-or-create / upsert / find-then-delete — invariant #11):
+
+- **`bin/dev`** — the whole pass, run from your laptop, and it runs the FULL pass every time (slow but always
+  convergent, by design): find-or-create the box (uses your `~/.ssh/id_rsa`) → upsert `dev.rb.run` A → the
+  box → install `mise`+Ruby 3.4.4, Caddy, cloudflared, Claude Code → clone/reset the repo (via `gh auth
+  token`) → `scp` your `.env` → bundle + `app:db:prepare` (dev) → bring up **app + Caddy + webhook tunnel**
+  as systemd services → validate Claude Code → open a session on the box. It `git reset --hard origin/main`
+  on the box, so **commit + push before re-running** or box-local work is lost.
+- **`bin/ssh`** — `ssh` in (`bin/ssh` shell · `bin/ssh claude` straight into a session · `bin/ssh <cmd>`).
+- **`bin/destroy`** — tear down the box + its `dev.rb.run` record. **Nothing else** (SSH keys, preview
+  records untouched).
+
+Architecture that must not be re-muddled (we relearned it the hard way):
+
+- **The app is served publicly by Caddy on the box, on-demand TLS → the app on `:3000`.** So `dev.rb.run`
+  and every `<token>-preview.rb.run` get HTTPS with **NO tunnel in the app path**. `preview_target` is the
+  app's own origin (`dev.rb.run`), never a tunnel (see invariant #10).
+- **The cloudflared tunnel is webhooks-only** (Daytona → box). It never serves the app or previews.
+- Secrets ride in the `scp`'d `.env`. Claude Code is authed with `CLAUDE_CODE_OAUTH_TOKEN`
+  (= `ANTHROPIC_OAUTH_TOKEN`) persisted to `/etc/profile.d` so **every** shell is authed, and its first-run
+  onboarding is pre-seeded in `~/.claude.json` so `claude` lands on the prompt. Git identity + a `gh`-token
+  push credential are configured on the box so a session can commit + push as you.
+- `.env` must carry: `HETZNER_API_TOKEN`, `CLOUDFLARE_API_KEY`/`CLOUDFLARE_ZONE_ID`, `ANTHROPIC_OAUTH_TOKEN`
+  (+ `DAYTONA_*` for the app). The GitHub token comes from `gh auth token` (no PAT in `.env`).
