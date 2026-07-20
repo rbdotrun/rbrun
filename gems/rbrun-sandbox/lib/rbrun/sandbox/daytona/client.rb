@@ -191,6 +191,13 @@ module Rbrun
           get("#{TOOLBOX}/#{id}/process/session/#{session_id}/command/#{command_id}")
         end
 
+        # A SNAPSHOT of the command's output — a plain, non-follow GET that closes immediately. Use this
+        # for "show me the logs"; session_logs_follow is only for streaming a run to completion. Following
+        # a still-running process never closes its stream, so a follow-based snapshot hangs.
+        def session_logs(id, session_id, command_id)
+          request(:get, "#{TOOLBOX}/#{id}/process/session/#{session_id}/command/#{command_id}/logs").body.to_s
+        end
+
         # FOLLOW the command's output live. RAW async-http, not Faraday: the Faraday async-http adapter
         # buffers the whole body, so its on_data never fires until the stream closes — a deadlock for a
         # follow that only closes on command exit. `skip` bytes are dropped first (resume offset).

@@ -17,6 +17,10 @@ gem "rubocop-rails-omakase", require: false
 gem "capybara", require: false
 gem "cuprite", require: false
 
+# HTTP stubbing for provider clients. Provider adapters are tested by driving the REAL client against a
+# stubbed WIRE — never a hand-rolled fake client, which hides request/response bugs by construction.
+gem "webmock", require: false
+
 # Start debugger with binding.b [https://github.com/ruby/debug]
 # gem "debug", ">= 1.0.0"
 

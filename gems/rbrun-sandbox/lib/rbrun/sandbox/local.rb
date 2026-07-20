@@ -123,6 +123,12 @@ module Rbrun
         { "exitCode" => (thr.alive? ? nil : thr.value.exitstatus) }
       end
 
+      # Snapshot of a command's output (non-follow) — the whole log so far, safe on a live process.
+      def session_logs(session_id, cmd_id)
+        entry = @sessions.dig(session_id, cmd_id) or return ""
+        File.exist?(entry[:log]) ? File.binread(entry[:log]) : ""
+      end
+
       # Follow the command's merged output. `skip` bytes are dropped first (resume offset). Returns
       # total bytes seen. Stops when the command exits and the log is fully read, or when the block
       # returns truthy (the caller signalled terminal).

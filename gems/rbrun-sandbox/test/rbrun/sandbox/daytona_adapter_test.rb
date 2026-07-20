@@ -1,75 +1,136 @@
 require "test_helper"
 
+# The adapter over the REAL Daytona::Client, with only the WIRE stubbed (WebMock). No hand-rolled fake
+# client: a fake stands in for the very code that builds requests and parses responses, so it hides
+# exactly the bugs these tests exist to catch (e.g. session_create 409s on Daytona).
 class DaytonaAdapterTest < Minitest::Test
-  # A hand fake standing in for Daytona::Client, recording calls and returning canned wire shapes.
-  class FakeClient
-    attr_reader :calls
+  API = "https://api.test"
+  TOOLBOX = "https://proxy.app.daytona.io/toolbox"
+  BOX = "box-1"
 
-    def initialize = @calls = []
-    def find_or_create(_labels) = { "id" => "box-1", "state" => "started" }
-
-    def exec(_id, command, timeout: 60)
-      @calls << [ :exec, command, timeout ]
-      command.include?("boom") ? { "exitCode" => 2, "result" => "nope" } : { "exitCode" => 0, "result" => "ok\n" }
-    end
-
-    def download(_id, path) = "contents-of-#{path}"
-    def create_folder(_id, path, _mode = "755") = @calls << [ :create_folder, path ]
-    def upload(_id, path, _source) = @calls << [ :upload, path ]
-    def destroy(_id) = @calls << [ :destroy ]
-    def create_session(_id, sid) = @calls << [ :create_session, sid ]
-    def session_exec(_id, _sid, _command) = "cmd-9"
-    def session_input(_id, _sid, _cid, data) = @calls << [ :session_input, data ]
-    def session_command(_id, _sid, _cid) = { "exitCode" => 0 }
+  def setup
+    # Box lookup: list by labels, then confirm the candidate by id.
+    stub_request(:get, "#{API}/sandbox")
+      .with(query: { "labels" => { session: "1" }.to_json })
+      .to_return(json({ "items" => [ { "id" => BOX, "state" => "started", "createdAt" => "1" } ] }))
+    stub_request(:get, "#{API}/sandbox/#{BOX}")
+      .to_return(json({ "id" => BOX, "state" => "started" }))
   end
 
-  def build(client = FakeClient.new)
-    Rbrun::Sandbox::Daytona.new(config: { api_key: "k", api_url: "u" }, labels: { session: 1 }, client: client)
+  def json(body, status: 200)
+    { status: status, body: body.to_json, headers: { "Content-Type" => "application/json" } }
+  end
+
+  def build
+    Rbrun::Sandbox::Daytona.new(config: { api_key: "k", api_url: API }, labels: { session: 1 })
+  end
+
+  def stub_exec(exit_code: 0, result: "ok\n")
+    stub_request(:post, "#{TOOLBOX}/#{BOX}/process/execute")
+      .to_return(json({ "exitCode" => exit_code, "result" => result }))
   end
 
   def test_config_fails_fast_without_api_key
     assert_raises(Rbrun::Sandbox::Error) do
-      Rbrun::Sandbox::Daytona.new(config: { api_url: "u" }, labels: {})
+      Rbrun::Sandbox::Daytona.new(config: { api_url: API }, labels: {})
     end
   end
 
   def test_exec_normalizes_to_exec_result
+    stub_exec
     result = build.exec("echo ok")
     assert_instance_of Rbrun::Sandbox::ExecResult, result
     assert result.success?
     assert_equal "ok\n", result.stdout
   end
 
+  def test_exec_sends_the_command_to_the_box
+    stub_exec
+    build.exec("echo ok", timeout: 30)
+    assert_requested(:post, "#{TOOLBOX}/#{BOX}/process/execute") do |req|
+      JSON.parse(req.body) == { "command" => "echo ok", "timeout" => 30 }
+    end
+  end
+
   def test_exec_bang_raises_on_nonzero
+    stub_exec(exit_code: 2, result: "nope")
     assert_raises(Rbrun::Sandbox::Error) { build.exec!("boom") }
   end
 
-  def test_exist_uses_exit_code
-    adapter = build
-    assert adapter.exist?("/some/path")            # exec exit 0 → true
-    refute adapter.exist?("/boom/path")            # exec exit 2 → false
+  def test_exist_is_true_on_exit_zero
+    stub_exec(exit_code: 0, result: "")
+    assert build.exist?("/some/path")
+  end
+
+  def test_exist_is_false_on_nonzero_exit
+    stub_exec(exit_code: 1, result: "")
+    refute build.exist?("/missing/path")
+  end
+
+  def test_read_downloads_the_path
+    stub_request(:get, "#{TOOLBOX}/#{BOX}/files/download")
+      .with(query: { "path" => "/w/a.txt" })
+      .to_return(status: 200, body: "contents")
+    assert_equal "contents", build.read("/w/a.txt")
   end
 
   def test_write_creates_folder_then_uploads
-    client = FakeClient.new
-    build(client).write("/w/dir/a.txt", "hello")
-    assert_includes client.calls.map(&:first), :create_folder
-    assert_includes client.calls.map(&:first), :upload
+    folder = stub_request(:post, "#{TOOLBOX}/#{BOX}/files/folder")
+      .with(query: { "path" => "/w/dir", "mode" => "755" }).to_return(status: 200, body: "")
+    stub_request(:post, "#{TOOLBOX}/#{BOX}/files/upload")
+      .with(query: { "path" => "/w/dir/a.txt" }).to_return(status: 200, body: "")
+
+    build.write("/w/dir/a.txt", "hello")
+
+    assert_requested folder
+    # the content lands in the multipart body, not just the path query
+    assert_requested(:post, "#{TOOLBOX}/#{BOX}/files/upload?path=/w/dir/a.txt") { |req| req.body.include?("hello") }
   end
 
   def test_session_delegates_with_box_id
-    client = FakeClient.new
-    adapter = build(client)
+    session = "#{TOOLBOX}/#{BOX}/process/session"
+    stub_request(:post, session).to_return(json({}))
+    stub_request(:post, "#{session}/s1/exec").to_return(json({ "cmdId" => "cmd-9" }))
+    stub_request(:post, "#{session}/s1/command/cmd-9/input").to_return(json({}))
+    stub_request(:get, "#{session}/s1/command/cmd-9").to_return(json({ "exitCode" => 0 }))
+
+    adapter = build
     adapter.session_create("s1")
     assert_equal "cmd-9", adapter.session_exec("s1", "run")
     adapter.session_input("s1", "cmd-9", "data")
     assert_equal 0, adapter.session_command("s1", "cmd-9")["exitCode"]
-    assert_includes client.calls, [ :create_session, "s1" ]
+
+    assert_requested(:post, session) { |req| JSON.parse(req.body) == { "sessionId" => "s1" } }
+    assert_requested(:post, "#{session}/s1/exec") { |req| JSON.parse(req.body)["command"] == "run" }
+    assert_requested(:post, "#{session}/s1/command/cmd-9/input") { |req| JSON.parse(req.body) == { "data" => "data" } }
+  end
+
+  # A session that already exists is success for a caller that only wants it to exist — the box is
+  # found by label, so a relaunch under a deterministic session name always meets its own 409.
+  def test_session_create_is_idempotent_on_409
+    stub_request(:post, "#{TOOLBOX}/#{BOX}/process/session")
+      .to_return(json({ "message" => "session already exists" }, status: 409))
+    assert_nil build.session_create("s1")
+  end
+
+  def test_session_create_raises_on_other_errors
+    stub_request(:post, "#{TOOLBOX}/#{BOX}/process/session")
+      .to_return(json({ "message" => "boom" }, status: 500))
+    assert_raises(Rbrun::Sandbox::Error) { build.session_create("s1") }
+  end
+
+  def test_preview_url_maps_the_wire
+    stub_request(:get, "#{API}/sandbox/#{BOX}/ports/3000/preview-url")
+      .to_return(json({ "url" => "https://3000-box-1.proxy.test", "token" => "tok" }))
+    link = build.preview_url(3000)
+    assert_equal "https://3000-box-1.proxy.test", link.url
+    assert_equal "tok", link.token
   end
 
   def test_destroy_resets_the_box
-    client = FakeClient.new
-    build(client).destroy!
-    assert_includes client.calls, [ :destroy ]
+    destroy = stub_request(:delete, "#{API}/sandbox/#{BOX}")
+      .with(query: { "force" => "true" }).to_return(status: 200, body: "")
+    build.destroy!
+    assert_requested destroy
   end
 end

@@ -34,6 +34,8 @@ module Rbrun
       status = tool(Rbrun::Tools::RepoServicesStatus).execute.dig("data", "services")
       assert_equal [ "web" ], status.map { |s| s["name"] }
 
+      # logs are a non-follow SNAPSHOT now — give the process a moment to actually write.
+      sleep 0.5
       logs = tool(Rbrun::Tools::RepoServicesLogs).execute(name: "web").dig("data", "logs")
       assert_includes logs, "hello-logs"
 

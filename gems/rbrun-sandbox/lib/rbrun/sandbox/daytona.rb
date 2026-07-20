@@ -95,6 +95,8 @@ module Rbrun
         nil
       end
       def session_exec(session_id, command) = @client.session_exec(id, session_id, command)
+      # Snapshot of a command's output (non-follow) — safe on a still-running process.
+      def session_logs(session_id, cmd_id) = @client.session_logs(id, session_id, cmd_id)
       def session_input(session_id, cmd_id, data) = @client.session_input(id, session_id, cmd_id, data)
       def session_command(session_id, cmd_id) = @client.session_command(id, session_id, cmd_id)
 

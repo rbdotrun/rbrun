@@ -156,6 +156,9 @@ GEM
       fiber-annotation
       fiber-local (~> 1.1)
       json
+    crack (1.0.1)
+      bigdecimal
+      rexml
     crass (1.0.7)
     cuprite (0.17)
       capybara (~> 3.0)
@@ -188,6 +191,7 @@ GEM
     fiber-storage (1.0.1)
     globalid (1.4.0)
       activesupport (>= 6.1)
+    hashdiff (1.2.1)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
     io-console (0.8.2)
@@ -316,6 +320,7 @@ GEM
     regexp_parser (2.12.0)
     reline (0.6.3)
       io-console (~> 0.5)
+    rexml (3.4.4)
     rubocop (1.88.2)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
@@ -385,6 +390,10 @@ GEM
     view_component-contrib (0.2.5)
       ruby-next-core (>= 0.15.0)
       view_component
+    webmock (3.26.2)
+      addressable (>= 2.8.0)
+      crack (>= 0.3.2)
+      hashdiff (>= 0.4.0, < 2.0.0)
     webrick (1.9.2)
     websocket-driver (0.8.2)
       base64
@@ -407,6 +416,7 @@ DEPENDENCIES
   rbrun-sandbox!
   rubocop-rails-omakase
   sqlite3
+  webmock
 
 BUNDLED WITH
    2.6.9

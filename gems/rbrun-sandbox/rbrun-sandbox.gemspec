@@ -16,4 +16,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-http-faraday", ">= 0.12"
   spec.add_dependency "faraday", "~> 2.0"
   spec.add_dependency "faraday-multipart", "~> 1.0"
+
+  spec.add_development_dependency "webmock", "~> 3.0"
 end

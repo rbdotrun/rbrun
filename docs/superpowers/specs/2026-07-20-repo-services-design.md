@@ -111,8 +111,11 @@ token:)`. `Daytona` implements it (proxy link, via `Client#preview_link`); `Loca
   and logs, just without an `[Open ↗]`. Graceful degrade — the presence of the method IS the capability.
 - **`Rbrun::Sandbox::PreviewLink = Data.define(:url, :token)`** — a gem value object beside `ExecResult`.
 
-Because launch/logs/stop use transport both adapters have, the whole feature is **exercisable on
-`Local`** (localhost) — testable offline; only Daytona's proxy URL + token needs the cloud.
+`Local` implements `preview_url` (localhost) so the **unit tests** and the **multi-provider seam** are
+exercised without a cloud. But `Local` is a **test fixture, not an exposed provider** — a real sandbox is
+required in production, and `Local` is never an acceptance gate. Its adapter semantics differ from a real
+provider's in ways that silently mask bugs (see §11: `session_create` idempotency), so **provider
+behaviour is only ever proven against the provider.**
 
 ## 6. UI — the Services panel
 
@@ -193,19 +196,20 @@ backends (the tool contract is built to allow them, they aren't built now); log 
 sandbox is torn down (live tail only); a repo-declared services/secrets manifest (the agent reads
 `Procfile.dev` etc. and declares the set itself — a manifest convention is a later north-star).
 
-## 11. Dogfoods (acceptance gate)
+## 11. Dogfood (the acceptance gate) — Daytona only
 
-- **`repo_services_local`** (offline, no cloud): drives the whole tool contract + secrets injection on
-  the `Local` adapter. `request_secrets` → submit a `MY_SECRET` through the secure flow (asserting the
-  value never appears in the tool_result/nudge — only the key). `repo_services_start` a service whose
-  command echoes `$MY_SECRET` to prove **injection**, plus an HTTP one (a `bun`/`python -m http.server`);
-  assert rows go `running`, the HTTP `url` is `http://localhost:PORT` and serves, `repo_services_logs`
-  tails real output (including the injected secret's *effect*, not the value in our logs), a stuck one
-  `repo_services_restart`s, `repo_services_stop` flips `stopped`, and a second `start` is idempotent.
-- **`preview_daytona`** (live, `.env` creds — present) — the **real** end-to-end on `benbonnet/dummy-rails`:
-  provision a ruby+node+postgres sandbox (custom Dockerfile), `request_secrets` → submit
-  `RAILS_MASTER_KEY` (read from the local checkout's `config/master.key` — the harness stands in for the
-  user), `repo_services_start` postgres + `bin/rails server -p 3000` (+ a one-shot `db:prepare`), and
-  **verify the proxy `preview_url` shape and the browser token mechanism** through `services/:id/open`
-  against the live Rails app. This closes §7's open question. **Built in this pass but NOT run — fired
-  separately.**
+**`preview_daytona`** (live, `.env` creds) — the **real** end-to-end on `benbonnet/dummy-rails`: a
+ruby+node+postgres box (custom Dockerfile), the app uploaded (it's private, no PAT), a real Claude turn
+driving `request_secrets` → `RAILS_MASTER_KEY` (the harness stands in for the user's secure form) →
+`repo_services_start` for postgres + `bin/rails server -p 3000`, then it **prints the browser-openable
+preview URL** and leaves the box alive (Daytona auto-stops it in ~5 min) so a human can open it and
+confirm the app actually serves. The gate is a human opening that URL.
+
+**There is deliberately NO local dogfood.** One existed and was deleted: it drove the same tool contract
+on the `Local` adapter and passed green — while the real provider was broken. `Local#session_create` is
+`@sessions[id] ||= {}` (idempotent) but Daytona returns **409 "session already exists"**, so every
+relaunch of a service failed on Daytona, breaking `repo_services_restart` and the idempotent
+`repo_services_start`. The local gate could not fail where the real one did, so it bought false
+confidence. `Local` earns its keep as a **unit-test fixture and multi-provider proof** — it is not an
+exposed provider (a sandbox is required) and never an acceptance gate. Provider behaviour is only ever
+proven against the provider.
