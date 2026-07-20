@@ -89,12 +89,25 @@ else
   warn "→ CNAME created: #{HOST} → #{content}"
 end
 
-# 4. Fetch (never store) the run token.
+# 4. Fetch the run token and UPSERT it into .env idempotently (replace the line if present, else append —
+#    never a duplicate). All other lines are preserved untouched.
 token = cf(:get, "/accounts/#{ACCOUNT}/cfd_tunnel/#{tunnel_id}/token")
+
+env_path = File.join(ROOT, ".env")
+lines = File.exist?(env_path) ? File.read(env_path).lines : []
+line  = "TUNNEL_TOKEN=#{token}\n"
+if lines.any? { |l| l.start_with?("TUNNEL_TOKEN=") }
+  lines.map! { |l| l.start_with?("TUNNEL_TOKEN=") ? line : l }
+  action = "updated"
+else
+  lines << "\n" unless lines.empty? || lines.last.end_with?("\n")
+  lines << line
+  action = "added"
+end
+File.write(env_path, lines.join)
 
 warn "\n#{'═' * 64}"
 warn "  rbrun is exposed at: https://#{HOST}   (→ localhost:#{PORT})"
-warn "  Run the tunnel with:"
-warn "    cloudflared tunnel run --token $TUNNEL_TOKEN"
-warn "#{'═' * 64}\n"
-puts "TUNNEL_TOKEN=#{token}"
+warn "  TUNNEL_TOKEN #{action} in .env"
+warn "  Run the tunnel with:  cloudflared tunnel run --token \"$TUNNEL_TOKEN\""
+warn "#{'═' * 64}"
