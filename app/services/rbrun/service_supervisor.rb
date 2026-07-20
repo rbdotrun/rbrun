@@ -26,8 +26,11 @@ module Rbrun
     def launch(run)
       sess = session_name(run)
       @sandbox.session_create(sess)
+      # `exec env <command>` — NOT `exec <command>`: POSIX exec rejects leading VAR=value assignments
+      # ("exec: FOO=bar: not found"), which is the most common way to write a service command. `env`
+      # consumes the assignments and execve's in place, so the recorded pid still IS the service.
       wrapped = "cd #{ws} && mkdir -p .rbrun && set -a; [ -f .rbrun/env ] && . .rbrun/env; set +a; " \
-                "echo $$ > .rbrun/#{pidfile(run)}; exec #{run.command}"
+                "echo $$ > .rbrun/#{pidfile(run)}; exec env #{run.command}"
       cmd_id = @sandbox.session_exec(sess, "sh -c #{Shellwords.escape(wrapped)}")
       run.update!(process_session: sess, cmd_id: cmd_id, status: "running", exit_code: nil, log_offset: 0)
       run

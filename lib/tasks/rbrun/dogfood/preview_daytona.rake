@@ -193,13 +193,28 @@ namespace :dogfood do
         dog.info "GET preview url (token header)", status.inspect
         dog.ok "the live Rails app answers 200 through the preview", status == 200
 
-        anon = begin
-          conn.get(web.url).status
-        rescue StandardError
-          nil
+        # NOT ENOUGH to assert `anon != 200` — a 307 proves nothing about where it leads. Follow the
+        # whole anonymous chain and require it to terminate at the provider's LOGIN, i.e. an
+        # unauthenticated stranger with the link never reaches the app.
+        anon_status, anon_final = begin
+          u = web.url
+          st = nil
+          8.times do
+            r = conn.get(u)
+            st = r.status
+            loc = r.headers["location"]
+            break unless loc && st.between?(300, 399)
+
+            u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
+          end
+          [ st, u ]
+        rescue StandardError => e
+          [ "err:#{e.class}", nil ]
         end
-        dog.info "anonymous (no token)", anon.inspect
-        dog.ok "the box is NOT publicly open (anonymous is not served)", anon != 200
+        dog.info "anonymous chain ends at", anon_final.to_s[0, 80]
+        dog.ok "an anonymous stranger is bounced to provider login, never the app",
+               anon_final.to_s.include?("auth0") || anon_final.to_s.include?("login")
+        dog.ok "…and never gets a 200 from the app anonymously", anon_status != 200
 
         puts "\n╔══════════════════════════════════════════════════════════════════"
         puts "║  OPEN THIS IN YOUR BROWSER TO VALIDATE (box auto-stops in ~5 min):"

@@ -106,10 +106,32 @@ The **only** provider-optional piece. Capability-by-method-presence, matching rb
 - An adapter that can publish a port defines `preview_url(port) → Rbrun::Sandbox::PreviewLink(url:,
 token:)`. `Daytona` implements it (proxy link, via `Client#preview_link`); `Local` implements it as
   `http://localhost:{port}`; a proxy-less provider **omits** it.
-- `Worktree#previews_supported? = sandbox.respond_to?(:preview_url)`. At launch, a port-bearing service
-  resolves `preview_url(port)` → stores `url` + `token` **only when supported**; otherwise it still runs
-  and logs, just without an `[Open ↗]`. Graceful degrade — the presence of the method IS the capability.
+- `Worktree#previews_supported? = sandbox.respond_to?(:preview_url)`. Graceful degrade — the presence of
+  the method IS the capability.
 - **`Rbrun::Sandbox::PreviewLink = Data.define(:url, :token)`** — a gem value object beside `ExecResult`.
+
+### Running ≠ exposing (the hard rule)
+
+**A service is a supervised process inside the box, and nothing more.** `repo_services_start` NEVER
+resolves a preview, never contacts the proxy, never exposes anything. A declared `port` is only what the
+process binds to *internally* — it is not a request to expose it.
+
+**Previewing is a separate, explicit, reversible decision**, made by two declarative tools (and the same
+two actions in the panel):
+- `preview_service(name)` — resolve the URL for one running, port-bearing service.
+- `stop_preview(name)` — withdraw it; the service keeps running.
+
+The declaration lives on **`RepoService#previewed`** (the definition), not the run: `repo_services_start`
+is a reset that recreates runs, so a per-run flag would be lost on every restart. Launch resolves a URL
+only for a service *already declared* previewed — honouring a prior decision, never implying one.
+No join table: one service → one port → one preview, nothing many-to-many.
+
+**Gating.** `preview_service` is **ungated**: the resolved URL still requires the viewer's own provider
+authentication, so it does not open the box to strangers (verified — an anonymous visitor is bounced to
+the provider's login and never reaches the app). **Any genuinely public exposure MUST be
+`needs_approval!`** — that is a human decision, never the agent's. rbrun does not implement public
+exposure today, and nothing in it sets Daytona's box-wide `public` flag; note that flag is **sandbox-wide,
+not per-port**, so it would expose every service on the box.
 
 `Local` implements `preview_url` (localhost) so the **unit tests** and the **multi-provider seam** are
 exercised without a cloud. But `Local` is a **test fixture, not an exposed provider** — a real sandbox is
