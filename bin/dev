@@ -46,6 +46,8 @@ for c in hcloud gh ssh scp ssh-keygen ruby curl; do command -v "$c" >/dev/null |
 : "${CLOUDFLARE_ZONE_ID:?required — Cloudflare zone id}"
 export HCLOUD_TOKEN="$HETZNER_API_TOKEN"
 GH_TOKEN_VAL="$(gh auth token)" || fail "gh auth token failed — run: gh auth login"
+GIT_NAME="$(git config user.name 2>/dev/null || true)"    # mirror your local identity onto the box
+GIT_EMAIL="$(git config user.email 2>/dev/null || true)"
 
 # The box IP is ephemeral (Hetzner recycles it), so a reused IP carries a stale known_hosts key that
 # accept-new would refuse. Skip known_hosts for it entirely — this is a throwaway dev box we own.
@@ -146,6 +148,19 @@ git -C "$REMOTE_DIR" remote set-url origin "https://github.com/rbdotrun/rbrun.gi
 echo "repo synced"
 REMOTE
 
+# --- 6b. git identity + push credential on the box (idempotent) ---------
+# So a Claude Code session on the box can commit + push as you, without prompting. Identity mirrors your
+# local git; the push credential is the gh token stored in the standard credential-store file.
+log "remote: git identity + push credential"
+rexec "GH_TOKEN='$GH_TOKEN_VAL' GIT_NAME='$GIT_NAME' GIT_EMAIL='$GIT_EMAIL' bash -s" <<'REMOTE'
+set -euo pipefail
+[ -n "${GIT_NAME:-}" ]  && git config --global user.name  "$GIT_NAME"
+[ -n "${GIT_EMAIL:-}" ] && git config --global user.email "$GIT_EMAIL"
+git config --global credential.helper store
+umask 077; printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > ~/.git-credentials
+echo "git: $(git config --global user.name) <$(git config --global user.email)>"
+REMOTE
+
 # --- 7. secrets: sync .env + derive CLAUDE_CODE_OAUTH_TOKEN --------------
 log "remote: sync .env + claude token"
 scp "${SSH_OPTS[@]}" "$ENV_FILE" "root@$SERVER_IP:$REMOTE_DIR/.env" >/dev/null
@@ -154,6 +169,11 @@ set -euo pipefail
 cd "$REMOTE_DIR"
 tok="$(grep '^ANTHROPIC_OAUTH_TOKEN=' .env | tail -1 | cut -d= -f2-)"
 grep -q '^CLAUDE_CODE_OAUTH_TOKEN=' .env && sed -i "s#^CLAUDE_CODE_OAUTH_TOKEN=.*#CLAUDE_CODE_OAUTH_TOKEN=${tok}#" .env || echo "CLAUDE_CODE_OAUTH_TOKEN=${tok}" >> .env
+# Persist the Claude token into EVERY login shell so `claude` is authed whether you land here via
+# `bin/dev`, `bin/ssh claude`, or a plain `bin/ssh` + `claude`. Without this, only the specific launch
+# command carried the token and a plain shell would prompt to log in.
+umask 077; printf 'export CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$tok" > /etc/profile.d/rbrun-claude.sh
+chmod 644 /etc/profile.d/rbrun-claude.sh
 echo "secrets synced"
 REMOTE
 
