@@ -13,6 +13,16 @@ module Rbrun
       app.config.filter_parameters += [ :secrets, :value, :token ]
     end
 
+    # The preview edge. Inserted at the TOP of the stack so it intercepts EVERY path on a preview host —
+    # including /assets, which ActionDispatch::Static would otherwise grab first. No-ops for non-preview
+    # hosts and when the host app owns the edge (Rbrun.preview_edge). (Being above the session middleware,
+    # the private-preview gate cannot read the rbrun session here — level-2 auth needs a cross-subdomain
+    # handshake, a follow-up; public previews are fully served.)
+    initializer "rbrun.preview_proxy" do |app|
+      require "rbrun/preview_proxy"
+      app.middleware.insert_before(0, Rbrun::PreviewProxy)
+    end
+
     initializer "rbrun.assets" do |app|
       if app.config.respond_to?(:assets)
         app.config.assets.paths << root.join("app/assets/builds").to_s
