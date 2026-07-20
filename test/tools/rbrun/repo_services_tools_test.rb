@@ -25,7 +25,7 @@ module Rbrun
       # Previewing is a separate, explicit decision — the URL is the engine's own edge host.
       Rbrun.config.preview_domain = "rb.run"
       preview = tool(Rbrun::Tools::PreviewService).execute(name: "web")
-      assert_match %r{\Ahttps://\w+-preview\.rb\.run\z}, preview.dig("data", "url")
+      assert_match %r{\Ahttps://[\w-]+-preview\.rb\.run\z}, preview.dig("data", "url")
       assert preview.dig("data", "previewed")
       assert_equal "http://localhost:4322", @worktree.service_runs.find_by(name: "web").url, "upstream on the run"
 
