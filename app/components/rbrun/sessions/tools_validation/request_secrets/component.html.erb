@@ -1,0 +1,29 @@
+<div class="border-t border-slate-200 p-3">
+  <% if answered? %>
+    <p class="mb-1 text-xs font-medium text-slate-500">Secrets stored</p>
+    <ul class="flex flex-col gap-0.5 text-sm text-slate-700">
+      <% stored_keys.each do |key| %>
+        <li class="flex items-center gap-2">
+          <%= lucide_icon("lock", class: "size-3.5 text-green-600") %><code class="text-xs"><%= key %></code>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <%= form_with url: submit_path, method: :post, class: "flex flex-col gap-3" do %>
+      <p class="text-sm font-medium text-slate-800">Provide the secrets this app needs</p>
+      <% spec.keys.each do |key| %>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="font-medium text-slate-700"><%= spec.label_for(key) %></span>
+          <% if spec.hint_for(key).present? %><span class="text-xs text-slate-400"><%= spec.hint_for(key) %></span><% end %>
+          <input type="password" name="secrets[<%= key %>]" autocomplete="off" spellcheck="false"
+                 <%= "required" if spec.required?(key) %>
+                 class="rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-default-500 focus:outline-none focus:ring-1 focus:ring-default-500">
+        </label>
+      <% end %>
+      <div class="flex items-center gap-2 pt-1">
+        <%= component("button", variant: :primary, size: :sm, type: "submit") do %>Save secrets<% end %>
+        <span class="ml-auto text-[11px] text-slate-400">Stored securely — the agent never sees the values.</span>
+      </div>
+    <% end %>
+  <% end %>
+</div>

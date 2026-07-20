@@ -11,6 +11,8 @@ Rbrun::Engine.routes.draw do
   post "ask_user/:tool_use_id", to: "ask_user_responses#create", as: :ask_user_response
   # Custom gate: workflow_create submits its Apply/Save/Cancel decision here.
   post "workflow_decision/:tool_use_id", to: "workflow_decisions#create", as: :workflow_decision
+  # Custom gate: request_secrets submits the secure form here (values → encrypted store, never the LLM).
+  post "secrets/:tool_use_id", to: "secrets#create", as: :secrets_submission
 
   # Repo workspace switcher: the searchable result frame + the switch action.
   get  "repos",        to: "repositories#index",  as: :repos

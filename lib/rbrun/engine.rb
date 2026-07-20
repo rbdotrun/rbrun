@@ -29,6 +29,7 @@ module Rbrun
         Rbrun::Tools::WorkflowSearch, Rbrun::Tools::UseWorkflow ].each { |t| Rbrun.register_tool(t) }
       [ Rbrun::Tools::RepoServicesStart, Rbrun::Tools::RepoServicesRestart, Rbrun::Tools::RepoServicesStop,
         Rbrun::Tools::RepoServicesStatus, Rbrun::Tools::RepoServicesLogs ].each { |t| Rbrun.register_tool(t) }
+      Rbrun.register_tool(Rbrun::Tools::RequestSecrets) # custom gate (card + :secrets_submission route required)
       Rbrun::ApplicationTool.validate_tool_approvals! # a half-built custom_approval! fails boot
       Rbrun::SkillSeeder.seed_at_boot!
       Rbrun::McpSeeder.seed_at_boot!
