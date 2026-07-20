@@ -39,7 +39,7 @@ module Rbrun
       skills_dir = materialize_skills
       runtime.run(
         prompt: prompt,
-        system: Rbrun.config(@session.tenant).system_prompt,
+        system: [ Rbrun.config(@session.tenant).system_prompt, Rbrun::ServiceConventions::PROMPT ].join("\n\n"),
         tools: Rbrun::ApplicationTool.manifest,
         skills: skills_dir,
         mcp: materialize_mcp,
