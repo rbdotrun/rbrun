@@ -170,52 +170,67 @@ namespace :dogfood do
       drive.call
       shared_call = session.messages.where(event_type: "tool_use").any? { |m| m.payload["name"] == "share_public" }
       launcher = Rbrun::ServiceLauncher.new(worktree: worktree)
-      share = launcher.share_for("web")
+      web = worktree.service_runs.reload.find_by(name: "web")
       dog.ok "the agent called share_public", shared_call
       dog.ok "share_public is a GATED tool (approval was required)", Rbrun::Tools::SharePublic.needs_approval?
-      dog.ok "a public share exists for web", share.present?
+      dog.ok "web is declared shared_public", launcher.shared?("web")
 
-      # SCOPING — the whole point: only the shared service has a route.
-      dog.ok "postgres has NO public share", launcher.share_for("db").nil?
-      dog.ok "the job worker has NO public share", launcher.share_for("jobs").nil?
-      dog.ok "exactly ONE service is shared", worktree.public_shares.count == 1
+      # SCOPING IS OUR INTENT: only web is declared shared. (The provider switch is box-wide — that gap
+      # is documented in the spec, not claimed away here.)
+      dog.ok "postgres is NOT declared shared", !launcher.shared?("db")
+      dog.ok "the job worker is NOT declared shared", !launcher.shared?("jobs")
+      dog.ok "exactly ONE service is declared shared", launcher.shared_names == [ "web" ]
 
-      # THE BOX ITSELF WAS NEVER OPENED: the raw provider preview URL still demands provider auth.
-      if web&.url.present?
-        anon_final = begin
-          c = Faraday.new { |f| f.adapter :async_http }
-          u = web.url
-          8.times do
-            r = c.get(u)
-            loc = r.headers["location"]
-            break unless loc && r.status.between?(300, 399)
+      conn = Faraday.new { |f| f.adapter :async_http }
+      anon = lambda do |url|
+        status = nil
+        u = url
+        8.times do
+          r = conn.get(u)
+          status = r.status
+          loc = r.headers["location"]
+          break unless loc && status.between?(300, 399)
 
-            u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
-          end
-          u
-        rescue StandardError
-          nil
+          u = loc.start_with?("http") ? loc : URI.join(u, loc).to_s
         end
-        dog.ok "the SANDBOX is still private (raw provider url ⇒ provider login)",
-               anon_final.to_s.match?(/auth0|login/)
+        [ status, u ]
+      rescue StandardError => e
+        [ "err:#{e.class}", nil ]
       end
 
-      if share
-        puts "\n╔══════════════════════════════════════════════════════════════════"
-        puts "║  PUBLIC LINK (served by rbrun's own edge — no account needed):"
-        puts "║  #{Rbrun::Engine.routes.url_helpers.public_preview_path(token: share.token)}"
-        puts "║  (mount it under your rbrun host, e.g. http://localhost:3000/rbrun/p/…)"
-        puts "╚══════════════════════════════════════════════════════════════════\n"
+      # THE PROOF: anonymous, no cookies, no provider account — the real app answers.
+      status, final = anon.call(web.url)
+      body = begin
+        conn.get(web.url).body.to_s
+      rescue StandardError
+        ""
       end
+      dog.info "anonymous GET (shared)", "#{status} #{final.to_s[0, 60]}"
+      dog.ok "PUBLIC: an anonymous stranger gets the live app (200)", status == 200
+      dog.ok "…and it is really the Rails app (its HTML came back)", body.include?("<html") || body.downcase.include?("rails")
+      # assets are served by the provider at the app's own root — nothing rewrites paths.
+      asset = body[%r{(?:href|src)="(/assets/[^"]+)"}, 1]
+      if asset
+        a_status, = anon.call(File.join(web.url.chomp("/"), asset.sub(%r{\A/}, "")))
+        dog.info "anonymous GET asset", "#{asset[0, 40]} -> #{a_status}"
+        dog.ok "ASSETS load anonymously too (no proxy, no path rewriting)", a_status == 200
+      end
+
+      puts "\n╔══════════════════════════════════════════════════════════════════"
+      puts "║  PUBLIC LINK — no account needed, send it to anyone:"
+      puts "║  #{web.url}"
+      puts "╚══════════════════════════════════════════════════════════════════\n"
 
       dog.header "revocation"
       launcher.stop_sharing("web")
-      dog.ok "stop_sharing revokes the link", launcher.share_for("web").nil?
-      launcher.preview("web")
+      r_status, = anon.call(web.url)
+      dog.ok "stop_sharing revokes it (anonymous no longer served)", r_status != 200
+      dog.ok "…and the flag is cleared", !launcher.shared?("web")
+
       launcher.share_public("web")
-      dog.ok "re-sharing mints a share again", launcher.share_for("web").present?
+      dog.ok "re-sharing works again", launcher.shared?("web")
       launcher.stop_preview("web")
-      dog.ok "stop_preview CASCADES — the public share is revoked too", launcher.share_for("web").nil?
+      dog.ok "stop_preview CASCADES — public is revoked too", !launcher.shared?("web")
 
       dog.header "what the agent actually did (diagnostics)"
       if start_gate
