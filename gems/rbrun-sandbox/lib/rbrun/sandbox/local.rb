@@ -29,6 +29,10 @@ module Rbrun
       # no token. Defining this method IS opting into the preview capability.
       def preview_url(port) = PreviewLink.new(url: "http://localhost:#{port}", token: nil)
 
+      # A local box has no proxy and no auth in front of it — a localhost URL is already reachable by
+      # whoever can reach the host. Accepting the call keeps the capability uniform; nothing to toggle.
+      def set_public(enabled) = enabled
+
       def exec(command, timeout: 60)
         Timeout.timeout(timeout) do
           out, err, status = Open3.capture3(command, chdir: workspace)

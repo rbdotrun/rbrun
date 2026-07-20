@@ -1,8 +1,4 @@
 Rbrun::Engine.routes.draw do
-  # THE ONLY UNAUTHENTICATED ROUTE — the public edge (exposure ladder level 3). It proxies to exactly one
-  # shared ServiceRun; a service without a PublicShare has no route here and cannot surface.
-  match "p/:token(/*path)", to: "public_previews#show", via: :all, as: :public_preview
-
   get    "login",  to: "auth/sessions#new",     as: :login
   post   "login",  to: "auth/sessions#create"
   delete "logout", to: "auth/sessions#destroy", as: :logout

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_200000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -42,18 +42,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_190000) do
     t.index ["tenant", "name"], name: "index_rbrun_mcp_servers_on_tenant_and_name", unique: true
   end
 
-  create_table "rbrun_public_shares", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "name", null: false
-    t.string "tenant", null: false
-    t.string "token", null: false
-    t.datetime "updated_at", null: false
-    t.integer "worktree_id", null: false
-    t.index ["token"], name: "index_rbrun_public_shares_on_token", unique: true
-    t.index ["worktree_id", "name"], name: "index_rbrun_public_shares_on_worktree_id_and_name", unique: true
-    t.index ["worktree_id"], name: "index_rbrun_public_shares_on_worktree_id"
-  end
-
   create_table "rbrun_repo_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "key", null: false
@@ -72,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_190000) do
     t.integer "position", default: 0, null: false
     t.boolean "previewed", default: false, null: false
     t.string "repo", null: false
+    t.boolean "shared_public", default: false, null: false
     t.string "tenant", null: false
     t.datetime "updated_at", null: false
     t.index ["tenant", "repo", "name"], name: "idx_rbrun_repo_services_uniq", unique: true
@@ -204,7 +193,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_190000) do
 
   add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
-  add_foreign_key "rbrun_public_shares", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_service_runs", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_sessions", "rbrun_workflows", column: "workflow_id"

@@ -172,6 +172,10 @@ module Rbrun
         # live in the preview_daytona dogfood (the one unverified wire in this feature).
         def preview_link(id, port) = get("#{@api_url}/sandbox/#{id}/ports/#{port}/preview-url")
 
+        # Drop / restore the auth requirement on this box's preview URLs. NOTE: Daytona expresses this
+        # per SANDBOX, not per port — see Rbrun::Sandbox::Daytona#set_public.
+        def set_public(id, enabled) = post("#{@api_url}/sandbox/#{id}/public/#{enabled ? "true" : "false"}")
+
         # ── process sessions ───────────────────────────────────────────
         def create_session(id, session_id)
           post("#{TOOLBOX}/#{id}/process/session", body: { "sessionId" => session_id })

@@ -14,51 +14,34 @@
 Each step is opt-in, reversible, and **scoped to one service**. A level is never skipped: public requires
 previewed.
 
-## 1. The non-negotiable: never use the provider's box-wide switch
+## 1. Implementation: the provider's own switch
 
-Daytona exposes `POST /sandbox/{id}/public/true`. It works (verified: anonymous → `200`), and it is
-**forbidden here**. It is **sandbox-WIDE**: it opens every port reachable on the box. In a normal
-worktree — postgres, a worker, a web server — it would surface all of them, which is precisely the
-scoping this ladder exists to guarantee. **The sandbox stays `public: false`, always.**
+Level 3 uses the sandbox's optional `set_public(enabled)` capability. On Daytona that is
+`POST /sandbox/{id}/public/{true|false}` — verified working (anonymous → `200`, no login).
 
-Scoping must be enforced by something we control. So:
+**Granularity gap, accepted explicitly.** Daytona expresses this per **SANDBOX**, not per port: every
+externally-bound port becomes reachable at its own `<port>-<sandboxId>` host, and that id is visible in
+any link we share. So our per-service `shared_public` flag is **intent**, not enforcement. We accept it
+because dev sandboxes are throwaway and their db/queue/worker bind locally — an assumption, not a
+guarantee. A provider offering per-port control implements `set_public` honouring the port; nothing
+above the adapter changes.
 
-## 2. rbrun owns the public edge
+**Why not an rbrun-owned reverse proxy** (the discarded design): serving the app under our own path
+prefix breaks its root-relative URLs — assets and JS 404 — and no app-side setting
+(`RAILS_RELATIVE_URL_ROOT`) should be required, since rbrun must host any framework. Fixing it properly
+needs host-based routing (wildcard DNS + cert), and being in the request path taxes every stream,
+upload and websocket forever. Not worth it for a throwaway dev box.
 
-One unauthenticated route reverse-proxies to exactly one `ServiceRun`:
+## 2. Reference counting
 
-```
-GET|POST|PUT|PATCH|DELETE  /p/:token(/*path)   →  Rbrun::PublicPreviewsController#show
-```
+The provider switch is box-wide, so it is turned **off only when no service remains shared** — revoking
+one service must never silently cut another that is still public.
 
-1. resolve `:token` → `PublicShare`; unknown ⇒ **404** (never "exists but forbidden" — no enumeration).
-2. find that share's live `ServiceRun`; not running ⇒ **503**.
-3. forward method / path / query / body to `run.url + path`, attaching
-   `x-daytona-preview-token: run.token` **server-side**.
-4. relay status, headers and body back.
+## 3. Model — a flag, not a table
 
-**Why this scopes correctly:** an unshared service has **no route**. Reachability is decided by rbrun's
-routing table, not by what a process happens to bind to. Postgres bound to `0.0.0.0` still cannot be
-reached, because nothing forwards to it.
-
-The provider preview token is a server-side secret and **must never reach the browser**.
-
-## 3. Model — `Rbrun::PublicShare`
-
-`worktree_id` (FK), `name` (the service name), `token` (unique, indexed), `tenant` (Tenanted, inherited
-from the worktree), timestamps. Unique `[worktree_id, name]`.
-`Worktree has_many :public_shares, dependent: :destroy`.
-
-**Why a table, when preview is only a boolean.** A share is a *credential with its own lifetime* —
-revocable and rotatable. Neither existing table can hold it:
-- `RepoService` is **repo-wide**, not bound to a box; a public link must point at one specific box.
-- `ServiceRun` is **destroyed on every `repo_services_start`** (the idempotent reset), so a token there
-  would die on each restart.
-
-Keyed on `[worktree, name]` it survives restarts and dies only when revoked.
-
-**Token**: `SecureRandom.urlsafe_base64(32)`. Re-sharing after a revoke mints a **new** token, so an old
-link is permanently dead. Added to `filter_parameters`.
+`RepoService#shared_public` (boolean, default false), beside `previewed`. On the **definition**, so it
+survives the `repo_services_start` reset, exactly like `previewed`. No table and no token: the public URL
+is the provider's own preview URL (`ServiceRun#url`), because rbrun is not in the request path.
 
 ## 4. Tools + actions
 
@@ -76,51 +59,46 @@ anyone with the link, without an account.*
 ## 5. Cascade rules (a level can never be skipped)
 
 - `share_public` on a service that is not previewed ⇒ error. Level 3 sits on level 2.
-- **`stop_preview` revokes any share** for that service — you cannot be public while not previewed.
-- Service stopped/exited ⇒ the share survives; the edge answers **503**. Restarting restores it (the link
-  is stable across restarts, which is the point of keying on `[worktree, name]`).
-- Worktree destroyed ⇒ shares destroyed.
+- **`stop_preview` revokes the share** for that service — you cannot be public while not previewed.
+- `stop_sharing` clears the flag, and flips the provider switch off **only if no other service is still
+  shared**.
+- Service stopped/exited ⇒ the flag survives; the URL simply stops answering until it runs again.
 
 ## 6. UI
 
 In the Services panel, per service: `[Preview]` → once previewed, `[Open ↗]` `[Share publicly]`; once
-shared, the public URL (with copy) and `[Stop sharing]`. A shared service is visually marked — public
+shared, the globe turns amber and the action flips to `[Stop sharing]`. Public state is shown loudly —
 exposure must never be quiet.
 
-## 7. Security
+## 7. Security posture — stated honestly
 
-- `/p/:token` is the **only** unauthenticated endpoint in the engine (explicit `skip_before_action`).
-- Unknown/revoked token ⇒ 404, indistinguishable from never-existed.
-- The provider token is attached server-side only.
-- No path can address another port: we forward solely to that one run's URL, and the incoming path is
-  appended to it (never used to re-target a host).
-- The sandbox is never made provider-public.
+- The public URL is the **provider's** preview URL; rbrun is not in the request path and holds no edge.
+- **Scoping is intent, not enforcement** (see §1): the provider switch is box-wide, so any other
+  externally-bound port on that box is reachable by editing the port in the hostname. Accepted for
+  throwaway dev sandboxes; revisit if boxes ever become long-lived or hold real data.
+- `share_public` is `needs_approval!` — the agent can never expose anything on its own.
+- Revocation is immediate and always available, ungated.
 
-## 8. Known limitations (v1, stated not buried)
+## 8. Known limitations
 
-- **WebSockets / ActionCable do not traverse a plain HTTP forward** — Turbo Streams over cable are dead
-  through a public link. Needs explicit upgrade handling; out of scope here.
-- rbrun must itself be publicly reachable for the link to work; traffic and latency flow through it.
-- Long-lived streaming responses need `ActionController::Live` care; v1 buffers.
-- No rate limiting or abuse controls.
+- The granularity gap in §1/§7.
+- Whether a `localhost`-bound service is reachable through the provider proxy is **unverified** — we
+  assume not. Untested by choice.
+- No rate limiting or abuse controls (the provider owns the edge).
 
 ## 9. Wiring summary
 
-`Rbrun::PublicShare` model + migration + `Worktree has_many`; `ServiceLauncher#share_public` /
-`#stop_sharing` (+ the `stop_preview` cascade); `Rbrun::Tools::SharePublic` (`needs_approval!`) +
-`Rbrun::Tools::StopSharing`, registered as built-ins + the share gate card;
-`Rbrun::PublicPreviewsController` + the `/p/:token(/*path)` route (unauthenticated);
-panel actions + the shared-state badge; `ServiceConventions` updated to teach the ladder.
+`RepoService#shared_public` + migration (drops the old `rbrun_public_shares` table);
+`Sandbox#set_public(enabled)` optional capability (`Daytona` → `POST /sandbox/{id}/public/{bool}`,
+`Local` → no-op); `ServiceLauncher#share_public` / `#stop_sharing` (+ the `stop_preview` cascade and the
+box-wide reference count); `Rbrun::Tools::SharePublic` (`needs_approval!`) + `Rbrun::Tools::StopSharing`
++ the share gate card; panel actions; `ServiceConventions` teaches the ladder.
 
 ## 10. Dogfood (the gate)
 
-Extend `preview_daytona` with a **phase 3**, proving the scoping on a real box with postgres + jobs +
-rails running:
-- `share_public("web")` (approved via the gate) ⇒ a public URL.
-- **anonymous, no cookies, no provider account** ⇒ the URL serves the Rails app (`200`).
-- the **box itself is still private**: the raw Daytona preview URL, fetched anonymously, still terminates
-  at the provider login.
-- **postgres and jobs have no public route** — assert no share exists for them and that they are not
-  reachable through the edge.
-- `stop_sharing("web")` ⇒ the same URL now **404s**.
-- `stop_preview("web")` ⇒ cascades, any share revoked.
+`preview_daytona` phase 3, on a real box running postgres + jobs + css + rails:
+- `share_public("web")` (approved via the gate) ⇒ `shared_public` set, provider switch on.
+- **anonymous, no cookies, no provider account** ⇒ the preview URL serves the Rails app (`200`) —
+  including its assets, since the app is served at its own root by the provider.
+- `stop_sharing("web")` ⇒ anonymous access returns to the provider login.
+- `stop_preview("web")` ⇒ cascades: the share is revoked too.

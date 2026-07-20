@@ -22,9 +22,8 @@ module Rbrun
         when :unknown       then error("no such service: #{name}")
         when :not_running   then error("service #{name} is not running — start it first")
         when :not_previewed then error("service #{name} is not previewed — call preview_service first (public requires preview)")
-        else
-          { "data" => { "name" => name, "public" => true,
-                        "url" => Rbrun::Engine.routes.url_helpers.public_preview_path(token: result.token) } }
+        when :unsupported   then error("this sandbox provider cannot make a service public")
+        else { "data" => { "name" => name, "public" => true, "url" => result.url } }
         end
       end
     end

@@ -63,23 +63,33 @@ module Rbrun
     end
 
     # ── level 3: public. STRICTLY requires level 2 — the state (public && !previewed) is unreachable. ──
-    # Returns the share, or :unknown · :not_running · :not_previewed.
+    # Returns the run, or :unknown · :not_running · :not_previewed · :unsupported.
+    #
+    # GRANULARITY: we record per-service intent, but the provider's switch is box-wide (see
+    # Sandbox::Daytona#set_public). Our flag is the source of truth for the UI, the agent and revocation;
+    # enforcement at the provider is coarser than our model. Documented, not pretended away.
     def share_public(name)
       run = find(name)
       return :unknown unless run || saved(name)
       return :not_running unless run&.status_running?
       return :not_previewed unless run.url.present? && saved(name)&.previewed?
+      return :unsupported unless @worktree.sandbox.respond_to?(:set_public)
 
-      @worktree.public_shares.find_or_create_by!(name: name)
+      saved(name).update!(shared_public: true)
+      @worktree.sandbox.set_public(true)
+      run
     end
 
-    # Revoke the public link. Always safe, hence ungated everywhere.
+    # Revoke. Always safe, hence ungated everywhere. The provider switch only goes back off once NO
+    # service is still shared — otherwise revoking one would silently cut another.
     def stop_sharing(name)
-      @worktree.public_shares.where(name: name).destroy_all
+      saved(name)&.update!(shared_public: false)
+      @worktree.sandbox.set_public(false) if shared_names.empty? && @worktree.sandbox.respond_to?(:set_public)
       true
     end
 
-    def share_for(name) = @worktree.public_shares.find_by(name: name)
+    def shared?(name) = !!saved(name)&.shared_public?
+    def shared_names = Rbrun::RepoService.for_tenant(@worktree.tenant).for_repo(@worktree.repo).where(shared_public: true).map(&:name)
 
     # Re-launch the repo's saved services (the panel's "Restart all") in this worktree.
     def restart_saved

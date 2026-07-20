@@ -29,7 +29,7 @@ module Rbrun
       start_web!
       res = tool(Rbrun::Tools::SharePublic).execute(name: "web")
       assert_includes res["error"], "not previewed"
-      assert_nil @launcher.share_for("web")
+      refute @launcher.shared?("web")
     end
 
     test "previewed → share_public returns a public url; stop_sharing revokes it" do
@@ -38,12 +38,12 @@ module Rbrun
 
       res = tool(Rbrun::Tools::SharePublic).execute(name: "web")
       assert res.dig("data", "public")
-      assert_match %r{/p/}, res.dig("data", "url")
-      assert @launcher.share_for("web")
+      assert_match %r{^http}, res.dig("data", "url")
+      assert @launcher.shared?("web")
 
       off = tool(Rbrun::Tools::StopSharing).execute(name: "web")
       refute off.dig("data", "public")
-      assert_nil @launcher.share_for("web")
+      refute @launcher.shared?("web")
     end
 
     test "share_public errors on an unknown service" do

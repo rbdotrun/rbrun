@@ -36,17 +36,19 @@ module Rbrun
       get "/rbrun/c/#{@session.id}"
       assert_select "form[action=?]", "/rbrun/services/#{run.id}/share_public"
 
-      # level 3 — the public link is surfaced and the action flips to revoke
-      share = @worktree.public_shares.create!(name: "web")
+      # level 3 — the action flips to revoke, and public state is shown loudly
+      Rbrun::RepoService.for_tenant("rbrun").for_repo("a/b")
+                        .find_or_create_by!(name: "web") { |r| r.command = "x" }
+                        .update!(previewed: true, shared_public: true)
       get "/rbrun/c/#{@session.id}"
       assert_select "form[action=?]", "/rbrun/services/#{run.id}/stop_sharing"
-      assert_select "#services_panel_#{@worktree.id}", /#{Regexp.escape(share.token[0, 12])}/
+      assert_select "form[action=?]", "/rbrun/services/#{run.id}/share_public", false
     end
 
     test "share_public refuses a service that is not previewed" do
       run = @worktree.service_runs.create!(name: "web", command: "x", port: 3000, status: "running")
       post "/rbrun/services/#{run.id}/share_public"
-      assert_nil @worktree.public_shares.find_by(name: "web"), "public requires previewed"
+      refute Rbrun::ServiceLauncher.new(worktree: @worktree).shared?("web"), "public requires previewed"
     end
 
     test "no worktree in context → no panel" do

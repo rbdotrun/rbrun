@@ -61,17 +61,17 @@ module Rbrun
       start!
       # level 3 is refused while only level 1 holds
       assert_equal :not_previewed, @launcher.share_public("web")
-      assert_nil @launcher.share_for("web")
+      refute @launcher.shared?("web")
 
       @launcher.preview("web")
-      share = @launcher.share_public("web")
-      assert_instance_of Rbrun::PublicShare, share
-      assert share.token.present?
-      assert_equal share, @launcher.share_public("web"), "sharing twice is idempotent"
+      @launcher.share_public("web")
+      assert @launcher.shared?("web")
+      @launcher.share_public("web")
+      assert @launcher.shared?("web"), "sharing twice is idempotent"
 
       # withdrawing level 2 must cascade — (public && !previewed) is unreachable
       @launcher.stop_preview("web")
-      assert_nil @launcher.share_for("web"), "stop_preview revokes the public share"
+      refute @launcher.shared?("web"), "stop_preview revokes the public share"
     end
 
     test "stop_sharing revokes without touching the service or its preview" do
@@ -80,7 +80,7 @@ module Rbrun
       @launcher.share_public("web")
       @launcher.stop_sharing("web")
 
-      assert_nil @launcher.share_for("web")
+      refute @launcher.shared?("web")
       assert @worktree.service_runs.find_by(name: "web").previewable?, "still previewed"
       assert @worktree.service_runs.find_by(name: "web").status_running?, "still running"
     end
