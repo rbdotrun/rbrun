@@ -10,7 +10,8 @@ module Rbrun
     MCP_AUTHS = %i[api_key bearer oauth].freeze
 
     attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt,
-                  :auth_managed_at_runtime, :skills_path
+                  :auth_managed_at_runtime, :skills_path,
+                  :preview_domain, :preview_target, :preview_max_sockets
     attr_reader :users, :skills, :mcp_servers
 
     def initialize
@@ -20,6 +21,9 @@ module Rbrun
       @tenancy_key             = "tenant"
       @auth_managed_at_runtime = false
       @skills_path             = nil
+      @preview_domain          = nil # e.g. "rb.run"; hosts are <token>-preview.<preview_domain>. nil ⇒ previews off.
+      @preview_target          = nil # what the wildcard CNAME points at (e.g. a tunnel's cfargotunnel.com host)
+      @preview_max_sockets     = 5   # concurrent hijacked WebSocket upgrades (Puma pins a thread each)
       @users                   = []
       @skills                  = []
       @mcp_servers             = []
