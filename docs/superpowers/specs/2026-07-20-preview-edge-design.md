@@ -43,6 +43,25 @@ idempotently. Per-share records would mean per-share cleanup, and a leaked recor
 revocation. With a wildcard there is nothing to clean up: revocation is a DB row, and an unknown host
 404s.
 
+## 1a. A preview host resolves to EXACTLY ONE sandbox's service
+
+`<token>-preview.<domain>` must address one deterministic running service — one worktree's sandbox, one
+port. Never "guess the most recent."
+
+The addressing token therefore lives on a **per-`[worktree, name]`** record, `Rbrun::ServiceExposure`:
+
+- `belongs_to :worktree`; Tenanted (inherited); columns `name`, `preview_token` (unique, single-label),
+  `previewed`, `shared_public`. Unique `[worktree_id, name]`.
+- **Survives the `repo_services_start` reset** — only `ServiceRun` is destroyed, not this — so a shared
+  link never rotates. It is the stable per-worktree home the token needs, which neither `RepoService`
+  (repo-level) nor `ServiceRun` (ephemeral) provides.
+- Resolution: `token → ServiceExposure → worktree → service_runs.find_by(name:, status: "running")`.
+  Exactly one sandbox. No cross-worktree ambiguity.
+
+The intent flags **move here from `RepoService`**: `previewed`/`shared_public` are per-worktree decisions
+(previewing `web` on branch A must not expose branch B), not repo-wide ones. `RepoService` goes back to
+being just the saved command set.
+
 ## 2. `rbrun-dns` — the capability (product, for our users)
 
 A pure gem beside `rbrun-sandbox`, same idioms: constant-lookup adapters, no registry, adapter validates

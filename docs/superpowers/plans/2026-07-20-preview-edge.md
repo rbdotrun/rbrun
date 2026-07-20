@@ -75,11 +75,28 @@ end
 
 ---
 
+### Task 2.5: `Rbrun::ServiceExposure` — per-[worktree,name] intent + token (CORRECTION)
+
+Supersedes the token-on-RepoService choice: a preview host must resolve to ONE sandbox's service.
+
+**Files:** migration (add `rbrun_service_exposures`; drop `preview_token`/`previewed`/`shared_public`
+from `rbrun_repo_services`), `app/models/rbrun/service_exposure.rb`, `worktree.rb` (has_many),
+`repo_service.rb` (remove the flags + token), `service_launcher.rb` (flags move here);
+tests updated.
+
+- [ ] `Rbrun::ServiceExposure` — `belongs_to :worktree`, Tenanted inherited, `name`, `preview_token`
+  (unique, `SecureRandom.urlsafe_base64(6)` minted on first preview), `previewed`, `shared_public`.
+  Unique `[worktree_id, name]`. `#live_run = worktree.service_runs.find_by(name:, status: "running")`.
+- [ ] `Worktree has_many :service_exposures, dependent: :destroy`.
+- [ ] `ServiceLauncher` reads/writes the flags here (per worktree), keyed by `[@worktree, name]`; the
+  `previewed`/`shared_public`/`preview_token` on `RepoService` are removed.
+- [ ] Tests: token minted once + stable across a `repo_services_start` reset; resolution lands in the
+  right worktree; two worktrees of one repo get **distinct** tokens. **Commit.**
+
 ### Task 3: the proxy — HTTP
 
-**Files:** `lib/rbrun/preview_proxy.rb` (Rack middleware), `lib/rbrun/engine.rb` (insert),
-`app/models/rbrun/repo_service.rb` (share lookup by token); test
-`test/integration/rbrun/preview_proxy_test.rb`
+**Files:** `lib/rbrun/preview_proxy.rb` (Rack middleware), `lib/rbrun/engine.rb` (insert); resolution via
+`Rbrun::ServiceExposure.find_by(preview_token:)`; test `test/integration/rbrun/preview_proxy_test.rb`
 
 - [ ] **Step 1** share addressing: a stable per-service `preview_token` on `RepoService` (single label,
   `SecureRandom.urlsafe_base64(8)`), minted on first preview. Migration + model.
