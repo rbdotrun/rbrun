@@ -2,6 +2,7 @@
 
 require "faraday"
 require "async/http/faraday"
+require "rbrun/preview_socket"
 
 module Rbrun
   # THE PREVIEW EDGE — the engine's own proxy (no Cloudflare Worker). Rack middleware that intercepts
@@ -17,6 +18,14 @@ module Rbrun
   class PreviewProxy
     HOP_BY_HOP = %w[connection keep-alive transfer-encoding upgrade proxy-authenticate
                     proxy-authorization te trailer content-length content-encoding].freeze
+
+    # Live hijacked upgrades, process-global. On Puma each pins a thread, so it is capped
+    # (preview_max_sockets); on Falcon the connection is a fiber and the cap can be lifted.
+    @sockets = 0
+    @mutex = Mutex.new
+    class << self
+      attr_accessor :sockets, :mutex
+    end
 
     def initialize(app)
       @app = app
@@ -49,7 +58,43 @@ module Rbrun
       # be scoped to ".<domain>" — otherwise the preview host never sees it. Public needs no session.
       return require_login unless exposure.shared_public? || authenticated?(request)
 
-      relay(request, run)
+      websocket?(request) ? upgrade(request, run) : relay(request, run)
+    end
+
+    def websocket?(request) = request.get_header("HTTP_UPGRADE").to_s.casecmp?("websocket")
+
+    # Hijack the browser socket and byte-bridge it to the sandbox's upstream websocket, with the provider
+    # token attached server-side. Capped: past preview_max_sockets we REFUSE the upgrade (503) rather than
+    # starve the app that is serving the UI.
+    def upgrade(request, run)
+      hijack = request.env["rack.hijack"]
+      return [ 501, { "content-type" => "text/plain" }, [ "WebSocket not supported here." ] ] unless hijack
+
+      return busy unless acquire_slot
+
+      client = hijack.call || request.env["rack.hijack_io"]
+      Thread.new do
+        Rbrun::PreviewSocket.bridge(client, url: upstream_ws_url(request, run), headers: forward_headers(request, run))
+      ensure
+        release_slot
+      end
+      [ -1, {}, [] ] # hijacked — the server must not emit a response
+    end
+
+    def acquire_slot
+      self.class.mutex.synchronize do
+        return false if self.class.sockets >= Rbrun.config.preview_max_sockets.to_i
+
+        self.class.sockets += 1
+        true
+      end
+    end
+
+    def release_slot = self.class.mutex.synchronize { self.class.sockets -= 1 }
+
+    def upstream_ws_url(request, run)
+      base = run.url.to_s.sub(%r{\Ahttp}, "ws").chomp("/")
+      "#{base}/#{request.fullpath.sub(%r{\A/}, '')}"
     end
 
     def authenticated?(request)
@@ -104,5 +149,6 @@ module Rbrun
     def not_found   = [ 404, { "content-type" => "text/plain" }, [ "No such preview." ] ]
     def unavailable = [ 503, { "content-type" => "text/plain" }, [ "This preview is not running." ] ]
     def require_login = [ 403, { "content-type" => "text/plain" }, [ "This preview is private — sign in to rbrun to view it." ] ]
+    def busy = [ 503, { "content-type" => "text/plain" }, [ "Too many live preview connections — try again shortly." ] ]
   end
 end
