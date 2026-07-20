@@ -177,6 +177,27 @@ chmod 644 /etc/profile.d/rbrun-claude.sh
 echo "secrets synced"
 REMOTE
 
+# --- 7b. pre-seed Claude Code onboarding (idempotent) -------------------
+# The token authenticates, but a fresh install still shows the first-run wizard (theme + trust folder)
+# before the prompt. Mark onboarding complete + trust the repo dir so `claude` lands straight in.
+log "remote: pre-seed Claude Code onboarding"
+rexec "REMOTE_DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+set -euo pipefail
+eval "$($HOME/.local/bin/mise activate bash)"
+mise exec -- ruby <<'RB'
+require "json"
+p = File.expand_path("~/.claude.json")
+d = File.exist?(p) ? (JSON.parse(File.read(p)) rescue {}) : {}
+d["hasCompletedOnboarding"] = true
+d["theme"] ||= "dark"
+dir = ENV.fetch("REMOTE_DIR")
+(d["projects"] ||= {})[dir] ||= {}
+d["projects"][dir].merge!("hasTrustDialogAccepted" => true, "hasCompletedProjectOnboarding" => true)
+File.write(p, JSON.pretty_generate(d))
+puts "claude onboarding pre-seeded for #{dir}"
+RB
+REMOTE
+
 # --- 8. app deps + database ---------------------------------------------
 log "remote: bundle install + db:prepare (development)"
 # rbrun is an engine: the dummy host app's own rake tasks are namespaced under app:, so it's app:db:prepare
