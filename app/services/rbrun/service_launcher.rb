@@ -49,16 +49,37 @@ module Rbrun
       run ? resolve_preview(run) : :not_running
     end
 
-    # Withdraw the declaration and forget the resolved link.
+    # Withdraw the declaration and forget the resolved link. CASCADES to level 3: you cannot remain
+    # publicly shared while not previewed.
     def stop_preview(name)
       definition = saved(name)
       run = find(name)
       return :unknown unless definition || run
 
+      stop_sharing(name)
       definition&.update!(previewed: false)
       run&.update!(url: nil, token: nil)
       run || :not_running
     end
+
+    # ── level 3: public. STRICTLY requires level 2 — the state (public && !previewed) is unreachable. ──
+    # Returns the share, or :unknown · :not_running · :not_previewed.
+    def share_public(name)
+      run = find(name)
+      return :unknown unless run || saved(name)
+      return :not_running unless run&.status_running?
+      return :not_previewed unless run.url.present? && saved(name)&.previewed?
+
+      @worktree.public_shares.find_or_create_by!(name: name)
+    end
+
+    # Revoke the public link. Always safe, hence ungated everywhere.
+    def stop_sharing(name)
+      @worktree.public_shares.where(name: name).destroy_all
+      true
+    end
+
+    def share_for(name) = @worktree.public_shares.find_by(name: name)
 
     # Re-launch the repo's saved services (the panel's "Restart all") in this worktree.
     def restart_saved

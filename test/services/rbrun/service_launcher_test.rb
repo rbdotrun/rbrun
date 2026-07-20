@@ -57,6 +57,42 @@ module Rbrun
       refute @worktree.service_runs.find_by(name: "web").previewable?
     end
 
+    test "public STRICTLY requires previewed — and stop_preview revokes the share" do
+      start!
+      # level 3 is refused while only level 1 holds
+      assert_equal :not_previewed, @launcher.share_public("web")
+      assert_nil @launcher.share_for("web")
+
+      @launcher.preview("web")
+      share = @launcher.share_public("web")
+      assert_instance_of Rbrun::PublicShare, share
+      assert share.token.present?
+      assert_equal share, @launcher.share_public("web"), "sharing twice is idempotent"
+
+      # withdrawing level 2 must cascade — (public && !previewed) is unreachable
+      @launcher.stop_preview("web")
+      assert_nil @launcher.share_for("web"), "stop_preview revokes the public share"
+    end
+
+    test "stop_sharing revokes without touching the service or its preview" do
+      start!
+      @launcher.preview("web")
+      @launcher.share_public("web")
+      @launcher.stop_sharing("web")
+
+      assert_nil @launcher.share_for("web")
+      assert @worktree.service_runs.find_by(name: "web").previewable?, "still previewed"
+      assert @worktree.service_runs.find_by(name: "web").status_running?, "still running"
+    end
+
+    test "share_public refuses a service that is not running, and an unknown one" do
+      start!
+      assert_equal :unknown, @launcher.share_public("nope")
+      @launcher.preview("web")
+      @launcher.stop(name: "web")
+      assert_equal :not_running, @launcher.share_public("web")
+    end
+
     test "preview refuses a service with no port, and an unknown service" do
       start!
       assert_equal :no_port, @launcher.preview("worker")
