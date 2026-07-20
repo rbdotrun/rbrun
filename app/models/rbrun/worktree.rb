@@ -9,6 +9,7 @@ module Rbrun
 
     has_many :sessions, class_name: "Rbrun::Session", dependent: :destroy
     has_many :commits,  class_name: "Rbrun::Commit",  dependent: :destroy
+    has_many :service_runs, class_name: "Rbrun::ServiceRun", dependent: :destroy
 
     before_validation :assign_branch, on: :create
 
