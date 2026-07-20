@@ -2,6 +2,7 @@
 
 require "rbrun/sandbox/version"
 require "rbrun/sandbox/exec_result"
+require "rbrun/sandbox/preview_link"
 require "rbrun/sandbox/file_upload"
 require "rbrun/sandbox/line_buffer"
 require "rbrun/sandbox/local"

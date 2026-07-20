@@ -168,6 +168,10 @@ module Rbrun
 
         def download(id, path) = request(:get, "#{TOOLBOX}/#{id}/files/download", params: { "path" => path }).body.to_s
 
+        # The public preview for a port on this box → { "url", "token" }. Endpoint + field names verified
+        # live in the preview_daytona dogfood (the one unverified wire in this feature).
+        def preview_link(id, port) = get("#{@api_url}/sandbox/#{id}/ports/#{port}/preview-url")
+
         # ── process sessions ───────────────────────────────────────────
         def create_session(id, session_id)
           post("#{TOOLBOX}/#{id}/process/session", body: { "sessionId" => session_id })

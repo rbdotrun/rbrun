@@ -32,6 +32,14 @@ module Rbrun
 
       def workspace = WORKSPACE
 
+      # Preview capability: the box's public preview for a port, via Daytona's proxy. Returns a
+      # PreviewLink { url, token }; token authorizes a private port. The exact wire (endpoint + field
+      # names) is verified live in the preview_daytona dogfood.
+      def preview_url(port)
+        raw = @client.preview_link(id, port)
+        PreviewLink.new(url: raw["url"], token: raw["token"])
+      end
+
       def exec(command, timeout: 60)
         raw = @client.exec(id, command, timeout: timeout)
         ExecResult.new(exit_code: raw["exitCode"].to_i, stdout: raw["result"].to_s, stderr: "")
