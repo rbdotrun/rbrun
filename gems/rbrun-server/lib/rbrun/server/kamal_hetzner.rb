@@ -60,18 +60,28 @@ module Rbrun
       # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
       # the server IP + registry creds from the child env, so nothing secret is written to disk.
       def deploy(work_dir:, host:, server_ip:, env: {})
-        child_env = {
-          "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
-          "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
-          "KAMAL_HOST"              => host.to_s,
-          "KAMAL_SERVER_IP"         => server_ip.to_s,
-          "SSH_PRIVATE_KEY"         => @ssh_key.to_s,
-        }.merge(env.transform_keys(&:to_s))
-        output, ok = run_kamal([ "deploy" ], env: child_env, chdir: work_dir)
+        output, ok = run_kamal([ "deploy" ], env: kamal_env(host: host, server_ip: server_ip).merge(env.transform_keys(&:to_s)), chdir: work_dir)
         DeployResult.new(ok: ok, output: output)
       end
 
+      # The deployed app's container logs from the server, via Kamal. @return [String]
+      def app_logs(work_dir:, server_ip:, tail: 100)
+        output, _ok = run_kamal([ "app", "logs", "-n", tail.to_s ], env: kamal_env(server_ip: server_ip), chdir: work_dir)
+        output
+      end
+
       private
+
+      def kamal_env(server_ip:, host: nil)
+        env = {
+          "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
+          "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
+          "KAMAL_SERVER_IP"         => server_ip.to_s,
+          "SSH_PRIVATE_KEY"         => @ssh_key.to_s,
+        }
+        env["KAMAL_HOST"] = host.to_s if host
+        env
+      end
 
       def run_kamal(argv, env:, chdir:)
         out, status = Open3.capture2e(env, "kamal", *argv, chdir: chdir)

@@ -91,4 +91,18 @@ class KamalHetznerTest < Minitest::Test
     assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
     assert_equal "w1.rb.run", captured[:env]["KAMAL_HOST"]
   end
+
+  def test_app_logs_shells_kamal_app_logs
+    captured = {}
+    adp = adapter
+    adp.define_singleton_method(:run_kamal) do |argv, env:, chdir:|
+      captured[:argv] = argv; captured[:env] = env
+      [ "line1\nline2", true ]
+    end
+
+    out = adp.app_logs(work_dir: "/work/w-1", server_ip: "1.1.1.1", tail: 50)
+    assert_equal "line1\nline2", out
+    assert_equal [ "app", "logs", "-n", "50" ], captured[:argv]
+    assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
+  end
 end
