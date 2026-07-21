@@ -3,6 +3,13 @@
 require "test_helper"
 
 class ServerTest < Minitest::Test
+  def test_resolves_the_adapter_by_constant_lookup
+    srv = Rbrun::Server.new(provider: :kamal_hetzner,
+                            config: { hcloud_token: "t", ssh_public_key: "ssh-rsa k", ssh_private_key: "p",
+                                      registry: { server: "docker.io", username: "u", password: "pw" } })
+    assert_instance_of Rbrun::Server::KamalHetzner, srv
+  end
+
   def test_unknown_provider_fails_loud
     error = assert_raises(Rbrun::Server::Error) { Rbrun::Server.new(provider: :aws, config: {}) }
     assert_match(/unknown server provider :aws/, error.message)

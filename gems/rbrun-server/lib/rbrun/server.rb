@@ -4,7 +4,7 @@ require "rbrun/server/version"
 require "rbrun/server/node"
 require "rbrun/server/deploy_result"
 require "rbrun/server/base"
-# require "rbrun/server/kamal_hetzner" # added in Task 2
+require "rbrun/server/kamal_hetzner"
 
 module Rbrun
   # The server provider family. Pure Ruby; depends on no other rbrun gem. Provisions a server and deploys an
