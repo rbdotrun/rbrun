@@ -32,7 +32,7 @@ module Rbrun
           status:          result.ok ? "deployed" : "failed",
           deployed_sha:    result.ok ? sha : @target.deployed_sha,
           deploy_tag:      sha[0, 12], # the deployed version IS the sha
-          last_deploy_log: result.output.to_s.last(20_000))
+          last_deploy_log: result.output.to_s) # the FULL kamal build+deploy output — never truncate the error away
         result
       end
     end

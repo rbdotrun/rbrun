@@ -48,7 +48,10 @@ module Rbrun
     # Read a blob straight into a { relative-path => bytes } map (in-memory unpack).
     def files(blob)
       Gem::Package::TarReader.new(StringIO.new(Zlib.gunzip(blob))).each_with_object({}) do |entry, map|
-        map[entry.full_name] = entry.read if entry.file?
+        # TarReader returns ASCII-8BIT bytes; skill files are UTF-8 text. Re-tag as UTF-8 so the content
+        # renders in the UI (no BINARY/UTF-8 buffer clash) AND the digest matches read_dir's UTF-8 bytes
+        # (otherwise a skill with multibyte chars falsely reads as "diverged").
+        map[entry.full_name] = entry.read.force_encoding("UTF-8") if entry.file?
       end
     end
 
@@ -64,7 +67,9 @@ module Rbrun
     def read_dir(dir)
       root = File.expand_path(dir)
       Dir.glob(File.join(root, "**", "*")).select { |f| File.file?(f) }.each_with_object({}) do |path, map|
-        map[path.delete_prefix("#{root}/")] = File.binread(path)
+        # UTF-8 (not binread's ASCII-8BIT) so it matches files() and renders — bytes are unchanged, so the
+        # content digest is identical; this just keeps the encoding consistent across pack/unpack.
+        map[path.delete_prefix("#{root}/")] = File.binread(path).force_encoding("UTF-8")
       end
     end
   end

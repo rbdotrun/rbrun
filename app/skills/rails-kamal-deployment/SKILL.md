@@ -50,7 +50,8 @@ and hardcoding breaks re-deploys).
    `Dockerfile`. This is mandatory: `deploy` clones the pushed branch and REFUSES if the branch isn't
    pushed. The deployed version is the commit sha (no separate tag).
 
-5. **`provision_server`** → **`create_deploy_dns`** → **`deploy`** (needs your approval).
+5. **`deploy_registry`** (get the exact image/registry) → **`provision_server`** → **`create_deploy_dns`** →
+   **`deploy`** (needs your approval).
 
 6. **The deploy runs off-turn — watch it and iterate.** After `deploy`, poll **`deploy_status`** until it
    reports `deployed` or `failed` (don't assume success). If it's `failed`, call **`deploy_logs`** and read
@@ -61,20 +62,25 @@ and hardcoding breaks re-deploys).
 
 ## config/deploy.yml (target our infra via env)
 
+# FIRST call the `deploy_registry` tool — it returns the exact `service`, `image`, `registry_server`, and
+# `registry_username`. Put those LITERAL values in deploy.yml. Do NOT guess the registry namespace and do
+# NOT use a bare image name like `dummy-rails` — the registry rejects it ("push access denied /
+# unauthorized"). `servers` is the IP, `proxy.host` is the hostname — do NOT swap them.
 ```yaml
-service: myapp
-image: <%= ENV["KAMAL_REGISTRY_USERNAME"] %>/myapp
+service: <service>                  # <- the `service` from deploy_registry
+image: <registry_username>/<service>   # <- the `image` from deploy_registry — a real value, NEVER bare
 servers:
   web:
-    - <%= ENV["KAMAL_SERVER_IP"] %>
+    - <%= ENV["KAMAL_SERVER_IP"] %>                    # the IP, not the host
 proxy:
   ssl: true                      # Let's Encrypt, auto
   host: <%= ENV["KAMAL_HOST"] %>
   app_port: 80                   # Thruster/puma; match your Dockerfile's EXPOSE
 registry:
-  server: <%= ENV["KAMAL_REGISTRY_SERVER"] %>
-  username: [ KAMAL_REGISTRY_USERNAME ]
-  password: [ KAMAL_REGISTRY_PASSWORD ]
+  server: <registry_server>        # <- registry_server from deploy_registry (literal, e.g. docker.io)
+  username: <registry_username>    # <- registry_username from deploy_registry (literal)
+  password:
+    - KAMAL_REGISTRY_PASSWORD      # the password IS a secret — reference it, injected at deploy time
 ssh:
   user: root
   keys: [ <%= ENV["KAMAL_SSH_KEY_FILE"] %> ]
