@@ -34,15 +34,16 @@ module Rbrun
       assert_not @sandbox.exist?(File.join(@sandbox.workspace, Rbrun::ClaudeSnapshot::TAR_NAME))
     end
 
-    test "restore_if_lost! rebuilds history on a fresh box, minus the re-staged skills" do
+    test "restore_if_lost! rebuilds the WHOLE .claude on a fresh box" do
       Rbrun::ClaudeSnapshot.new(@session).capture!
       wipe_claude!
       assert_not @sandbox.exist?(claude("projects/sess.jsonl"))
 
       assert Rbrun::ClaudeSnapshot.new(@session).restore_if_lost!
-      assert @sandbox.exist?(claude("projects/sess.jsonl")), "resume history restored"
-      assert_equal %({"type":"summary"}\n), @sandbox.read(claude("projects/sess.jsonl"))
-      assert_not @sandbox.exist?(claude("skills/pdf/SKILL.md")), "skills are re-staged, never snapshotted"
+      assert_equal %({"type":"summary"}\n), @sandbox.read(claude("projects/sess.jsonl")), "resume history"
+      assert @sandbox.exist?(claude("settings.json")), "settings restored"
+      # The whole dir comes back — we never have to know where the SDK keeps resume state.
+      assert @sandbox.exist?(claude("skills/pdf/SKILL.md")), "whole .claude restored"
     end
 
     test "restore_if_lost! is a NO-OP on a live box (never clobbers newer history)" do

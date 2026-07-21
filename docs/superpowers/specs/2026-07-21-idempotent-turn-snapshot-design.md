@@ -14,8 +14,10 @@ durable or regenerated:
 - **Code** — a git worktree the agent commits + pushes; a lost box re-clones via `Worktree#provision!`.
 - **Skills + settings** — re-staged into `.claude/` by `AgentTurn#call_client` on every turn.
 
-So the *only* irreplaceable, non-durable state is the SDK's `.claude` **history**. We snapshot exactly that
-— nothing else (echoing insitix's whole-workspace backup, narrowed because rbrun's code is in git).
+So the *only* irreplaceable, non-durable state is the box's `.claude` dir. We snapshot the **whole** dir
+(echoing insitix's whole-workspace backup, narrowed to `.claude` because rbrun's code is already in git).
+Snapshotting the whole dir rather than a hand-picked subset means we never depend on where the SDK keeps
+its resume state.
 
 ## Ownership (invariants #2, #9)
 
@@ -36,19 +38,22 @@ tenant inherited from the session.
 
 ## Orchestration — `Rbrun::ClaudeSnapshot`
 
-Engine service, constructed from a session; drives `session.sandbox`.
+Engine service, constructed from a session; drives `session.sandbox`. Snapshots the **whole** `.claude`
+dir — not a hand-picked subset — so we never have to know where the SDK keeps resume state; whatever it
+wrote comes back. (`.claude/skills` rides along; it's a few KB of markdown and gets overwritten by the fresh
+stage anyway — the insitix `node_modules` exclude doesn't transfer, since that's hundreds of MB truly
+rebuilt by `bun install`.)
 
-- `EXCLUDES = %w[skills]` — the runtime re-stages `.claude/skills` every turn; never snapshot it.
-- **`capture!`** (after a turn): `return` unless `<workspace>/.claude` exists;
-  `tar czf … -C .claude --exclude=skills .`; `read` the tar; upsert the `SessionSnapshot`. **Best-effort** —
-  a failure is logged, never raised (the answer already streamed).
-- **`restore_if_lost!`** (before a turn): `return` unless a snapshot exists **and** the box's
-  `.claude/projects` is absent (the SDK writes resume jsonl there, so its absence = fresh/lost box; a live
-  resumed box has it → no-op). Then `write` the tar and `tar xzf` it into `.claude`. Best-effort.
+- **`capture!`** (after a turn): `return` unless `<workspace>/.claude` exists; `tar czf … -C .claude .`;
+  `read` the tar; upsert the `SessionSnapshot`. **Best-effort** — a failure is logged, never raised (the
+  answer already streamed).
+- **`restore_if_lost!`** (before a turn): `return` unless a snapshot exists **and** the box has no `.claude`
+  at all. Restore runs *before* the runtime stages skills, so a box that still carries `.claude` is a LIVE
+  box → no-op; absence = fresh/lost box → `write` the tar and `tar xzf` it into `.claude`. Best-effort.
 
-The `.claude/projects`-absence guard is load-bearing: restoring over a live box's *newer* history would
-corrupt the conversation. Restore fires only on a genuinely fresh box, gated by snapshot presence (so the
-first-ever turn — no snapshot — is a clean no-op).
+The `.claude`-presence guard is load-bearing: restoring over a live box's *newer* history would corrupt the
+conversation. Restore fires only on a genuinely fresh box, gated by snapshot presence (so the first-ever
+turn — no snapshot — is a clean no-op).
 
 ## Seam — `AgentTurn#call_client`
 
@@ -82,8 +87,8 @@ that lets teardown reuse the session without a babysat box.
 
 - **Model:** tenant inherited from session; one-per-session upsert (second `capture!` updates, never a 2nd row).
 - **Service (`ClaudeSnapshot`):** write `.claude/projects/x.jsonl` in a Local box → `capture!` stores a
-  non-empty blob; delete `.claude` (simulate box loss) → `restore_if_lost!` brings `x.jsonl` back; with
-  `.claude/projects` present → `restore_if_lost!` is a no-op (live box not clobbered); `.claude/skills` is
-  excluded from the tar.
+  non-empty blob; delete `.claude` (simulate box loss) → `restore_if_lost!` brings the WHOLE dir back
+  (history, settings, skills); with `.claude` present → `restore_if_lost!` is a no-op (live box not
+  clobbered); the transfer tar is cleaned up, never left in the workspace.
 - **AgentTurn wiring:** a turn with a scripted runtime still no-ops cleanly (no `.claude` → no capture),
   proving the hooks never break an offline turn.
