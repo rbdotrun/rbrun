@@ -32,9 +32,10 @@ never bake in values:
    - Add a DB accessory if the app needs one; fix a stale `Gemfile.lock` (bundle install); remove any
      repo-specific `.kamal/hooks` that assume other infra.
 
-3. **Declare secrets.** For each secret the app needs (`RAILS_MASTER_KEY`, `POSTGRES_PASSWORD`, …), make
-   sure it's stored (ask the user / request_secrets). Never commit secret VALUES — only the `.kamal/secrets`
-   references.
+3. **Declare secrets + ask for any missing env.** Read what the app actually needs — every `ENV[...]` it
+   reads (`RAILS_MASTER_KEY`, `POSTGRES_PASSWORD`, a `DATABASE_URL`, third-party API keys, …). Make sure each
+   is stored, and **ask the user for anything that's missing** (use `request_secrets`) rather than guessing
+   or leaving it blank. Never commit secret VALUES — only the `.kamal/secrets` references.
 
 4. **Commit + push everything you added/changed** — including a newly-created `config/deploy.yml` and
    `Dockerfile`. This is mandatory: `deploy` clones the pushed branch and REFUSES if the branch isn't
