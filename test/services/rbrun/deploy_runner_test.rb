@@ -13,13 +13,19 @@ module Rbrun
     # A fake server adapter (injected — no global stubbing).
     def fake_server(ok:, output:)
       srv = Object.new
-      srv.define_singleton_method(:deploy) { |work_dir:, host:, server_ip:, ssh_private_key:| Rbrun::Server::DeployResult.new(ok: ok, output: output) }
+      srv.define_singleton_method(:deploy) do |work_dir:, host:, server_ip:, ssh_private_key:, env:|
+        # our config was injected into the checkout before deploy
+        raise "deploy.yml not injected" unless File.exist?(File.join(work_dir, "config", "deploy.yml"))
+        Rbrun::Server::DeployResult.new(ok: ok, output: output)
+      end
       srv
     end
 
     def runner_with(server)
       r = DeployRunner.new(worktree: @wt, server: server)
-      r.define_singleton_method(:with_checkout) { |&blk| blk.call("/tmp/x", "abc123def4567") }
+      r.define_singleton_method(:with_checkout) do |&blk|
+        Dir.mktmpdir("rbrun-test-") { |d| blk.call(d, "abc123def4567") }
+      end
       r
     end
 
