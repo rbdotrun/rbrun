@@ -9,9 +9,12 @@ module Rbrun
     belongs_to :worktree, class_name: "Rbrun::Worktree"
     before_validation :inherit_tenant, on: :create
 
-    STATUSES = %w[pending provisioned deployed torn_down].freeze
+    STATUSES = %w[pending provisioned deploying deployed failed torn_down].freeze
     validates :provider, :server_type, :region, :image, :host, presence: true
     validates :status, inclusion: { in: STATUSES }
+
+    # The clickable live URL for this deployment (nil until a host exists).
+    def url = host.present? ? "https://#{host}" : nil
 
     private
 

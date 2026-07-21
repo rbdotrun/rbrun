@@ -77,7 +77,7 @@ module Rbrun
           "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
           "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
           "KAMAL_SERVER_IP"         => server_ip.to_s,
-          "SSH_PRIVATE_KEY"         => @ssh_key.to_s,
+          "SSH_PRIVATE_KEY"         => @ssh_key.to_s
         }
         env["KAMAL_HOST"] = host.to_s if host
         env

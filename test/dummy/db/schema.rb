@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_130000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -25,8 +25,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_120000) do
 
   create_table "rbrun_deploy_targets", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "deploy_tag"
+    t.string "deployed_sha"
     t.string "host", null: false
     t.string "image", null: false
+    t.text "last_deploy_log"
     t.string "provider", null: false
     t.string "region", null: false
     t.string "server_id"

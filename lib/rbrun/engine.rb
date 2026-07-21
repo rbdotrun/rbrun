@@ -41,6 +41,9 @@ module Rbrun
         Rbrun::Tools::RepoServicesStatus, Rbrun::Tools::RepoServicesLogs,
         Rbrun::Tools::PreviewService, Rbrun::Tools::StopPreview,
         Rbrun::Tools::SharePublic, Rbrun::Tools::StopSharing ].each { |t| Rbrun.register_tool(t) }
+      [ Rbrun::Tools::DeployStatus, Rbrun::Tools::ProvisionServer, Rbrun::Tools::CreateDeployDns,
+        Rbrun::Tools::PrepareDeploy, Rbrun::Tools::SaveDeployTag, Rbrun::Tools::Deploy,
+        Rbrun::Tools::DeployLogs, Rbrun::Tools::TeardownDeploy ].each { |t| Rbrun.register_tool(t) }
       Rbrun.register_tool(Rbrun::Tools::RequestSecrets) # custom gate (card + :secrets_submission route required)
       Rbrun::ApplicationTool.validate_tool_approvals! # a half-built custom_approval! fails boot
       Rbrun::SkillSeeder.seed_at_boot!
