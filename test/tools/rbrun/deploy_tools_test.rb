@@ -47,6 +47,19 @@ module Rbrun
       assert_includes data["deploy_yml_ssh"], "user: deploy"
     end
 
+    test "list_deploy_secrets returns stored NAMES (never values) + the infra env the engine injects" do
+      Rbrun::RepoSecret.create!(tenant: "acme", repo: "acme/webapp", key: "RAILS_MASTER_KEY", value: "topsecret")
+      Rbrun::RepoSecret.create!(tenant: "acme", repo: "acme/webapp", key: "POSTGRES_PASSWORD", value: "pw")
+      Rbrun::RepoSecret.create!(tenant: "acme", repo: "other/repo",  key: "LEAK", value: "no")
+
+      data = Rbrun::Tools::ListDeploySecrets.in_session(@session).execute["data"]
+      assert_equal %w[POSTGRES_PASSWORD RAILS_MASTER_KEY], data["stored_secrets"] # this repo only, sorted
+      assert_includes data["infra_injected"], "KAMAL_SERVER_IP"
+      # Never leak a value, anywhere in the payload.
+      refute_includes data.to_s, "topsecret"
+      refute_includes data.to_s, "LEAK"
+    end
+
     test "deploy_status reports none, then the live url + tag after deploy" do
       assert_equal "none", Rbrun::Tools::DeployStatus.in_session(@session).execute.dig("data", "status")
       target!(server_ip: "9.9.9.9", status: "deployed", deploy_tag: "v1", deployed_sha: "abc")

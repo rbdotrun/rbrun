@@ -42,9 +42,13 @@ and hardcoding breaks re-deploys).
        to `colorize (~> 1.1)`. Match every mismatched gem, then commit.
 
 3. **Declare secrets + ask for any missing env.** Read what the app actually needs — every `ENV[...]` it
-   reads (`RAILS_MASTER_KEY`, `POSTGRES_PASSWORD`, a `DATABASE_URL`, third-party API keys, …). Make sure each
-   is stored, and **ask the user for anything that's missing** (use `request_secrets`) rather than guessing
-   or leaving it blank. Never commit secret VALUES — only the `.kamal/secrets` references.
+   reads (`RAILS_MASTER_KEY`, `POSTGRES_PASSWORD`, a `DATABASE_URL`, third-party API keys, …), and read
+   `config/database.yml` specifically to learn the EXACT DB env names the `production:` block interpolates
+   (they differ per app — see the Postgres section). Cross-check against what's already stored with
+   `list_deploy_secrets` (it returns the NAMES on file, never values), so you can see what's present vs.
+   missing. Make sure each name the app needs is stored and matches, and **ask the user for anything that's
+   missing** (use `request_secrets`) rather than guessing or leaving it blank. Never commit secret VALUES —
+   only the `.kamal/secrets` references.
 
 4. **Commit + push everything you added/changed** — including a newly-created `config/deploy.yml` and
    `Dockerfile`. This is mandatory: `deploy` clones the pushed branch and REFUSES if the branch isn't
@@ -103,6 +107,18 @@ RAILS_MASTER_KEY=$RAILS_MASTER_KEY
 ```
 
 ## Postgres (add when the app needs it)
+
+**First, read `config/database.yml` and match the env EXACTLY.** The `production:` block tells you the
+precise names the app interpolates — and they vary. A Rails-8 default reads a single `DATABASE_URL`; an
+older app reads discrete `POSTGRES_HOST`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`; a bespoke app
+reads app-specific names (`MYAPP_DB_PASSWORD`, `PGHOST`, …). Whatever the file reads, `deploy.yml` MUST
+supply **those same names** (clear for hosts/users, `secret:` for passwords) — otherwise the container
+starts but can't connect (`could not translate host name` / `password authentication failed`) and the
+deploy fails health-check. If the app reads `DATABASE_URL`, set it in `env.clear` pointing at the
+accessory host, e.g. `DATABASE_URL: postgres://app@myapp-db/app_production` with `POSTGRES_PASSWORD` as the
+secret and `password: <%= ENV["POSTGRES_PASSWORD"] %>` spliced in — or reference a full URL secret. Use
+`deploy_exec` to `cat config/database.yml` on the box if unsure, and confirm every name lines up before
+you deploy.
 
 Add to `config/deploy.yml`:
 
