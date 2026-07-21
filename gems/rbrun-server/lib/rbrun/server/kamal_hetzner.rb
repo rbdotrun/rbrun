@@ -2,6 +2,7 @@
 
 require "json"
 require "open3"
+require "tempfile"
 require "faraday"
 require "async/http/faraday"
 
@@ -57,26 +58,43 @@ module Rbrun
       # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
       # the server IP + registry creds from the child env; the ssh private key authenticates the deploy.
       def deploy(work_dir:, host:, server_ip:, ssh_private_key:, env: {})
-        child = kamal_env(server_ip: server_ip, ssh_private_key: ssh_private_key, host: host).merge(env.transform_keys(&:to_s))
-        output, ok = run_kamal([ "deploy" ], env: child, chdir: work_dir)
-        DeployResult.new(ok: ok, output: output)
+        with_key_file(ssh_private_key) do |key_path|
+          child = kamal_env(server_ip: server_ip, key_path: key_path, host: host).merge(env.transform_keys(&:to_s))
+          output, ok = run_kamal([ "deploy" ], env: child, chdir: work_dir)
+          DeployResult.new(ok: ok, output: output)
+        end
       end
 
       # The deployed app's container logs from the server, via Kamal. @return [String]
       def app_logs(work_dir:, server_ip:, ssh_private_key:, tail: 100)
-        output, _ok = run_kamal([ "app", "logs", "-n", tail.to_s ],
-                                env: kamal_env(server_ip: server_ip, ssh_private_key: ssh_private_key), chdir: work_dir)
-        output
+        with_key_file(ssh_private_key) do |key_path|
+          output, _ok = run_kamal([ "app", "logs", "-n", tail.to_s ],
+                                  env: kamal_env(server_ip: server_ip, key_path: key_path), chdir: work_dir)
+          output
+        end
       end
 
       private
 
-      def kamal_env(server_ip:, ssh_private_key:, host: nil)
+      # Kamal reads its SSH key from deploy.yml (ssh.keys), not an env var — so materialize the private key
+      # to a 0600 temp file and expose its path as KAMAL_SSH_KEY_FILE; the generated deploy.yml points at it.
+      # The file lives only for the command's duration.
+      def with_key_file(private_key)
+        f = Tempfile.new("rbrun-deploy-key")
+        f.write(private_key.to_s)
+        f.close
+        File.chmod(0o600, f.path)
+        yield f.path
+      ensure
+        f&.unlink
+      end
+
+      def kamal_env(server_ip:, key_path:, host: nil)
         env = {
           "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
           "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
           "KAMAL_SERVER_IP"         => server_ip.to_s,
-          "SSH_PRIVATE_KEY"         => ssh_private_key.to_s
+          "KAMAL_SSH_KEY_FILE"      => key_path.to_s
         }
         env["KAMAL_HOST"] = host.to_s if host
         env

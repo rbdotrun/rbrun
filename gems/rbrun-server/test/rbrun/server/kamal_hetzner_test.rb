@@ -56,11 +56,12 @@ class KamalHetznerTest < Minitest::Test
     assert_requested del
   end
 
-  def test_deploy_shells_kamal_with_registry_server_ip_and_ssh_key
+  def test_deploy_shells_kamal_with_registry_server_ip_and_ssh_key_file
     captured = {}
     adp = adapter
     adp.define_singleton_method(:run_kamal) do |argv, env:, chdir:|
       captured[:argv] = argv; captured[:env] = env; captured[:chdir] = chdir
+      captured[:key] = File.read(env["KAMAL_SSH_KEY_FILE"]) # the key file exists for the command's duration
       [ "Deployed w-1", true ]
     end
 
@@ -71,7 +72,7 @@ class KamalHetznerTest < Minitest::Test
     assert_equal "pw", captured[:env]["KAMAL_REGISTRY_PASSWORD"]
     assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
     assert_equal "w1.rb.run", captured[:env]["KAMAL_HOST"]
-    assert_equal PRIV, captured[:env]["SSH_PRIVATE_KEY"]
+    assert_equal PRIV, captured[:key]
   end
 
   def test_app_logs_shells_kamal_app_logs
@@ -86,6 +87,6 @@ class KamalHetznerTest < Minitest::Test
     assert_equal "line1\nline2", out
     assert_equal [ "app", "logs", "-n", "50" ], captured[:argv]
     assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
-    assert_equal PRIV, captured[:env]["SSH_PRIVATE_KEY"]
+    assert captured[:env]["KAMAL_SSH_KEY_FILE"]
   end
 end

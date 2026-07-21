@@ -32,12 +32,17 @@ module Rbrun
         proxy:
           ssl: true
           host: #{@target.host}
+          app_port: 3000
         registry:
           server: #{reg[:server] || "docker.io"}
           username:
             - KAMAL_REGISTRY_USERNAME
           password:
             - KAMAL_REGISTRY_PASSWORD
+        ssh:
+          user: root
+          keys:
+            - <%= ENV["KAMAL_SSH_KEY_FILE"] %>
         builder:
           arch: amd64
       YAML
