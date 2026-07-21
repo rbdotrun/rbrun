@@ -11,6 +11,7 @@ module Rbrun
     has_many :commits,  class_name: "Rbrun::Commit",  dependent: :destroy
     has_many :service_runs, class_name: "Rbrun::ServiceRun", dependent: :destroy
     has_many :service_exposures, class_name: "Rbrun::ServiceExposure", dependent: :destroy
+    has_one  :deploy_target, class_name: "Rbrun::DeployTarget", dependent: :destroy
 
     before_validation :assign_branch, on: :create
     before_validation :assign_sandbox_provider, on: :create

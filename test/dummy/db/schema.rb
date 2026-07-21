@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_120000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -21,6 +21,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
     t.index ["session_id"], name: "index_rbrun_commits_on_session_id"
     t.index ["worktree_id", "sha"], name: "index_rbrun_commits_on_worktree_id_and_sha", unique: true
     t.index ["worktree_id"], name: "index_rbrun_commits_on_worktree_id"
+  end
+
+  create_table "rbrun_deploy_targets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "host", null: false
+    t.string "image", null: false
+    t.string "provider", null: false
+    t.string "region", null: false
+    t.string "server_id"
+    t.string "server_ip"
+    t.string "server_type", null: false
+    t.string "status", default: "pending", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.integer "worktree_id", null: false
+    t.index ["worktree_id"], name: "index_rbrun_deploy_targets_on_worktree_id", unique: true
   end
 
   create_table "rbrun_mcp_servers", force: :cascade do |t|
@@ -206,6 +222,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
 
   add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
+  add_foreign_key "rbrun_deploy_targets", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_service_exposures", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_service_runs", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
