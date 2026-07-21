@@ -18,6 +18,9 @@ module Rbrun
     # app_logs authenticate with the given private key.
     class KamalHetzner < Base
       API = "https://api.hetzner.cloud/v1"
+      # Hetzner returns 412 "error during placement" when a location is out of capacity for the type — roll
+      # over to another location instead of failing the whole provision.
+      FALLBACK_LOCATIONS = %w[fsn1 nbg1 hel1].freeze
 
       def initialize(config: {}, poll_interval: 2, poll_attempts: 60)
         @token    = config[:hcloud_token]
@@ -41,10 +44,22 @@ module Rbrun
         existing = find_server(name: name)
         return await_ready(existing) if existing
 
-        body = { "name" => name, "server_type" => type, "image" => image, "location" => region,
-                 "ssh_keys" => [ ensure_ssh_key(name: name, public_key: ssh_public_key) ], "labels" => labels }
-        body["user_data"] = user_data if user_data
-        await_ready(node_from(request(:post, "/servers", body).fetch("server")))
+        key_name  = ensure_ssh_key(name: name, public_key: ssh_public_key)
+        locations = [ region, *FALLBACK_LOCATIONS ].uniq
+        last_error = nil
+        locations.each do |loc|
+          body = { "name" => name, "server_type" => type, "image" => image, "location" => loc,
+                   "ssh_keys" => [ key_name ], "labels" => labels }
+          body["user_data"] = user_data if user_data
+          begin
+            return await_ready(node_from(request(:post, "/servers", body).fetch("server")))
+          rescue Error => e
+            raise unless e.message.match?(/placement|resource_unavailable|412/)
+
+            last_error = e # this location is out of capacity — try the next
+          end
+        end
+        raise last_error
       end
 
       def destroy_server(name:)

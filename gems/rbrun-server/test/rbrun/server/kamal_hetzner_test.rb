@@ -43,6 +43,19 @@ class KamalHetznerTest < Minitest::Test
     assert_requested key_post
   end
 
+  def test_create_server_rolls_over_to_another_location_on_placement_error
+    stub_request(:get, "#{API}/servers").with(query: { "name" => "w-5" }).to_return(json(servers: []))
+    stub_request(:get, "#{API}/ssh_keys").with(query: { "name" => "w-5" }).to_return(json(ssh_keys: [ { id: 1, name: "w-5" } ]))
+    # first POST: fsn1 out of capacity (412 placement); second POST: succeeds
+    stub_request(:post, "#{API}/servers")
+      .to_return({ status: 412, body: { error: { message: "error during placement" } }.to_json, headers: { "Content-Type" => "application/json" } },
+                 json(server: { id: 20, name: "w-5", status: "running",
+                   public_net: { ipv4: { ip: "7.7.7.7" } }, datacenter: { location: { name: "nbg1" } } }))
+
+    node = adapter.create_server(name: "w-5", type: "cx23", region: "fsn1", image: "ubuntu-24.04", ssh_public_key: PUB)
+    assert_equal "7.7.7.7", node.ip
+  end
+
   def test_destroy_server_is_noop_when_absent
     stub_request(:get, "#{API}/servers").with(query: { "name" => "gone" }).to_return(json(servers: []))
     refute adapter.destroy_server(name: "gone")
