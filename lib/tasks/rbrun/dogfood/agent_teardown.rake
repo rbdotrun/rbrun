@@ -2,12 +2,13 @@
 
 require_relative "support"
 
-# Validate teardown THROUGH THE AGENT — run after app:dogfood:agent_deploy proved the live URL and left the
-# worktree (deployment + sandbox) up. This REUSES THE SAME SESSION and asks the agent to reap its own
-# deployment: the agent must call teardown_deploy ITSELF (proving it understood), never us scripting it.
-# The SDK resumes in the still-live box, so the agent has its own deploy context. Then we confirm the
-# server + DNS are gone and the URL no longer answers, and finally archive! the worktree (the ONE teardown
-# entry point: reaps the dev sandbox + soft-deletes, idempotent — invariant #11). Never variabilized.
+# Validate teardown THROUGH THE AGENT — run after app:dogfood:agent_deploy proved the live URL. This
+# REUSES THE SAME SESSION and asks the agent to reap its own deployment: the agent must call teardown_deploy
+# ITSELF (proving it understood), never us scripting it. The dev sandbox was reaped after the deploy, so
+# run_turn resolves a FRESH box and ClaudeSnapshot#restore_if_lost! rebuilds the .claude history — the SDK
+# resumes THIS conversation and the agent has its own deploy context. THAT resume-on-a-fresh-box is the
+# turn-idempotency proof. Then we confirm the server + DNS are gone and the URL no longer answers, and
+# finally archive! the worktree (the ONE teardown entry point, idempotent — invariant #11). Never variabilized.
 #
 #   bin/rails app:dogfood:agent_teardown
 namespace :dogfood do

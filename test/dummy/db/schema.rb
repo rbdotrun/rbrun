@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_170000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -88,6 +88,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_160000) do
     t.index ["session_id", "approval_status"], name: "idx_rbrun_msgs_pending", where: "approval_status IS NOT NULL"
     t.index ["session_id"], name: "index_rbrun_session_messages_on_session_id"
     t.index ["tool_use_id"], name: "index_rbrun_session_messages_on_tool_use_id"
+  end
+
+  create_table "rbrun_session_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.binary "data", null: false
+    t.integer "session_id", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.index ["session_id"], name: "idx_rbrun_session_snapshots_uniq", unique: true
   end
 
   create_table "rbrun_sessions", force: :cascade do |t|
@@ -184,6 +193,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_160000) do
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_deploy_targets", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
+  add_foreign_key "rbrun_session_snapshots", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_sessions", "rbrun_workflows", column: "workflow_id"
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"

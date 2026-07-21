@@ -5,10 +5,10 @@ require_relative "support"
 # THE proof: a REAL agent turn drives the deployment. The agent (rails-kamal-deployment skill) inspects
 # DOGFOOD_APP_REPO in a Daytona sandbox, adds/fixes the Kamal setup, COMMITS + PUSHES, then calls
 # provision_server -> create_deploy_dns -> deploy. We approve the deploy gate (standing in for the human),
-# run the deploy job, and prove the live URL. On success the WHOLE worktree stays UP — the deployment AND
-# its dev sandbox — so app:dogfood:agent_teardown can REUSE THE SAME SESSION and have the agent reap it
-# (the SDK resumes in that live box). The next deploy run reaps prior worktrees at start via archive!
-# (idempotent, invariant #11), so at most one is ever left behind. Never variabilized.
+# run the deploy job, and prove the live URL. On success the DEPLOYMENT stays UP as proof; the dev sandbox
+# is reaped. app:dogfood:agent_teardown REUSES THE SAME SESSION on a FRESH box — turn idempotency restores
+# the .claude history so the SDK resumes and the agent reaps its own deployment (no babysat box needed).
+# Never variabilized.
 #
 #   bin/rails app:dogfood:agent_deploy
 namespace :dogfood do
@@ -91,10 +91,16 @@ namespace :dogfood do
       live = url && poll_https_200(url, tries: 45)
       dog.ok "#{url} serves 200 over HTTPS", !!live
       puts "\n🔗  LIVE:  #{url}\n\n"
-      dog.info "left UP on purpose", "worktree + sandbox stay alive; validate teardown via app:dogfood:agent_teardown"
+      dog.info "left UP on purpose", "deployment stays; validate teardown via app:dogfood:agent_teardown"
+    ensure
+      # Reap only the DEV sandbox; the deployment stays up as proof. agent_teardown resumes THIS session on
+      # a fresh box — ClaudeSnapshot restores the .claude history so the SDK resume still works.
+      begin
+        worktree.sandbox.destroy!
+      rescue StandardError
+        nil
+      end
     end
-    # No ensure-reap: the sandbox stays alive so agent_teardown can resume THIS session. The next deploy
-    # run's start-reap (archive!) cleans it up, keeping at most one worktree behind (invariant #11).
   end
 end
 
