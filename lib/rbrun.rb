@@ -22,6 +22,11 @@ module Rbrun
       build(Rbrun::Dns, config(tenant).dns_provider, provider: provider, **opts)
     end
 
+    def server(provider = nil, tenant: nil, **opts)
+      require "rbrun/server"
+      build(Rbrun::Server, config(tenant).server_provider, provider: provider, **opts)
+    end
+
     # The tool roster: engine built-ins + host-registered tools. ApplicationTool.manifest/find read it.
     def tools = @tools ||= []
 
