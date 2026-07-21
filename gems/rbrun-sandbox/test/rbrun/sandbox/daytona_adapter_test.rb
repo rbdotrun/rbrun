@@ -30,6 +30,27 @@ class DaytonaAdapterTest < Minitest::Test
       .to_return(json({ "exitCode" => exit_code, "result" => result }))
   end
 
+  # A box that VANISHES while starting (Daytona kills it server-side mid-start) is transient — the client
+  # must discard it and create a fresh one, not crash the turn. This is the exact flake that aborted the
+  # lifecycle dogfood's second turn.
+  def test_create_retries_when_the_box_vanishes_while_starting
+    # No existing box for these labels — force the create path.
+    stub_request(:get, "#{API}/sandbox").with(query: { "labels" => { session: "1" }.to_json })
+                                         .to_return(json({ "items" => [] }))
+    # Snapshot already built.
+    stub_request(:get, %r{#{API}/snapshots/}).to_return(json({ "state" => "active" }))
+    # Create hands back a box still starting; start requests are accepted.
+    stub_request(:post, "#{API}/sandbox").to_return(json({ "id" => BOX, "state" => "starting" }))
+    stub_request(:post, "#{API}/sandbox/#{BOX}/start").to_return(json({}))
+    # First confirm 404s (vanished → raises); the retry's confirm finds it started.
+    stub_request(:get, "#{API}/sandbox/#{BOX}")
+      .to_return({ status: 404 }, json({ "id" => BOX, "state" => "started" }))
+    stub_exec
+
+    assert_equal "ok\n", build.exec("echo ok").stdout # resolves the box (find_or_create) then runs — no raise
+    assert_requested :post, "#{API}/sandbox", times: 2  # created a fresh box on the retry
+  end
+
   def test_config_fails_fast_without_api_key
     assert_raises(Rbrun::Sandbox::Error) do
       Rbrun::Sandbox::Daytona.new(config: { api_url: API }, labels: {})
