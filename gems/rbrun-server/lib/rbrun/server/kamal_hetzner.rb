@@ -21,6 +21,9 @@ module Rbrun
       # Hetzner returns 412 "error during placement" when a location is out of capacity for the type — roll
       # over to another location instead of failing the whole provision.
       FALLBACK_LOCATIONS = %w[fsn1 nbg1 hel1].freeze
+      # The box is provisioned with a non-root `deploy` user (our cloud-init), so kamal + the agent SSH in
+      # as `deploy`, never root. root login + password auth are disabled.
+      SSH_USER = "deploy"
 
       def initialize(config: {}, poll_interval: 2, poll_attempts: 60)
         @token    = config[:hcloud_token]
@@ -49,8 +52,8 @@ module Rbrun
         last_error = nil
         locations.each do |loc|
           body = { "name" => name, "server_type" => type, "image" => image, "location" => loc,
-                   "ssh_keys" => [ key_name ], "labels" => labels }
-          body["user_data"] = user_data if user_data
+                   "ssh_keys" => [ key_name ], "labels" => labels,
+                   "user_data" => (user_data || cloud_init(ssh_public_key)) }
           begin
             return await_ready(node_from(request(:post, "/servers", body).fetch("server")))
           rescue Error => e
@@ -110,10 +113,35 @@ module Rbrun
           "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
           "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
           "KAMAL_SERVER_IP"         => server_ip.to_s,
+          "KAMAL_SSH_USER"          => SSH_USER,
           "KAMAL_SSH_KEY_FILE"      => key_path.to_s
         }
         env["KAMAL_HOST"] = host.to_s if host
         env
+      end
+
+      # Cloud-init: a non-root `deploy` user (NOPASSWD sudo + our key), Docker installed and deploy added to
+      # the docker group, root login + password auth disabled. So kamal (and the agent) SSH in as `deploy`
+      # with our key, run Docker without sudo, and root is never exposed.
+      def cloud_init(ssh_public_key)
+        <<~YAML
+          #cloud-config
+          users:
+            - name: #{SSH_USER}
+              groups: [sudo]
+              shell: /bin/bash
+              sudo: "ALL=(ALL) NOPASSWD:ALL"
+              ssh_authorized_keys:
+                - #{ssh_public_key.to_s.strip}
+          ssh_pwauth: false
+          disable_root: true
+          package_update: true
+          packages:
+            - docker.io
+          runcmd:
+            - systemctl enable --now docker
+            - usermod -aG docker #{SSH_USER}
+        YAML
       end
 
       def run_kamal(argv, env:, chdir:)

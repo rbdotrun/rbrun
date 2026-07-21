@@ -50,25 +50,26 @@ and hardcoding breaks re-deploys).
    `Dockerfile`. This is mandatory: `deploy` clones the pushed branch and REFUSES if the branch isn't
    pushed. The deployed version is the commit sha (no separate tag).
 
-5. **`deploy_registry`** (get the exact image/registry) → **`provision_server`** → **`create_deploy_dns`** →
-   **`deploy`** (needs your approval).
+5. **`deploy_config`** (get the exact image, registry, AND the required `ssh:` block — user `deploy`) →
+   **`provision_server`** → **`create_deploy_dns`** → **`deploy`** (needs your approval).
 
 6. **The deploy runs off-turn — watch it and iterate.** After `deploy`, poll **`deploy_status`** until it
    reports `deployed` or `failed` (don't assume success). If it's `failed`, call **`deploy_logs`** and read
    the REAL build/deploy output — do NOT guess at the cause. The usual culprit is a stale `Gemfile.lock`
    (fix per step 2), a wrong `app_port`, or a missing secret. Fix the ACTUAL error, commit + push, and
-   `deploy` again. Repeat until `deployed`, then hand the user the URL from `deploy_status`. **`teardown_deploy`**
-   when done.
+   `deploy` again. Repeat until `deployed`, then hand the user the URL from `deploy_status`. Use
+   **`deploy_exec`** to run commands on the box (`docker ps`, container logs, `df -h`) when you need the
+   server's real state. **`teardown_deploy`** when done.
 
 ## config/deploy.yml (target our infra via env)
 
-# FIRST call the `deploy_registry` tool — it returns the exact `service`, `image`, `registry_server`, and
+# FIRST call the `deploy_config` tool — it returns the exact `service`, `image`, `registry_server`, and
 # `registry_username`. Put those LITERAL values in deploy.yml. Do NOT guess the registry namespace and do
 # NOT use a bare image name like `dummy-rails` — the registry rejects it ("push access denied /
 # unauthorized"). `servers` is the IP, `proxy.host` is the hostname — do NOT swap them.
 ```yaml
-service: <service>                  # <- the `service` from deploy_registry
-image: <registry_username>/<service>   # <- the `image` from deploy_registry — a real value, NEVER bare
+service: <service>                  # <- the `service` from deploy_config
+image: <registry_username>/<service>   # <- the `image` from deploy_config — a real value, NEVER bare
 servers:
   web:
     - <%= ENV["KAMAL_SERVER_IP"] %>                    # the IP, not the host
@@ -77,13 +78,13 @@ proxy:
   host: <%= ENV["KAMAL_HOST"] %>
   app_port: 80                   # Thruster/puma; match your Dockerfile's EXPOSE
 registry:
-  server: <registry_server>        # <- registry_server from deploy_registry (literal, e.g. docker.io)
-  username: <registry_username>    # <- registry_username from deploy_registry (literal)
+  server: <registry_server>        # <- registry_server from deploy_config (literal, e.g. docker.io)
+  username: <registry_username>    # <- registry_username from deploy_config (literal)
   password:
     - KAMAL_REGISTRY_PASSWORD      # the password IS a secret — reference it, injected at deploy time
-ssh:
-  user: root
-  keys: [ <%= ENV["KAMAL_SSH_KEY_FILE"] %> ]
+ssh:                               # REQUIRED — from deploy_config. The box runs a non-root `deploy` user;
+  user: deploy                     #   root login + password auth are DISABLED. Omit this and kamal tries
+  keys: [ <%= ENV["KAMAL_SSH_KEY_FILE"] %> ]   #   root -> password prompt -> deploy fails.
 env:
   clear:
     RAILS_ENV: production

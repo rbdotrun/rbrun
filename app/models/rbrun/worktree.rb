@@ -29,6 +29,34 @@ module Rbrun
     # port. The UI gates the Open ↗ affordance on this; the launcher gates preview resolution on it.
     def previews_supported? = sandbox.respond_to?(:preview_url)
 
+    def archived? = archived_at.present?
+
+    # The ONE teardown entry point. Soft-deletes the worktree but GUARANTEES its remote resources are gone
+    # first — the dev sandbox, and (if it was deployed) its server + DNS record. So callers never hand-reap
+    # infra: reaping is a property of archiving a worktree. Idempotent — safe to re-run.
+    def archive!
+      begin
+        sandbox.destroy!
+      rescue StandardError
+        nil
+      end
+      if (target = deploy_target)
+        server_name = "rbrun-w#{id}"
+        begin
+          Rbrun.server(tenant: tenant).destroy_server(name: server_name)
+        rescue StandardError
+          nil
+        end
+        begin
+          Rbrun.dns(tenant: tenant).remove(name: target.host, type: "A") if target.host.present?
+        rescue StandardError
+          nil
+        end
+      end
+      update!(archived_at: Time.current)
+      self
+    end
+
     # Clone the repo into the sandbox and spin the branch off base — using the config github_pat. Run
     # once, when the worktree is first used.
     def provision!

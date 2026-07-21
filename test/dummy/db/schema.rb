@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_150000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -215,6 +215,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_140000) do
   end
 
   create_table "rbrun_worktrees", force: :cascade do |t|
+    t.datetime "archived_at"
     t.string "base", default: "main", null: false
     t.string "branch", null: false
     t.datetime "created_at", null: false

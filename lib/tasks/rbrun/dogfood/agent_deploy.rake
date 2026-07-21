@@ -42,15 +42,9 @@ namespace :dogfood do
     Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = ENV["DOGFOOD_APP_MASTER_KEY"] }
     Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "POSTGRES_PASSWORD") { |s| s.value = SecureRandom.hex(16) }
 
-    # Reap any prior dogfood worktree + its sandbox AND its deploy box/DNS (idempotency, invariant #11).
-    Rbrun::Worktree.for_tenant(tenant).where(repo: repo).find_each do |old|
-      if (t = old.deploy_target)
-        begin Rbrun.server.destroy_server(name: "rbrun-w#{old.id}"); rescue StandardError; end
-        begin Rbrun.dns.remove(name: t.host, type: "A"); rescue StandardError; end
-      end
-      begin old.sandbox.destroy!; rescue StandardError; end
-      old.destroy
-    end
+    # Reap prior dogfood worktrees via the ONE teardown entry point — archive! guarantees sandbox + server +
+    # DNS are gone (idempotency, invariant #11). No hand-reaping.
+    Rbrun::Worktree.for_tenant(tenant).where(repo: repo, archived_at: nil).find_each(&:archive!)
 
     worktree = Rbrun::Worktree.create!(tenant: tenant, repo: repo, base: "main")
     dog.header "provisioning the dev sandbox (clone #{repo} + push the branch)"

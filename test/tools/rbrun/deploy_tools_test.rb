@@ -35,14 +35,16 @@ module Rbrun
       assert Rbrun::Tools::Deploy.needs_approval?
     end
 
-    test "deploy_registry hands the agent the exact image + registry (no guessing)" do
+    test "deploy_config hands the agent the exact image, registry, and ssh (no guessing)" do
       Rbrun.config.server_provider = { default: :kamal_hetzner,
                                        kamal_hetzner: { registry: { server: "docker.io", username: "acme" } } }
-      data = Rbrun::Tools::DeployRegistry.in_session(@session).execute["data"]
+      data = Rbrun::Tools::DeployConfig.in_session(@session).execute["data"]
       assert_equal "docker.io", data["registry_server"]
       assert_equal "acme", data["registry_username"]
       assert_equal "rbrun-w#{@wt.id}", data["service"]
       assert_equal "acme/rbrun-w#{@wt.id}", data["image"]
+      assert_equal "deploy", data["ssh_user"]
+      assert_includes data["deploy_yml_ssh"], "user: deploy"
     end
 
     test "deploy_status reports none, then the live url + tag after deploy" do

@@ -1,5 +1,6 @@
 require "open3"
 require "tmpdir"
+require "tempfile"
 
 module Rbrun
   # Builds + deploys a worktree's app on OUR host — the build backend seam. Clones the worktree's PUSHED
@@ -25,6 +26,7 @@ module Rbrun
     def run!
       raise ArgumentError, "server not provisioned" if @target.server_ip.blank?
 
+      wait_for_box! # cloud-init must finish (deploy user + Docker) before kamal SSHes in
       with_checkout do |dir, sha|
         result = server.deploy(work_dir: dir, host: @target.host, server_ip: @target.server_ip,
                                ssh_private_key: @target.ssh_private_key, env: secrets_env)
@@ -46,6 +48,46 @@ module Rbrun
 
       with_checkout do |dir, _sha|
         server.app_logs(work_dir: dir, server_ip: @target.server_ip, ssh_private_key: @target.ssh_private_key, tail: tail)
+      end
+    end
+
+    SSH_USER = "deploy" # matches the cloud-init user the server adapter bakes
+
+    # SSH into the box as `deploy` and block until cloud-init has finished (the deploy user exists, Docker is
+    # installed + running). Otherwise kamal's first SSH races cloud-init and fails.
+    def ssh_ready?(tail: nil)
+      Tempfile.create("rbrun-wait-key") do |f|
+        f.write(@target.ssh_private_key.to_s)
+        f.flush
+        File.chmod(0o600, f.path)
+        out, = Open3.capture2e("ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                               "-o", "ConnectTimeout=10", "-i", f.path, "#{SSH_USER}@#{@target.server_ip}",
+                               "cloud-init status --wait >/dev/null 2>&1; docker info >/dev/null 2>&1 && echo RBRUN_READY")
+        out.include?("RBRUN_READY")
+      end
+    end
+
+    def wait_for_box!(attempts: 40)
+      attempts.times do
+        return true if ssh_ready?
+
+        sleep 10
+      end
+      false
+    end
+
+    # Run a command on the deploy box over SSH (as the deploy user, with our key). Powers the deploy_exec
+    # tool so the agent can inspect/debug the box.
+    def exec_on_box(command)
+      return "" if @target.server_ip.blank?
+
+      Tempfile.create("rbrun-exec-key") do |f|
+        f.write(@target.ssh_private_key.to_s)
+        f.flush
+        File.chmod(0o600, f.path)
+        out, = Open3.capture2e("ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                               "-o", "ConnectTimeout=15", "-i", f.path, "#{SSH_USER}@#{@target.server_ip}", command.to_s)
+        out
       end
     end
 
