@@ -1,0 +1,18 @@
+# Example Kamal deploy config (local builder). prepare_deploy renders a concrete one for you; this shows
+# the shape. Secrets + the server IP come from the environment at build time — nothing sensitive on disk.
+service: my-app
+image: my-registry-user/my-app
+servers:
+  web:
+    - <%= ENV["KAMAL_SERVER_IP"] %>
+proxy:
+  ssl: true
+  host: my-app.example.com
+registry:
+  server: docker.io
+  username:
+    - KAMAL_REGISTRY_USERNAME
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+builder:
+  arch: amd64
