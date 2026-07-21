@@ -36,11 +36,21 @@ namespace :dogfood do
       c.dns_provider     = { default: :cloudflare, cloudflare: { api_token: ENV["CLOUDFLARE_API_KEY"], zone_id: ENV["CLOUDFLARE_ZONE_ID"] } }
     end
     Rbrun.config.preview_domain = domain
-    ActiveJob::Base.queue_adapter = :test # we run the deploy job ourselves, synchronously, below
+    Rbrun::ApplicationJob.queue_adapter = :test # capture the enqueue; we run the deploy job once, below
 
     # Store the app's secrets so the agent doesn't have to ask in this headless run.
     Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = ENV["DOGFOOD_APP_MASTER_KEY"] }
     Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "POSTGRES_PASSWORD") { |s| s.value = SecureRandom.hex(16) }
+
+    # Reap any prior dogfood worktree + its sandbox AND its deploy box/DNS (idempotency, invariant #11).
+    Rbrun::Worktree.for_tenant(tenant).where(repo: repo).find_each do |old|
+      if (t = old.deploy_target)
+        begin Rbrun.server.destroy_server(name: "rbrun-w#{old.id}"); rescue StandardError; end
+        begin Rbrun.dns.remove(name: t.host, type: "A"); rescue StandardError; end
+      end
+      begin old.sandbox.destroy!; rescue StandardError; end
+      old.destroy
+    end
 
     worktree = Rbrun::Worktree.create!(tenant: tenant, repo: repo, base: "main")
     dog.header "provisioning the dev sandbox (clone #{repo} + push the branch)"
@@ -48,39 +58,44 @@ namespace :dogfood do
     session = worktree.sessions.create!
 
     begin
-      dog.header "the agent turn (prep -> commit+push -> provision -> dns -> deploy)"
+      dog.header "the agent turn (prep -> commit+push -> provision -> dns -> deploy -> ITERATE)"
       session.run_turn(<<~MSG)
         Deploy this Rails app to a live public HTTPS URL using the rails-kamal-deployment skill.
         It uses Postgres. Prepare the repo (add/fix the Kamal setup — Dockerfile, config/deploy.yml
-        reading the KAMAL_* env, a Postgres accessory, .kamal/secrets), COMMIT and PUSH your changes,
-        then call provision_server, create_deploy_dns, and deploy. RAILS_MASTER_KEY and POSTGRES_PASSWORD
-        are already stored as secrets. When finished, tell me the URL.
+        reading the KAMAL_* env, a Postgres accessory, .kamal/secrets, and SYNC the Gemfile.lock),
+        COMMIT and PUSH, then call provision_server, create_deploy_dns, and deploy. After deploying,
+        poll deploy_status; if it failed, read deploy_logs, fix the real error, push, and deploy again —
+        repeat until it is deployed. RAILS_MASTER_KEY and POSTGRES_PASSWORD are already stored. Then give
+        me the URL.
       MSG
 
-      # Approve the deploy gate (the human's yes), then let the agent finish its turn.
-      if session.reload.needs_approval?
+      # Let the AGENT iterate: every time it calls the gated deploy, approve it, RUN the deploy for real
+      # (so deploy_status/deploy_logs are truthful), then resume the agent so it reads the result and,
+      # on failure, fixes the ACTUAL error and redeploys. The agent — not us — makes it work.
+      8.times do
+        session.reload
+        break unless session.needs_approval?
         pending = session.messages.approval_pending.last
-        dog.info "approving gate", pending&.payload&.dig("name")
-        nudge = pending.decide_approval!(:approve)
-        session.continue_turn!(nudge) if nudge
+        break unless pending&.payload&.dig("name") == "deploy"
+        nudge = pending.decide_approval!(:approve)      # marks deploying + enqueues the job
+        Rbrun::DeployJob.perform_now(worktree.id)        # actually build + deploy — real result
+        st = worktree.reload.deploy_target&.status
+        dog.info "deploy attempt -> ", st
+        break if st == "deployed"
+        session.continue_turn!(nudge)                    # agent resumes, reads status/logs, fixes, retries
       end
 
       target = worktree.reload.deploy_target
       dog.ok "agent provisioned a server", target&.server_ip.present?
-      dog.ok "agent pushed the branch (deployable)", Rbrun::DeployRunner.branch_pushed?(worktree)
+      dog.ok "agent drove the deploy to 'deployed'", target&.status == "deployed"
+      puts target&.last_deploy_log.to_s.lines.last(20).join
 
-      if target&.server_ip.present? && Rbrun::DeployRunner.branch_pushed?(worktree)
-        dog.header "running the deploy (kamal, synchronous)"
-        result = Rbrun::DeployRunner.new(worktree: worktree).run!
-        puts result.output.to_s.lines.last(30).join
-        dog.ok "kamal deploy succeeded", result.ok
-      end
-
+      url = target&.url
       dog.header "prove the live URL"
-      live = poll_https_200("https://#{host}", tries: 45)
-      dog.ok "https://#{host} serves 200 over HTTPS", live
-      puts "\n🔗  LIVE:  https://#{host}\n\n"
-      dog.info "left UP on purpose", "validate teardown with: bin/rails app:dogfood:server_teardown"
+      live = url && poll_https_200(url, tries: 45)
+      dog.ok "#{url} serves 200 over HTTPS", !!live
+      puts "\n🔗  LIVE:  #{url}\n\n"
+      dog.info "left UP on purpose", "validate teardown separately"
     ensure
       # Reap only the DEV sandbox; the deployment stays up as proof.
       begin

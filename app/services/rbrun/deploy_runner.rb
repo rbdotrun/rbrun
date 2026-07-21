@@ -37,10 +37,12 @@ module Rbrun
       end
     end
 
-    # Live container logs from the deployed server (re-clones for the Kamal config). Falls back to the stored
-    # last deploy log when there is no server yet.
+    # Logs the agent debugs with. When the deploy did NOT succeed (build/deploy failed, or still deploying),
+    # the useful signal is the BUILD/deploy output (last_deploy_log) — there is no running container to tail,
+    # so fetching live app logs would return nothing and hide the real error. Only once the app is actually
+    # `deployed` do we fetch live container logs.
     def logs(tail: 100)
-      return @target.last_deploy_log.to_s if @target.server_ip.blank?
+      return @target.last_deploy_log.to_s unless @target.status == "deployed" && @target.server_ip.present?
 
       with_checkout do |dir, _sha|
         server.app_logs(work_dir: dir, server_ip: @target.server_ip, ssh_private_key: @target.ssh_private_key, tail: tail)

@@ -10,8 +10,10 @@ You take a Rails repo from "code in the worktree" to a **live HTTPS URL**. rbrun
 
 ## The infra rbrun gives you (do NOT hardcode these)
 
-At deploy time the engine sets these in Kamal's environment. Your `config/deploy.yml` must READ them,
-never bake in values:
+The engine sets these in Kamal's environment **AT DEPLOY TIME**. You will NOT see them in your shell while
+preparing the repo — that is expected and correct. **Trust the contract:** write `<%= ENV["KAMAL_HOST"] %>`
+etc. in `config/deploy.yml` and NEVER hardcode an IP or host (you don't have the box yet when writing it,
+and hardcoding breaks re-deploys).
 
 - `KAMAL_SERVER_IP`     — the provisioned box's IP (use for `servers`)
 - `KAMAL_HOST`          — the public host, e.g. `myapp.rb.run` (use for `proxy.host`)
@@ -29,8 +31,15 @@ never bake in values:
      already ships one; if so, leave it.
    - **`config/deploy.yml`** — if absent, add it, reading the infra env above (never hardcode IPs/hosts).
    - **`.kamal/secrets`** — map secret names to `$ENV`.
-   - Add a DB accessory if the app needs one; fix a stale `Gemfile.lock` (bundle install); remove any
-     repo-specific `.kamal/hooks` that assume other infra.
+   - Add a DB accessory if the app needs one; remove any repo-specific `.kamal/hooks` that assume other infra.
+   - **CRITICAL — sync `Gemfile.lock`.** Rails Dockerfiles run `bundle install` FROZEN, which fails if the
+     lock is even slightly out of sync with the `Gemfile` (a changed version constraint, an added/removed
+     gem). A stale lock is the #1 cause of a failed image build — never skip this. Fix it:
+     - If bundler + the app's Ruby are available, run `bundle lock` and commit `Gemfile.lock`.
+     - **If Ruby ISN'T in the sandbox (common), hand-edit `Gemfile.lock`.** Its `DEPENDENCIES` section (near
+       the bottom) must list each gem with the SAME constraint as the `Gemfile`. E.g. if `Gemfile` has
+       `gem "colorize", "~> 1.1"` but `Gemfile.lock` shows a bare `colorize` under `DEPENDENCIES`, change it
+       to `colorize (~> 1.1)`. Match every mismatched gem, then commit.
 
 3. **Declare secrets + ask for any missing env.** Read what the app actually needs — every `ENV[...]` it
    reads (`RAILS_MASTER_KEY`, `POSTGRES_PASSWORD`, a `DATABASE_URL`, third-party API keys, …). Make sure each
@@ -41,9 +50,14 @@ never bake in values:
    `Dockerfile`. This is mandatory: `deploy` clones the pushed branch and REFUSES if the branch isn't
    pushed. The deployed version is the commit sha (no separate tag).
 
-5. **`provision_server`** → **`create_deploy_dns`** → **`deploy`** (needs your approval). Poll
-   **`deploy_status`** until it reports `deployed`, then hand the user the URL. Use **`deploy_logs`** to
-   debug. **`teardown_deploy`** when done.
+5. **`provision_server`** → **`create_deploy_dns`** → **`deploy`** (needs your approval).
+
+6. **The deploy runs off-turn — watch it and iterate.** After `deploy`, poll **`deploy_status`** until it
+   reports `deployed` or `failed` (don't assume success). If it's `failed`, call **`deploy_logs`** and read
+   the REAL build/deploy output — do NOT guess at the cause. The usual culprit is a stale `Gemfile.lock`
+   (fix per step 2), a wrong `app_port`, or a missing secret. Fix the ACTUAL error, commit + push, and
+   `deploy` again. Repeat until `deployed`, then hand the user the URL from `deploy_status`. **`teardown_deploy`**
+   when done.
 
 ## config/deploy.yml (target our infra via env)
 
