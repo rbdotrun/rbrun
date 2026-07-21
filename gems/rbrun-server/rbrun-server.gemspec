@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-http", ">= 0.60"
   spec.add_dependency "async-http-faraday", ">= 0.12"
   spec.add_dependency "faraday", "~> 2.0"
-  # spec.add_dependency "kamal", ">= 2.0" # added in Task 3 (deploy)
+  spec.add_dependency "kamal", ">= 2.0"
 
   spec.add_development_dependency "webmock", "~> 3.0"
 end

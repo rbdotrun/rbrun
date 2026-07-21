@@ -72,4 +72,23 @@ class KamalHetznerTest < Minitest::Test
     assert adapter.destroy_server(name: "w-4")
     assert_requested del
   end
+
+  def test_deploy_shells_kamal_with_registry_and_server_ip
+    captured = {}
+    adp = adapter
+    adp.define_singleton_method(:run_kamal) do |argv, env:, chdir:|
+      captured[:argv] = argv; captured[:env] = env; captured[:chdir] = chdir
+      [ "Deployed w-1", true ]
+    end
+
+    result = adp.deploy(work_dir: "/work/w-1", host: "w1.rb.run", server_ip: "1.1.1.1")
+    assert result.ok
+    assert_equal "Deployed w-1", result.output
+    assert_equal "/work/w-1", captured[:chdir]
+    assert_includes captured[:argv], "deploy"
+    assert_equal "pw", captured[:env]["KAMAL_REGISTRY_PASSWORD"]
+    assert_equal "u",  captured[:env]["KAMAL_REGISTRY_USERNAME"]
+    assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
+    assert_equal "w1.rb.run", captured[:env]["KAMAL_HOST"]
+  end
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "open3"
 require "faraday"
 require "async/http/faraday"
 
@@ -56,7 +57,26 @@ module Rbrun
         true
       end
 
+      # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
+      # the server IP + registry creds from the child env, so nothing secret is written to disk.
+      def deploy(work_dir:, host:, server_ip:, env: {})
+        child_env = {
+          "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
+          "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
+          "KAMAL_HOST"              => host.to_s,
+          "KAMAL_SERVER_IP"         => server_ip.to_s,
+          "SSH_PRIVATE_KEY"         => @ssh_key.to_s,
+        }.merge(env.transform_keys(&:to_s))
+        output, ok = run_kamal([ "deploy" ], env: child_env, chdir: work_dir)
+        DeployResult.new(ok: ok, output: output)
+      end
+
       private
+
+      def run_kamal(argv, env:, chdir:)
+        out, status = Open3.capture2e(env, "kamal", *argv, chdir: chdir)
+        [ out, status.success? ]
+      end
 
       # Find-or-create our SSH public key in the project (by name), so the box is reachable for the Kamal
       # deploy. Returns the key name to attach. Idempotent — a re-run reuses the existing key.
