@@ -7,11 +7,13 @@ module Rbrun
     # forgets one fails loud with NotImplementedError instead of a confusing NoMethodError. Pure
     # documentation + enforcement: no behaviour, no state, no dependencies.
     #
-    # Every mutating method MUST be idempotent by server name — create is find-or-create, destroy is a no-op
-    # when absent — so callers can re-run freely (invariant #11).
+    # SSH keys flow PER CALL, not from config — the engine generates + stores a keypair per deployment
+    # ("infra we own") and hands the adapter the public key to upload and the private key to deploy with.
+    # Every mutating method MUST be idempotent by server name (invariant #11).
     class Base
-      # Find-or-create the server by name; block until it has a public IP / reaches running. @return [Node]
-      def create_server(name:, type:, region:, image:, ssh_keys: [], user_data: nil, labels: {})
+      # Find-or-create the server by name (uploading + attaching ssh_public_key); block until it has a
+      # public IP / reaches running. @return [Node]
+      def create_server(name:, type:, region:, image:, ssh_public_key:, user_data: nil, labels: {})
         raise NotImplementedError, "#{self.class}#create_server"
       end
 
@@ -31,13 +33,14 @@ module Rbrun
         raise NotImplementedError, "#{self.class}#destroy_server"
       end
 
-      # Deploy the app in work_dir onto the server via Kamal (local builder). @return [DeployResult]
-      def deploy(work_dir:, host:, server_ip:, env: {})
+      # Deploy the app in work_dir onto the server via Kamal (local builder), authenticating over SSH with
+      # ssh_private_key. @return [DeployResult]
+      def deploy(work_dir:, host:, server_ip:, ssh_private_key:, env: {})
         raise NotImplementedError, "#{self.class}#deploy"
       end
 
       # The deployed app's container logs from the server (parity with repo_services logs). @return [String]
-      def app_logs(work_dir:, server_ip:, tail: 100)
+      def app_logs(work_dir:, server_ip:, ssh_private_key:, tail: 100)
         raise NotImplementedError, "#{self.class}#app_logs"
       end
     end

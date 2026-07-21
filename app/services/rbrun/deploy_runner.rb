@@ -19,7 +19,8 @@ module Rbrun
       raise ArgumentError, "server not provisioned" if @target.server_ip.blank?
 
       with_checkout do |dir, sha|
-        result = server.deploy(work_dir: dir, host: @target.host, server_ip: @target.server_ip)
+        result = server.deploy(work_dir: dir, host: @target.host, server_ip: @target.server_ip,
+                               ssh_private_key: @target.ssh_private_key)
         @target.update!(
           status:          result.ok ? "deployed" : "failed",
           deployed_sha:    result.ok ? sha : @target.deployed_sha,
@@ -34,7 +35,7 @@ module Rbrun
     def logs(tail: 100)
       return @target.last_deploy_log.to_s if @target.server_ip.blank?
 
-      with_checkout { |dir, _sha| server.app_logs(work_dir: dir, server_ip: @target.server_ip, tail: tail) }
+      with_checkout { |dir, _sha| server.app_logs(work_dir: dir, server_ip: @target.server_ip, ssh_private_key: @target.ssh_private_key, tail: tail) }
     end
 
     private

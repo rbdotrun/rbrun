@@ -9,9 +9,10 @@ module Rbrun
       def execute
         wt = session.worktree
         target = wt.deploy_target || wt.create_deploy_target!(default_attrs(wt))
+        public_key, = Rbrun::DeployKeys.ensure!(target) # our own per-deployment keypair
         node = Rbrun.server(tenant: session.tenant).create_server(
           name: server_name(wt), type: target.server_type, region: target.region,
-          image: target.image, labels: { "rbrun-worktree" => wt.id.to_s })
+          image: target.image, ssh_public_key: public_key, labels: { "rbrun-worktree" => wt.id.to_s })
         target.update!(server_id: node.id.to_s, server_ip: node.ip, status: "provisioned")
         { "data" => { "server_ip" => node.ip, "status" => node.status, "host" => target.host } }
       end

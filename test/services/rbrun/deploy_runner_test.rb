@@ -13,7 +13,7 @@ module Rbrun
     # A fake server adapter (injected — no global stubbing).
     def fake_server(ok:, output:)
       srv = Object.new
-      srv.define_singleton_method(:deploy) { |work_dir:, host:, server_ip:| Rbrun::Server::DeployResult.new(ok: ok, output: output) }
+      srv.define_singleton_method(:deploy) { |work_dir:, host:, server_ip:, ssh_private_key:| Rbrun::Server::DeployResult.new(ok: ok, output: output) }
       srv
     end
 

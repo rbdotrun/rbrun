@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_140000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -35,6 +35,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_130000) do
     t.string "server_id"
     t.string "server_ip"
     t.string "server_type", null: false
+    t.text "ssh_private_key"
+    t.text "ssh_public_key"
     t.string "status", default: "pending", null: false
     t.string "tenant", null: false
     t.datetime "updated_at", null: false

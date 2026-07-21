@@ -41,6 +41,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "faraday-multipart", "~> 1.0"
   spec.add_dependency "ruby_llm"
   spec.add_dependency "bcrypt"
+  spec.add_dependency "sshkey", "~> 3.0" # generate the per-deployment ssh keypair we own
   spec.add_dependency "view_component", "~> 3.21"
   spec.add_dependency "view_component-contrib"
   spec.add_dependency "tailwind_merge"
