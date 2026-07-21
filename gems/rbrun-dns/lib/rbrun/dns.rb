@@ -2,6 +2,7 @@
 
 require "rbrun/dns/version"
 require "rbrun/dns/record"
+require "rbrun/dns/base"
 require "rbrun/dns/cloudflare"
 
 module Rbrun

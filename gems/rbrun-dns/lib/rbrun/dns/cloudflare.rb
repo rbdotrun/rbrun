@@ -10,8 +10,8 @@ module Rbrun
     # Cloudflare DNS, and nothing else — one zone's records. FARADAY ON ASYNC-HTTP (fork-safe under
     # Falcon), constructed from EXPLICIT credentials, never the environment. Validates its own config and
     # fails fast. Every operation is idempotent by resource identity (name+type), so upsert never
-    # duplicates a record.
-    class Cloudflare
+    # duplicates a record. Implements the Rbrun::Dns::Base interface.
+    class Cloudflare < Base
       API = "https://api.cloudflare.com/client/v4"
 
       def initialize(config: {})
