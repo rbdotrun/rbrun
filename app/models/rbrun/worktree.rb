@@ -9,8 +9,6 @@ module Rbrun
 
     has_many :sessions, class_name: "Rbrun::Session", dependent: :destroy
     has_many :commits,  class_name: "Rbrun::Commit",  dependent: :destroy
-    has_many :service_runs, class_name: "Rbrun::ServiceRun", dependent: :destroy
-    has_many :service_exposures, class_name: "Rbrun::ServiceExposure", dependent: :destroy
     has_one  :deploy_target, class_name: "Rbrun::DeployTarget", dependent: :destroy
 
     before_validation :assign_branch, on: :create
@@ -24,10 +22,6 @@ module Rbrun
     # quietly creating a new empty box instead of finding the real one. If the process can't build that
     # provider (missing credentials), this now fails LOUDLY rather than drifting to another backend.
     def sandbox = @sandbox ||= Rbrun.sandbox(sandbox_provider&.to_sym, tenant: tenant, labels: { worktree: id.to_s })
-
-    # Preview capability probe (no registry): true when this worktree's sandbox provider can publish a
-    # port. The UI gates the Open ↗ affordance on this; the launcher gates preview resolution on it.
-    def previews_supported? = sandbox.respond_to?(:preview_url)
 
     def archived? = archived_at.present?
 

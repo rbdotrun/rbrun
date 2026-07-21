@@ -2,8 +2,8 @@ module Rbrun
   module Tools
     # Ask the user to provide secrets/env the app needs to run (API keys, RAILS_MASTER_KEY, DB
     # passwords). A custom gate (sibling of ask_user): the run parks and a SECURE form renders. The agent
-    # declares only the KEYS — it NEVER sees the values, which are stored encrypted and injected into the
-    # services' environment (ServiceSupervisor#write_env!).
+    # declares only the KEYS — it NEVER sees the values, which are stored encrypted and injected as
+    # Kamal secrets at deploy time (DeployRunner).
     #
     # No execute: a gate tool's operation is the user's submission; custom_approval! supplies the degrade.
     class RequestSecrets < Rbrun::ApplicationTool

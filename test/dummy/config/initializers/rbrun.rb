@@ -18,16 +18,13 @@ Rbrun.configure do |c|
     anthropic_api_key: ENV["ANTHROPIC_OAUTH_TOKEN"].presence || "sk-test-dummy"
   } }
 
-  # DNS capability + preview edge: when Cloudflare creds are present, the engine creates ONE record per
-  # shared preview — <token>-preview.<preview_domain> -> preview_target. preview_target is THIS app's own
-  # public origin (the deployed box), never a tunnel; each preview host CNAMEs here and the request lands
-  # back on the PreviewProxy, which relays into the private sandbox.
+  # DNS capability: when Cloudflare creds are present, the engine points deploy hosts (rbrun-w<id>.<domain>)
+  # at the provisioned box's IP.
   if ENV["CLOUDFLARE_API_KEY"].present? && ENV["CLOUDFLARE_ZONE_ID"].present?
     c.dns_provider   = { default: :cloudflare, cloudflare: {
       api_token: ENV["CLOUDFLARE_API_KEY"], zone_id: ENV["CLOUDFLARE_ZONE_ID"]
     } }
     c.preview_domain = ENV.fetch("RBRUN_PREVIEW_DOMAIN", "rb.run")
-    c.preview_target = ENV.fetch("RBRUN_PREVIEW_TARGET", "dev.rb.run")
   end
 
   c.user email: "dev@rbrun.test", password: "password", tenant: "rbrun"

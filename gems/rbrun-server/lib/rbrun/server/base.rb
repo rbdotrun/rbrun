@@ -39,7 +39,7 @@ module Rbrun
         raise NotImplementedError, "#{self.class}#deploy"
       end
 
-      # The deployed app's container logs from the server (parity with repo_services logs). @return [String]
+      # The deployed app's container logs from the server. @return [String]
       def app_logs(work_dir:, server_ip:, ssh_private_key:, tail: 100)
         raise NotImplementedError, "#{self.class}#app_logs"
       end

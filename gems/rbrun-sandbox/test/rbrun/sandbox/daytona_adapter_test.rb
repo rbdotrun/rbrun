@@ -119,14 +119,6 @@ class DaytonaAdapterTest < Minitest::Test
     assert_raises(Rbrun::Sandbox::Error) { build.session_create("s1") }
   end
 
-  def test_preview_url_maps_the_wire
-    stub_request(:get, "#{API}/sandbox/#{BOX}/ports/3000/preview-url")
-      .to_return(json({ "url" => "https://3000-box-1.proxy.test", "token" => "tok" }))
-    link = build.preview_url(3000)
-    assert_equal "https://3000-box-1.proxy.test", link.url
-    assert_equal "tok", link.token
-  end
-
   def test_destroy_resets_the_box
     destroy = stub_request(:delete, "#{API}/sandbox/#{BOX}")
       .with(query: { "force" => "true" }).to_return(status: 200, body: "")

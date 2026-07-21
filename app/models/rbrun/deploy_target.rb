@@ -1,6 +1,6 @@
 module Rbrun
   # The worktree's deployment: which server (Hetzner) the app is deployed onto and at which DNS host. One
-  # per worktree (mirrors ServiceExposure's per-[worktree] grain), so tools address it by the worktree —
+  # per worktree, so tools address it by the worktree —
   # never a free-floating name. Tenant is inherited from the worktree. Distinct from the worktree's dev
   # sandbox (Daytona): this is the deployed app's server.
   class DeployTarget < ApplicationRecord
