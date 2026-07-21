@@ -106,6 +106,7 @@ module Rbrun
 
       def kamal_env(server_ip:, key_path:, host: nil)
         env = {
+          "KAMAL_REGISTRY_SERVER"   => @registry[:server].to_s,
           "KAMAL_REGISTRY_USERNAME" => @registry[:username].to_s,
           "KAMAL_REGISTRY_PASSWORD" => @registry[:password].to_s,
           "KAMAL_SERVER_IP"         => server_ip.to_s,

@@ -9,11 +9,14 @@ module Rbrun
       needs_approval!
 
       def execute
-        t = session.worktree.deploy_target
+        wt = session.worktree
+        t = wt.deploy_target
         return error("no server provisioned — run provision_server first") if t.nil? || t.server_ip.blank?
+        # Enforced: we deploy the PUSHED branch, so it must be committed + pushed first.
+        return error("commit + push this worktree's branch before deploying") unless Rbrun::DeployRunner.branch_pushed?(wt)
 
         t.update!(status: "deploying")
-        Rbrun::DeployJob.perform_later(session.worktree.id)
+        Rbrun::DeployJob.perform_later(wt.id)
         { "data" => { "status" => "deploying", "url" => t.url } }
       end
     end

@@ -95,19 +95,32 @@ Value objects (mirroring `Rbrun::Dns::Record`, plain `Data`/`Struct`, framework-
 - `Rbrun::Server::Node` — `id, name, ip, status, region`.
 - `Rbrun::Server::DeployResult` — `ok (bool), output (string)`.
 
+### 0. Division of labor (the contract — do not blur it)
+
+- **The agent drives the tool calls and PREPARES THE REPO.** Guided by the `rails-kamal-deployment` skill,
+  the agent inspects the repo and — **if missing** — adds a `Dockerfile` and a `config/deploy.yml` that
+  targets our infra via the `KAMAL_*` env below, fixes a stale `Gemfile.lock`, adds a DB accessory + secrets,
+  then **commits + pushes**. All repo-prep is the agent's, NOT the engine's.
+- **The engine does the infra + enforces.** Provision the box, DNS, expose the `KAMAL_*` env, clone the
+  **pushed** branch, run kamal, record state. `deploy` **blocks unless the branch is committed + pushed**.
+  The deployed version is the commit sha (no separate tag tool). The engine NEVER writes `deploy.yml`/
+  `Dockerfile` — no config injection, no repo-prep in Ruby.
+
 ### 2.2 `Rbrun::Server::KamalHetzner` — the adapter
 
-- **Config, validated fail-fast at init** (invariant #2): `{ hcloud_token:, ssh_public_key:,
-ssh_private_key:, registry: { server:, username:, password: } }`. A blank required key raises `Error`.
+- **Config, validated fail-fast at init** (invariant #2): `{ hcloud_token:, registry: { server:, username:,
+  password: } }`. A blank `hcloud_token` raises `Error`. **SSH keys are NOT config** — they flow per call
+  (the engine generates + stores a keypair per deployment; see §4).
 - **Provisioning** talks to the Hetzner Cloud API over Faraday/async-http:
-  - `create_server` → `GET /servers?name=` (find), else `POST /servers` with
-    `{ name, server_type, image, location, ssh_keys, user_data, labels }`; poll `GET /servers/{id}` until
-    `status == "running"` and `public_net.ipv4.ip` is present; return a `Node`. Idempotent: an existing
-    server of that name is returned untouched.
+  - `create_server(name:, type:, region:, image:, ssh_public_key:, …)` → `GET /servers?name=` (find), else
+    `POST /servers` (uploading `ssh_public_key` under the server's own name, rolling over `fsn1→nbg1→hel1`
+    on a 412 placement/capacity error); poll until `running` + has an IP; return a `Node`. Idempotent.
   - `find_server` / `list_servers` / `destroy_server` → the obvious `GET`/`DELETE` (delete swallows 404).
-- **Deploy** shells `kamal deploy` in `work_dir`, with `KAMAL_REGISTRY_PASSWORD` etc. in the child env and
-  the server IP injected (env var the generated `deploy.yml` reads). Local builder only (`builder: { arch:
-amd64 }`, no remote host) — matches "we will use the local builder, kamal has it."
+- **Deploy** — `deploy(work_dir:, host:, server_ip:, ssh_private_key:, env:)` shells `kamal deploy` in
+  `work_dir` (local builder), materializing `ssh_private_key` to a 0600 temp file and exposing the **infra
+  env the repo's `deploy.yml` reads**: `KAMAL_SERVER_IP`, `KAMAL_HOST`, `KAMAL_REGISTRY_SERVER/USERNAME/
+  PASSWORD`, `KAMAL_SSH_KEY_FILE`, plus the app secrets passed in `env` (from `RepoSecret`). `app_logs`
+  runs `kamal app logs` the same way.
 
 ## 3. Engine composition root
 
@@ -125,7 +138,7 @@ Config (already accepted by the metaprogrammed `server_provider=`):
 ```ruby
 c.server_provider = {
   default:       :kamal_hetzner,
-  kamal_hetzner: { hcloud_token: ENV["HCLOUD_TOKEN"], ssh_public_key: …, ssh_private_key: …,
+  kamal_hetzner: { hcloud_token: ENV["HCLOUD_TOKEN"],
                    registry: { server: "docker.io", username: ENV["REGISTRY_USER"],
                                password: ENV["REGISTRY_PASSWORD"] } },
 }
@@ -140,7 +153,9 @@ class DeployTarget < ApplicationRecord
   include Rbrun::Tenanted
   belongs_to :worktree, class_name: "Rbrun::Worktree"
   before_validation :inherit_tenant, on: :create
-  # columns: provider, server_type, region, image, host, server_id, server_ip, status
+  # columns: provider, server_type, region, image, host, server_id, server_ip, status,
+  #          ssh_public_key, ssh_private_key,     # the per-deployment keypair WE generate + store
+  #          deploy_tag, deployed_sha, last_deploy_log
   private
   def inherit_tenant = self[Rbrun.config.tenancy_key] ||= worktree&.tenant
 end
@@ -150,31 +165,40 @@ end
 - **Unique index on `worktree_id`** — one target per worktree; the worktree _is_ the key, so no name to get
   wrong. Find-or-create is `worktree.deploy_target || worktree.create_deploy_target!(…)`.
 - `host` defaults to a worktree-derived label under `c.preview_domain` (overridable); `server_ip`/`server_id`
-  fill in after provision; `status` tracks `pending → provisioned → deployed → torn_down`.
+  fill in after provision; `status` tracks `pending → provisioned → deploying → deployed → failed → torn_down`.
+- **The per-deployment SSH keypair is ours** — `Rbrun::DeployKeys.ensure!(target)` generates it (via the
+  `sshkey` gem) and stores it here; the public half is uploaded to the provider, the private half deploys.
+- `deployed_sha` / `deploy_tag` = the deployed commit (the tag IS the sha); `last_deploy_log` = the build+
+  deploy output (surfaced by `deploy_status` / `deploy_logs`).
 - Migration under the engine's `db/migrate` (own-DB connection via `connects_to`, invariant #8).
 
 ## 5. Tools (`Rbrun::Tools::*`, agentic, idempotent)
 
 Every tool acts on **the current session's worktree's** target (`session.worktree`), find-or-create — no name
-argument. `< Rbrun::ApplicationTool`, one operation each, runs back in Ruby.
+argument. `< Rbrun::ApplicationTool`, one operation each, runs back in Ruby. **The engine does not write any
+repo files** — the agent prepares the repo (§0) and commits + pushes it before `deploy`. **Six tools** (no
+`prepare_deploy`, no `save_deploy_tag`):
 
-| Tool                | Does                                                                                                                       | Notes                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `deploy_status`     | Show this worktree's target: server (id/ip/status) + DNS host state.                                                       | read-only                                                                                                    |
-| `provision_server`  | find-or-create the target; `Rbrun.server.create_server(…)`; write `server_id`/`server_ip`.                                 | idempotent by server name (= worktree-derived)                                                               |
-| `create_deploy_dns` | `Rbrun.dns.upsert(name: host, type: "A", content: server_ip)`.                                                             | the `:dns` family does the work                                                                              |
-| `prepare_deploy`    | scaffold `Dockerfile` + `config/deploy.yml` into the worktree, rendered with `host`/registry (from the skill's templates). | idempotent write (upsert files)                                                                              |
-| `deploy`            | `Rbrun.server.deploy(work_dir:, host:, server_ip:, env:)`.                                                                 | **`needs_approval!`** — deploy makes something publicly reachable, a human decision (invariant #10's spirit) |
-| `teardown_deploy`   | `Rbrun.server.destroy_server` **+** `Rbrun.dns.remove(host)`; reset the target row.                                        | invariant #11 — leaves nothing behind                                                                        |
+| Tool                | Does                                                                                                      | Notes                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `provision_server`  | `DeployKeys.ensure!` → `Rbrun.server.create_server(…, ssh_public_key:)`; write `server_id`/`server_ip`.   | idempotent by server name (= worktree-derived, label `rbrun-worktree=<id>`)              |
+| `create_deploy_dns` | `Rbrun.dns.upsert(name: host, type: "A", content: server_ip)`.                                            | the `:dns` family does the work                                                          |
+| `deploy`            | **block unless the branch is committed + pushed** → enqueue `DeployJob` → `DeployRunner` (clone pushed branch → `Rbrun.server.deploy`). | **`needs_approval!`**; runs off-turn; version = commit sha |
+| `deploy_status`     | Show the target: live URL (`https://host`), status, deployed sha, server ip.                              | read-only                                                                                |
+| `deploy_logs`       | `DeployRunner#logs` → `Rbrun.server.app_logs` (`kamal app logs`), else stored `last_deploy_log`.          | parity with `repo_services` logs                                                         |
+| `teardown_deploy`   | `Rbrun.server.destroy_server` **+** `Rbrun.dns.remove(host)`; reset the target row.                       | invariant #11 — leaves nothing behind                                                    |
 
-Tools are added to `Rbrun.tools` (engine roster; host-extensible). Server names + labels are worktree-derived
-so provisioning is idempotent and reap-able (label `rbrun-worktree=<id>`).
+`Rbrun::DeployRunner` clones the **pushed** branch and runs kamal with the infra env — it injects **no**
+config and does **no** repo-prep. `DeployRunner.branch_pushed?(worktree)` is the enforcement predicate the
+`deploy` tool gates on.
 
-## 6. Skill — `app/skills/preview-deploy/`
+## 6. Skill — `app/skills/rails-kamal-deployment/`
 
-A DB-seeded skill (`SkillSeeder` from the `app/skills/<slug>/` source folder, per the skills design), carrying
-**curated example Dockerfiles** and a Kamal config template, plus step-by-step guidance driving the agent
-through: `provision_server → create_deploy_dns → prepare_deploy → deploy`, then `teardown_deploy` to reap.
+A DB-seeded skill (`SkillSeeder` from `app/skills/<slug>/`) — the agent's playbook. It teaches the agent to
+**kamal-ize a Rails repo**: inspect it, add a `Dockerfile` and `config/deploy.yml` (reading the `KAMAL_*`
+infra env) **if missing**, fix a stale `Gemfile.lock`, add a Postgres/MySQL accessory + `.kamal/secrets`,
+**commit + push**, then call `provision_server → create_deploy_dns → deploy`, poll `deploy_status`, and
+`teardown_deploy` when done. Carries `deploy.yml` / `.kamal/secrets` / Postgres / MySQL templates inline.
 
 ```
 app/skills/preview-deploy/

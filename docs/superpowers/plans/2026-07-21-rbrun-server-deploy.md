@@ -10,6 +10,25 @@
 
 **Design of record:** `docs/superpowers/specs/2026-07-21-rbrun-server-deploy-design.md`.
 
+## ⚠️ CORRECTED ARCHITECTURE (supersedes any drift in the tasks below)
+
+The division of labor is fixed (spec §0). **Do not blur it:**
+
+- **Agent + `rails-kamal-deployment` skill = repo prep.** The agent inspects the repo and, IF MISSING, adds
+  `Dockerfile` + `config/deploy.yml` (reading the `KAMAL_*` env), fixes `Gemfile.lock`, adds a DB accessory +
+  `.kamal/secrets`, then **commits + pushes**. The engine writes **no** repo files.
+- **Engine = infra + enforcement.** provision · dns · expose the `KAMAL_*` env · clone the **pushed** branch ·
+  run kamal. `deploy` **blocks unless the branch is committed + pushed** (`DeployRunner.branch_pushed?`).
+  `DeployRunner` does **no** config injection and **no** repo-prep. Version = commit sha.
+- **Tools are SIX:** `provision_server`, `create_deploy_dns`, `deploy` (gated + push-enforced), `deploy_status`,
+  `deploy_logs`, `teardown_deploy`. **Removed:** `prepare_deploy` (agent writes the files) and `save_deploy_tag`
+  (the sha IS the tag). **Removed service:** `DeployScaffold`.
+- **SSH keys are per-deployment, ours:** `DeployKeys.ensure!` generates + stores the keypair on `DeployTarget`;
+  the adapter takes keys per call (not config).
+- **Skill folder is `app/skills/rails-kamal-deployment/`** (replaces `preview-deploy`).
+- **Proof = a real agent turn**, not a synthetic rake dogfood: the agent (skill-guided) preps `DOGFOOD_APP_REPO`,
+  commits+pushes, and drives the tools to a live URL.
+
 ## Global Constraints
 
 Every task's requirements implicitly include these (verbatim from CLAUDE.md invariants + the spec):

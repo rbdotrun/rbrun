@@ -25,6 +25,7 @@ Every task's requirements implicitly include these project-wide rules (verbatim 
 ## File Structure
 
 **Created:**
+
 - `lib/rbrun/config.rb` — `Rbrun::Config` (flat knobs, `<family>_provider` hashes, repeatable `c.user`, tenancy) + `Rbrun.configure` / `Rbrun.config` / `Rbrun.reset_config!`.
 - `lib/rbrun/resolver.rb` — `Rbrun::ConfigError` + `Rbrun.build(family_module, providers_config, provider:, **opts)` (the config-aware constructor mechanism).
 - `lib/tasks/rbrun/dogfood/support.rb` — `Rbrun::Dogfood` output helpers (`ok`, `info`, `header`).
@@ -34,6 +35,7 @@ Every task's requirements implicitly include these project-wide rules (verbatim 
 - `gems/.keep` — establish the monorepo sub-gems directory.
 
 **Modified:**
+
 - `lib/rbrun.rb` — require `rbrun/config` and `rbrun/resolver`.
 - `Gemfile` — glob path-based sub-gems from `gems/*/*.gemspec` (no-op until gems exist).
 
@@ -42,11 +44,13 @@ Every task's requirements implicitly include these project-wide rules (verbatim 
 ### Task 1: Configuration object — `Rbrun::Config` + `Rbrun.configure`
 
 **Files:**
+
 - Create: `lib/rbrun/config.rb`
 - Modify: `lib/rbrun.rb`
 - Test: `test/rbrun/config_test.rb`
 
 **Interfaces:**
+
 - Produces:
   - `Rbrun.config → Rbrun::Config` (memoized singleton)
   - `Rbrun.configure { |c| … } → Rbrun::Config` (yields the singleton, returns it)
@@ -208,11 +212,13 @@ git commit -m "feat(config): Rbrun.configure kernel — flat knobs, users, <fami
 ### Task 2: Config-aware constructor — `Rbrun.build` + `Rbrun::ConfigError`
 
 **Files:**
+
 - Create: `lib/rbrun/resolver.rb`
 - Modify: `lib/rbrun.rb`
 - Test: `test/rbrun/resolver_test.rb`
 
 **Interfaces:**
+
 - Consumes: `Rbrun::Config` provider hashes from Task 1 (shape `{ default: :name, name: {…} }`).
 - Produces:
   - `Rbrun::ConfigError < StandardError`
@@ -353,10 +359,12 @@ git commit -m "feat(config): Rbrun.build config-aware constructor + ConfigError 
 ### Task 3: Monorepo sub-gems wiring
 
 **Files:**
+
 - Create: `gems/.keep`
 - Modify: `Gemfile`
 
 **Interfaces:**
+
 - Produces: the `gems/` directory and a Gemfile glob that auto-includes any `gems/<name>/<name>.gemspec` as a path gem. No gems exist yet, so the glob resolves to nothing (a safe no-op) until Phase 2 adds `rbrun-sandbox`.
 
 - [ ] **Step 1: Create the sub-gems directory**
@@ -394,10 +402,12 @@ git commit -m "chore: monorepo gems/ dir + path-gem glob for future sub-gems"
 ### Task 4: Dogfood spine + Phase 1 dogfood scenario
 
 **Files:**
+
 - Create: `lib/tasks/rbrun/dogfood/support.rb`
 - Create: `lib/tasks/rbrun/dogfood/config.rake`
 
 **Interfaces:**
+
 - Consumes: `Rbrun.configure`, `Rbrun.config`, `Rbrun.reset_config!` (Task 1); `Rbrun.build`, `Rbrun::ConfigError` (Task 2).
 - Produces:
   - `Rbrun::Dogfood.ok(label, cond) → Boolean` (prints `✓`/`✗ label`), `Rbrun::Dogfood.info(key, val)`, `Rbrun::Dogfood.header(text)` — shared by every future dogfood scenario.
@@ -541,6 +551,7 @@ git commit -m "feat(dogfood): support spine + dogfood:config — Phase 1 accepta
 ## Self-Review
 
 **1. Spec coverage (Phase 1 contract):**
+
 - Monorepo layout (`gems/` path-deps, gemspec wiring) → Task 3. ✓
 - `Rbrun.configure` DSL: flat knobs → Task 1; `<family>_provider` hash primitive → Task 1; reserved `default:` → enforced in `Rbrun.build`, Task 2; repeatable `c.user` → Task 1. ✓
 - Config-aware constructor pattern (constant lookup + config injection) → `Rbrun.build`, Task 2. (Family-specific wrappers `Rbrun.sandbox`/`Rbrun.runtime` are deferred to their gems' phases by design — they are one-line calls to `Rbrun.build`.) ✓

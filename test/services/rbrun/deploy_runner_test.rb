@@ -10,12 +10,11 @@ module Rbrun
                                 image: "ubuntu-24.04", host: "w.rb.run", server_ip: "9.9.9.9", status: "provisioned")
     end
 
-    # A fake server adapter (injected — no global stubbing).
+    # A fake server adapter (injected — no global stubbing). The engine writes NO repo files: the checkout is
+    # whatever the agent pushed. The fake just records the infra args it was handed.
     def fake_server(ok:, output:)
       srv = Object.new
       srv.define_singleton_method(:deploy) do |work_dir:, host:, server_ip:, ssh_private_key:, env:|
-        # our config was injected into the checkout before deploy
-        raise "deploy.yml not injected" unless File.exist?(File.join(work_dir, "config", "deploy.yml"))
         Rbrun::Server::DeployResult.new(ok: ok, output: output)
       end
       srv
@@ -23,9 +22,7 @@ module Rbrun
 
     def runner_with(server)
       r = DeployRunner.new(worktree: @wt, server: server)
-      r.define_singleton_method(:with_checkout) do |&blk|
-        Dir.mktmpdir("rbrun-test-") { |d| blk.call(d, "abc123def4567") }
-      end
+      r.define_singleton_method(:with_checkout) { |&blk| blk.call("/tmp/checkout", "abc123def4567") }
       r
     end
 

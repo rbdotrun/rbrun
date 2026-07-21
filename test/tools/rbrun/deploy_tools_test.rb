@@ -63,19 +63,31 @@ module Rbrun
       end
     end
 
-    test "save_deploy_tag records the tag" do
-      target!
-      Rbrun::Tools::SaveDeployTag.in_session(@session).execute(tag: "v2")
-      assert_equal "v2", @wt.reload.deploy_target.deploy_tag
+    # Temporarily override a class method (no minitest/mock in minitest 6).
+    def with_branch_pushed(pushed)
+      original = Rbrun::DeployRunner.method(:branch_pushed?)
+      Rbrun::DeployRunner.define_singleton_method(:branch_pushed?) { |_wt| pushed }
+      yield
+    ensure
+      Rbrun::DeployRunner.define_singleton_method(:branch_pushed?, original)
     end
 
-    test "deploy enqueues DeployJob and marks the target deploying" do
+    test "deploy enqueues DeployJob and marks deploying when the branch is pushed" do
       target!(server_ip: "9.9.9.9", status: "provisioned")
-      assert_enqueued_with(job: Rbrun::DeployJob, args: [ @wt.id ]) do
-        data = Rbrun::Tools::Deploy.in_session(@session).execute["data"]
-        assert_equal "deploying", data["status"]
+      with_branch_pushed(true) do
+        assert_enqueued_with(job: Rbrun::DeployJob, args: [ @wt.id ]) do
+          data = Rbrun::Tools::Deploy.in_session(@session).execute["data"]
+          assert_equal "deploying", data["status"]
+        end
       end
       assert_equal "deploying", @wt.reload.deploy_target.status
+    end
+
+    test "deploy refuses when the branch is not committed + pushed" do
+      target!(server_ip: "9.9.9.9", status: "provisioned")
+      with_branch_pushed(false) do
+        assert_match(/commit \+ push/, Rbrun::Tools::Deploy.in_session(@session).execute["error"].to_s)
+      end
     end
 
     test "teardown_deploy destroys the server + removes dns and marks torn_down" do
@@ -96,7 +108,7 @@ module Rbrun
 
     test "tools error cleanly before a target/server exists" do
       assert_match(/provision/, Rbrun::Tools::CreateDeployDns.in_session(@session).execute["error"].to_s)
-      assert_match(/provision/, Rbrun::Tools::SaveDeployTag.in_session(@session).execute(tag: "x")["error"].to_s)
+      assert_match(/provision/, Rbrun::Tools::Deploy.in_session(@session).execute["error"].to_s)
     end
   end
 end
