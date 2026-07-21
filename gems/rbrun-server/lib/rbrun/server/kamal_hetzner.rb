@@ -76,6 +76,7 @@ module Rbrun
       # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
       # the server IP + registry creds from the child env; the ssh private key authenticates the deploy.
       def deploy(work_dir:, host:, server_ip:, ssh_private_key:, env: {})
+        forget_host_key(server_ip)
         with_key_file(ssh_private_key) do |key_path|
           child = kamal_env(server_ip: server_ip, key_path: key_path, host: host).merge(env.transform_keys(&:to_s))
           output, ok = run_kamal([ "deploy" ], env: child, chdir: work_dir)
@@ -85,6 +86,7 @@ module Rbrun
 
       # The deployed app's container logs from the server, via Kamal. @return [String]
       def app_logs(work_dir:, server_ip:, ssh_private_key:, tail: 100)
+        forget_host_key(server_ip)
         with_key_file(ssh_private_key) do |key_path|
           output, _ok = run_kamal([ "app", "logs", "-n", tail.to_s ],
                                   env: kamal_env(server_ip: server_ip, key_path: key_path), chdir: work_dir)
@@ -147,6 +149,20 @@ module Rbrun
       def run_kamal(argv, env:, chdir:)
         out, status = Open3.capture2e(env, "kamal", *argv, chdir: chdir)
         [ out, status.success? ]
+      end
+
+      # Hetzner recycles IPs: a box we tore down and a freshly-provisioned one can land on the same IP, so a
+      # known_hosts entry from a PRIOR deploy makes kamal's Net::SSH raise HostKeyMismatch (it accepts new
+      # hosts but rejects changed keys). The box is ephemeral and provisioned by us seconds ago, so forget any
+      # prior key for this IP — the fresh key is then accepted as a new host. This mirrors the
+      # StrictHostKeyChecking=no our own SSH (DeployRunner#ssh_ready?/exec_on_box) already uses; kamal is the
+      # one deploy path that verifies. Best-effort: a missing known_hosts / no ssh-keygen must not block deploy.
+      def forget_host_key(server_ip)
+        return if server_ip.to_s.empty?
+
+        Open3.capture2e("ssh-keygen", "-R", server_ip.to_s)
+      rescue StandardError
+        nil
       end
 
       # Find-or-create the server's ssh key in the project (keyed by the server name, so each deployment has

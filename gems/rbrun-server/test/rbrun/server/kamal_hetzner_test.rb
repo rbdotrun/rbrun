@@ -77,6 +77,7 @@ class KamalHetznerTest < Minitest::Test
       captured[:key] = File.read(env["KAMAL_SSH_KEY_FILE"]) # the key file exists for the command's duration
       [ "Deployed w-1", true ]
     end
+    adp.define_singleton_method(:forget_host_key) { |ip| captured[:forgot] = ip } # don't touch real known_hosts
 
     result = adp.deploy(work_dir: "/work/w-1", host: "w1.rb.run", server_ip: "1.1.1.1", ssh_private_key: PRIV)
     assert result.ok
@@ -86,6 +87,8 @@ class KamalHetznerTest < Minitest::Test
     assert_equal "1.1.1.1", captured[:env]["KAMAL_SERVER_IP"]
     assert_equal "w1.rb.run", captured[:env]["KAMAL_HOST"]
     assert_equal PRIV, captured[:key]
+    # Recycled-IP guard: the stale host key is forgotten before kamal SSHes in (else Net::SSH mismatch).
+    assert_equal "1.1.1.1", captured[:forgot]
   end
 
   def test_app_logs_shells_kamal_app_logs
@@ -95,6 +98,7 @@ class KamalHetznerTest < Minitest::Test
       captured[:argv] = argv; captured[:env] = env
       [ "line1\nline2", true ]
     end
+    adp.define_singleton_method(:forget_host_key) { |ip| captured[:forgot] = ip } # don't touch real known_hosts
 
     out = adp.app_logs(work_dir: "/work/w-1", server_ip: "1.1.1.1", ssh_private_key: PRIV, tail: 50)
     assert_equal "line1\nline2", out
