@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_170000) do
   create_table "rbrun_commits", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -21,6 +21,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
     t.index ["session_id"], name: "index_rbrun_commits_on_session_id"
     t.index ["worktree_id", "sha"], name: "index_rbrun_commits_on_worktree_id_and_sha", unique: true
     t.index ["worktree_id"], name: "index_rbrun_commits_on_worktree_id"
+  end
+
+  create_table "rbrun_deploy_targets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "deploy_tag"
+    t.string "deployed_sha"
+    t.string "host", null: false
+    t.string "image", null: false
+    t.text "last_deploy_log"
+    t.string "provider", null: false
+    t.string "region", null: false
+    t.string "server_id"
+    t.string "server_ip"
+    t.string "server_type", null: false
+    t.text "ssh_private_key"
+    t.text "ssh_public_key"
+    t.string "status", default: "pending", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.integer "worktree_id", null: false
+    t.index ["worktree_id"], name: "index_rbrun_deploy_targets_on_worktree_id", unique: true
   end
 
   create_table "rbrun_mcp_servers", force: :cascade do |t|
@@ -52,52 +73,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
     t.index ["tenant", "repo", "key"], name: "idx_rbrun_repo_secrets_uniq", unique: true
   end
 
-  create_table "rbrun_repo_services", force: :cascade do |t|
-    t.string "command", null: false
-    t.datetime "created_at", null: false
-    t.string "name", null: false
-    t.integer "port"
-    t.integer "position", default: 0, null: false
-    t.string "repo", null: false
-    t.string "tenant", null: false
-    t.datetime "updated_at", null: false
-    t.index ["tenant", "repo", "name"], name: "idx_rbrun_repo_services_uniq", unique: true
-  end
-
-  create_table "rbrun_service_exposures", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "edge_url"
-    t.string "name", null: false
-    t.string "preview_token"
-    t.boolean "previewed", default: false, null: false
-    t.boolean "shared_public", default: false, null: false
-    t.string "tenant", null: false
-    t.datetime "updated_at", null: false
-    t.integer "worktree_id", null: false
-    t.index ["preview_token"], name: "index_rbrun_service_exposures_on_preview_token", unique: true
-    t.index ["worktree_id", "name"], name: "index_rbrun_service_exposures_on_worktree_id_and_name", unique: true
-    t.index ["worktree_id"], name: "index_rbrun_service_exposures_on_worktree_id"
-  end
-
-  create_table "rbrun_service_runs", force: :cascade do |t|
-    t.string "cmd_id"
-    t.string "command", null: false
-    t.datetime "created_at", null: false
-    t.integer "exit_code"
-    t.integer "log_offset", default: 0, null: false
-    t.string "name", null: false
-    t.integer "port"
-    t.string "process_session"
-    t.string "status", default: "starting", null: false
-    t.string "tenant", null: false
-    t.string "token"
-    t.datetime "updated_at", null: false
-    t.string "url"
-    t.integer "worktree_id", null: false
-    t.index ["worktree_id", "name"], name: "index_rbrun_service_runs_on_worktree_id_and_name", unique: true
-    t.index ["worktree_id"], name: "index_rbrun_service_runs_on_worktree_id"
-  end
-
   create_table "rbrun_session_messages", force: :cascade do |t|
     t.string "approval_status"
     t.text "content"
@@ -113,6 +88,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
     t.index ["session_id", "approval_status"], name: "idx_rbrun_msgs_pending", where: "approval_status IS NOT NULL"
     t.index ["session_id"], name: "index_rbrun_session_messages_on_session_id"
     t.index ["tool_use_id"], name: "index_rbrun_session_messages_on_tool_use_id"
+  end
+
+  create_table "rbrun_session_snapshots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.binary "data", null: false
+    t.integer "session_id", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.index ["session_id"], name: "idx_rbrun_session_snapshots_uniq", unique: true
   end
 
   create_table "rbrun_sessions", force: :cascade do |t|
@@ -194,6 +178,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
   end
 
   create_table "rbrun_worktrees", force: :cascade do |t|
+    t.datetime "archived_at"
     t.string "base", default: "main", null: false
     t.string "branch", null: false
     t.datetime "created_at", null: false
@@ -206,9 +191,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_230000) do
 
   add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
-  add_foreign_key "rbrun_service_exposures", "rbrun_worktrees", column: "worktree_id"
-  add_foreign_key "rbrun_service_runs", "rbrun_worktrees", column: "worktree_id"
+  add_foreign_key "rbrun_deploy_targets", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_session_messages", "rbrun_sessions", column: "session_id"
+  add_foreign_key "rbrun_session_snapshots", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_sessions", "rbrun_workflows", column: "workflow_id"
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"

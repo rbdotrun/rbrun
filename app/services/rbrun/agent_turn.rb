@@ -36,10 +36,12 @@ module Rbrun
 
     def call_client(prompt)
       runtime = @runtime || Rbrun.runtime(tenant: @session.tenant, sandbox: @session.sandbox)
+      # Reconstruct .claude history on a fresh/lost box BEFORE resume — the turn survives box loss.
+      Rbrun::ClaudeSnapshot.new(@session).restore_if_lost!
       skills_dir = materialize_skills
       runtime.run(
         prompt: prompt,
-        system: [ Rbrun.config(@session.tenant).system_prompt, Rbrun::ServiceConventions::PROMPT ].join("\n\n"),
+        system: Rbrun.config(@session.tenant).system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
         skills: skills_dir,
         mcp: materialize_mcp,
@@ -49,6 +51,8 @@ module Rbrun
       )
     ensure
       FileUtils.remove_entry(skills_dir) if skills_dir && Dir.exist?(skills_dir)
+      # Snapshot .claude AFTER the turn (best-effort, sync) so the snapshot lands before any reap.
+      Rbrun::ClaudeSnapshot.new(@session).capture!
     end
 
     # Resolve this turn's external MCP servers (resolver if set, else the tenant's enabled DB rows),

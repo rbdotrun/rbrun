@@ -11,6 +11,9 @@ module Rbrun
              class_name: "Rbrun::SessionMessage", dependent: :destroy
     has_many :commits, class_name: "Rbrun::Commit", dependent: :nullify
 
+    # The durable .claude-history snapshot that makes this session's turns idempotent (see ClaudeSnapshot).
+    has_one :snapshot, class_name: "Rbrun::SessionSnapshot", dependent: :destroy
+
     belongs_to :workflow, class_name: "Rbrun::Workflow", optional: true
     has_many :workflow_step_completions, class_name: "Rbrun::WorkflowStepCompletion", dependent: :destroy
 

@@ -26,6 +26,10 @@ module Rbrun
         TOOLBOX = "https://proxy.app.daytona.io/toolbox"
         AUTO_STOP_MINUTES = 5
         START_TIMEOUT = 90
+        # A box can vanish while starting (Daytona destroys it server-side mid-start) — a transient
+        # failure, not a dead end. Discard it and create a fresh one, bounded. Only vanish is retried:
+        # a box STUCK at a state is a real problem (e.g. a bad snapshot), and retrying wastes the timeout.
+        CREATE_ATTEMPTS = 3
 
         # Snapshot defaults — all overridable via config. The agent box is a SELF-BUILT Daytona
         # snapshot, built server-side from a Dockerfile STRING (POST /snapshots), content-addressed by
@@ -68,10 +72,19 @@ module Rbrun
         # The box for these labels, up and reachable. LABELS, NOT AN ID — we store nothing; the label
         # is the address. Nothing to go stale, so nothing to heal.
         def find_or_create(labels)
-          box = find_by_labels(labels) || create_sandbox(labels)
-          return box if box["state"].to_s == "started"
+          attempt = 0
+          begin
+            box = find_by_labels(labels) || create_sandbox(labels)
+            return box if box["state"].to_s == "started"
 
-          await_started(box["id"])
+            await_started(box["id"])
+          rescue Error => e
+            attempt += 1
+            raise if attempt >= CREATE_ATTEMPTS || !e.message.include?("vanished while starting")
+
+            sleep attempt # brief backoff; the vanished box 404s, so the retry creates a fresh one
+            retry
+          end
         end
 
         # ── snapshot (the box's image, built server-side from config[:dockerfile]) ──────────────
@@ -167,14 +180,6 @@ module Rbrun
         end
 
         def download(id, path) = request(:get, "#{TOOLBOX}/#{id}/files/download", params: { "path" => path }).body.to_s
-
-        # The public preview for a port on this box → { "url", "token" }. Endpoint + field names verified
-        # live in the preview_daytona dogfood (the one unverified wire in this feature).
-        def preview_link(id, port) = get("#{@api_url}/sandbox/#{id}/ports/#{port}/preview-url")
-
-        # Drop / restore the auth requirement on this box's preview URLs. NOTE: Daytona expresses this
-        # per SANDBOX, not per port — see Rbrun::Sandbox::Daytona#set_public.
-        def set_public(id, enabled) = post("#{@api_url}/sandbox/#{id}/public/#{enabled ? "true" : "false"}")
 
         # ── process sessions ───────────────────────────────────────────
         def create_session(id, session_id)

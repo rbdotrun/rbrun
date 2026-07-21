@@ -18,4 +18,17 @@ class DnsTest < Minitest::Test
     assert_equal "a.rb.run", r.name
     assert r.proxied
   end
+
+  # Every adapter must respect the Rbrun::Dns::Base interface.
+  def test_cloudflare_implements_the_base_interface
+    assert_operator Rbrun::Dns::Cloudflare, :<, Rbrun::Dns::Base
+  end
+
+  def test_base_methods_are_unimplemented_until_an_adapter_overrides_them
+    base = Rbrun::Dns::Base.new
+    assert_raises(NotImplementedError) { base.find(name: "a.rb.run") }
+    assert_raises(NotImplementedError) { base.list }
+    assert_raises(NotImplementedError) { base.upsert(name: "a.rb.run", type: "A", content: "1.2.3.4") }
+    assert_raises(NotImplementedError) { base.remove(name: "a.rb.run") }
+  end
 end

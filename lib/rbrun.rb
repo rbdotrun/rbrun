@@ -22,6 +22,11 @@ module Rbrun
       build(Rbrun::Dns, config(tenant).dns_provider, provider: provider, **opts)
     end
 
+    def server(provider = nil, tenant: nil, **opts)
+      require "rbrun/server"
+      build(Rbrun::Server, config(tenant).server_provider, provider: provider, **opts)
+    end
+
     # The tool roster: engine built-ins + host-registered tools. ApplicationTool.manifest/find read it.
     def tools = @tools ||= []
 
@@ -29,12 +34,6 @@ module Rbrun
       tools << klass unless tools.include?(klass)
       klass
     end
-
-    # Optional host-owned preview edge (set-once DI, the SaaS seam). When set, the host app owns the
-    # preview data path: the engine creates NO DNS record and serves NO proxy — it asks this object to
-    # #expose(service_run) → url and #revoke(service_run). When unset (self-host), the engine owns the
-    # edge itself. Wired in Task 6; present here so PreviewDomain/the proxy can probe it.
-    attr_accessor :preview_edge
 
     # Host-set resolver → the acting tenant slug (used when built-in auth is off). Defaults to the
     # single-tenant slug.

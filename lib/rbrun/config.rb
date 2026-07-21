@@ -10,8 +10,7 @@ module Rbrun
     MCP_AUTHS = %i[api_key bearer oauth].freeze
 
     attr_accessor :database_connection, :subprocess_timeout, :github_pat, :tenancy_key, :system_prompt,
-                  :auth_managed_at_runtime, :skills_path,
-                  :preview_domain, :preview_target, :preview_max_sockets
+                  :auth_managed_at_runtime, :skills_path, :preview_domain
     attr_reader :users, :skills, :mcp_servers
 
     def initialize
@@ -21,12 +20,7 @@ module Rbrun
       @tenancy_key             = "tenant"
       @auth_managed_at_runtime = false
       @skills_path             = nil
-      @preview_domain          = nil # e.g. "rb.run"; hosts are <token>-preview.<preview_domain>. nil ⇒ previews off.
-      @preview_target          = nil # THE RBRUN APP'S OWN PUBLIC ORIGIN (e.g. "app.example.com") — each
-                                     # <token>-preview host CNAMEs here so requests land back on this app,
-                                     # whose PreviewProxy relays them into the sandbox. NEVER a tunnel: the
-                                     # app is already public, so previews need no new ingress, only DNS.
-      @preview_max_sockets     = 5   # concurrent hijacked WebSocket upgrades (Puma pins a thread each)
+      @preview_domain          = nil # e.g. "rb.run" — the domain deployed hosts live under (rbrun-w<id>.<preview_domain>)
       @users                   = []
       @skills                  = []
       @mcp_servers             = []

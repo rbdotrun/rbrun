@@ -15,13 +15,10 @@ module Rbrun
       @session = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b").sessions.create!
     end
 
-    test "the turn's system prompt carries the host prompt AND the repo-services convention" do
+    test "the turn's system prompt is the host prompt" do
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
-      assert_includes runtime.system, Rbrun.config(@session.tenant).system_prompt.strip
-      assert_includes runtime.system, "repo_services_start"
-      assert_includes runtime.system, "NEVER a raw `&`" # the anti-backgrounding instruction
-      assert_includes runtime.system, "request_secrets"
+      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
     end
   end
 end

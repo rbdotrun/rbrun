@@ -13,6 +13,7 @@ PATH
       rails (>= 8.1.3)
       redcarpet
       ruby_llm
+      sshkey (~> 3.0)
       stimulus-rails
       tailwind_merge
       turbo-rails
@@ -43,6 +44,16 @@ PATH
       async-http-faraday (>= 0.12)
       faraday (~> 2.0)
       faraday-multipart (~> 1.0)
+
+PATH
+  remote: gems/rbrun-server
+  specs:
+    rbrun-server (0.1.0)
+      async (>= 2.0)
+      async-http (>= 0.60)
+      async-http-faraday (>= 0.12)
+      faraday (~> 2.0)
+      kamal (>= 2.0)
 
 GEM
   remote: https://rubygems.org/
@@ -148,6 +159,7 @@ GEM
       async (>= 2.0)
     base64 (0.3.0)
     bcrypt (3.1.22)
+    bcrypt_pbkdf (1.1.2)
     bigdecimal (4.1.2)
     builder (3.3.0)
     capybara (3.40.0)
@@ -173,8 +185,10 @@ GEM
       capybara (~> 3.0)
       ferrum (~> 0.17.0)
     date (3.5.1)
+    dotenv (3.2.0)
     drb (2.2.3)
     dry-initializer (3.2.0)
+    ed25519 (1.4.0)
     erb (6.0.5)
     erubi (1.13.1)
     event_stream_parser (1.0.0)
@@ -214,6 +228,17 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.21.1)
+    kamal (2.12.0)
+      activesupport (>= 7.0)
+      base64 (~> 0.2)
+      bcrypt_pbkdf (~> 1.0)
+      concurrent-ruby (~> 1.2)
+      dotenv (~> 3.1)
+      ed25519 (~> 1.4)
+      net-ssh (~> 7.3)
+      sshkit (>= 1.23.0, < 2.0)
+      thor (~> 1.3)
+      zeitwerk (>= 2.6.18, < 3.0)
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
     logger (1.7.0)
@@ -246,14 +271,18 @@ GEM
       net-protocol
     net-protocol (0.2.2)
       timeout
+    net-scp (4.1.0)
+      net-ssh (>= 2.6.5, < 8.0.0)
+    net-sftp (4.0.0)
+      net-ssh (>= 5.0.0, < 8.0.0)
     net-smtp (0.5.1)
       net-protocol
+    net-ssh (7.3.3)
     nio4r (2.7.5)
     nokogiri (1.19.4-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.4-x86_64-linux-gnu)
-      racc (~> 1.4)
     openssl (4.0.2)
+    ostruct (0.6.3)
     parallel (2.1.0)
     parser (3.3.11.1)
       ast (~> 2.4.1)
@@ -376,7 +405,14 @@ GEM
     securerandom (0.4.1)
     sin_lru_redux (2.5.2)
     sqlite3 (2.9.5-arm64-darwin)
-    sqlite3 (2.9.5-x86_64-linux-gnu)
+    sshkey (3.0.0)
+    sshkit (1.25.0)
+      base64
+      logger
+      net-scp (>= 1.1.2)
+      net-sftp (>= 2.1.2)
+      net-ssh (>= 2.8.0)
+      ostruct
     stimulus-rails (1.3.4)
       railties (>= 6.0.0)
     tailwind_merge (1.5.2)
@@ -417,7 +453,6 @@ GEM
 
 PLATFORMS
   arm64-darwin
-  x86_64-linux
 
 DEPENDENCIES
   capybara
@@ -428,6 +463,7 @@ DEPENDENCIES
   rbrun-dns!
   rbrun-runtime!
   rbrun-sandbox!
+  rbrun-server!
   rubocop-rails-omakase
   sqlite3
   webmock

@@ -32,25 +32,6 @@ module Rbrun
 
       def workspace = WORKSPACE
 
-      # Preview capability: the box's public preview for a port, via Daytona's proxy. Returns a
-      # PreviewLink { url, token }; token authorizes a private port. The exact wire (endpoint + field
-      # names) is verified live in the preview_daytona dogfood.
-      def preview_url(port)
-        raw = @client.preview_link(id, port)
-        PreviewLink.new(url: raw["url"], token: raw["token"])
-      end
-
-      # OPTIONAL CAPABILITY: drop the auth requirement so anyone with a preview URL can reach it.
-      #
-      # GRANULARITY CAVEAT: Daytona expresses this per SANDBOX, not per port. Every port on this box
-      # gets its preview URL unauthenticated, each at its own `<port>-<sandboxId>` host. The caller's
-      # per-service intent cannot be enforced here — it degrades to box-wide at this boundary. A
-      # provider offering per-port control would implement this method with the port honoured.
-      def set_public(enabled)
-        @client.set_public(id, enabled)
-        enabled
-      end
-
       def exec(command, timeout: 60)
         raw = @client.exec(id, command, timeout: timeout)
         ExecResult.new(exit_code: raw["exitCode"].to_i, stdout: raw["result"].to_s, stderr: "")
