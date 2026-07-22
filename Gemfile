@@ -12,6 +12,11 @@ gem "propshaft"
 # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
 gem "rubocop-rails-omakase", require: false
 
+# Loads the repo-root .env in development (see test/dummy/config/initializers/dotenv.rb). Dev-only: real
+# provider creds live there, so it must never load during tests (would flip the dummy initializer onto
+# live providers and break the offline suite).
+gem "dotenv", group: :development
+
 # Headless-browser driver for the Phase 8 browser dogfood (pure Chrome DevTools Protocol via ferrum —
 # no webdriver binary, no selenium). Dev-only: drives the real mounted UI, never shipped in the gem.
 gem "capybara", require: false

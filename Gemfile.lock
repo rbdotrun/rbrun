@@ -457,6 +457,7 @@ PLATFORMS
 DEPENDENCIES
   capybara
   cuprite
+  dotenv
   propshaft
   puma
   rbrun!
