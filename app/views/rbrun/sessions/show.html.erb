@@ -1,3 +1,7 @@
-<div class="h-full">
-  <%= render(Rbrun::Sessions::Default::Component.new(session: @session)) %>
-</div>
+<%# The conversation owns its full-height layout (scrolling timeline + pinned composer), so it fills a
+    :bleed page whose body self-manages scroll. No header — the conversation's composer is its footer. %>
+<%= preset("page", variant: :bleed) do |p| %>
+  <% p.with_body do %>
+    <%= render(Rbrun::Sessions::Default::Component.new(session: @session)) %>
+  <% end %>
+<% end %>

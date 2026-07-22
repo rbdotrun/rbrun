@@ -1,37 +1,10 @@
-<%# The repo workspace switcher: the dropdown shell hosting a command-menu — a search input
-    (debounced → GitHub search server-side) + a Turbo frame of results. Face = current_repo, or
-    "Select a repository" when none is chosen. %>
-<div id="repo_switcher" data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
-  <%= component("dropdown", placement: :bottom_start, trigger_class: "block w-full", panel_class: "w-64 p-0") do |d| %>
-    <% d.with_trigger do %>
-      <button type="button"
-              class="flex w-full items-center gap-2 rounded-md border bg-white px-2 py-1.5 text-left text-sm shadow-xs transition-colors hover:bg-slate-50 group-data-[collapsed]/sidebar:pl-[7px]">
-        <span id="repo_label" class="contents">
-          <% if current_repo %>
-            <span class="flex size-6 shrink-0 items-center justify-center rounded bg-slate-900 text-[10px] font-semibold text-white"><%= current_repo.split("/").last.to_s[0, 2].upcase %></span>
-            <span class="flex-1 truncate font-medium text-slate-800 group-data-[collapsed]/sidebar:opacity-0"><%= current_repo %></span>
-          <% else %>
-            <span class="flex size-6 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-400"><%= lucide_icon("github", class: "size-3.5") %></span>
-            <span class="flex-1 truncate text-slate-500 group-data-[collapsed]/sidebar:opacity-0">Select a repository</span>
-          <% end %>
-        </span>
-        <%= lucide_icon("chevrons-up-down", class: "size-4 shrink-0 text-slate-400 group-data-[collapsed]/sidebar:opacity-0") %>
-      </button>
-    <% end %>
-
-    <% d.with_panel do %>
-      <div class="flex h-9 items-center gap-2 border-b px-3">
-        <%= lucide_icon("search", class: "size-4 shrink-0 text-slate-400") %>
-        <input type="text" placeholder="Search repositories…" autocomplete="off"
-               data-command-target="input" data-action="input->command#search"
-               class="h-9 w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none">
-      </div>
-      <div class="max-h-72 overflow-y-auto p-1">
-        <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: "lazy",
-              data: { command_target: "frame" } do %>
-          <p class="px-3 py-6 text-center text-sm text-slate-400">Loading…</p>
-        <% end %>
-      </div>
-    <% end %>
-  <% end %>
+<%# TEMP stub — the repo switcher is being rebuilt on a real Dialog primitive (ported from ../insitix).
+    Slot kept so the sidebar layout is intact; nothing fetches. %>
+<div id="repo_switcher">
+  <button type="button" disabled
+          class="flex w-full items-center gap-2 rounded-md border bg-white px-2 py-1.5 text-left text-sm shadow-xs group-data-[collapsed]/sidebar:pl-[7px]">
+    <span class="flex size-6 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-400"><%= lucide_icon("github", class: "size-3.5") %></span>
+    <span class="flex-1 truncate text-slate-400 group-data-[collapsed]/sidebar:opacity-0">Select a repository</span>
+    <%= lucide_icon("chevrons-up-down", class: "size-4 shrink-0 text-slate-400 group-data-[collapsed]/sidebar:opacity-0") %>
+  </button>
 </div>

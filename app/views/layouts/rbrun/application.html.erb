@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html class="app-shell">
 <head>
   <title>rbrun</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
   <%= stylesheet_link_tag "rbrun/rbrun", "data-turbo-track": "reload" %>
   <%= javascript_include_tag "rbrun/rbrun", type: "module", "data-turbo-track": "reload" %>
 </head>
-<body class="h-screen bg-white text-slate-900">
-  <div class="flex h-full min-h-0 w-full min-w-0">
+<body class="app-shell">
+  <div class="w-full h-full min-w-0 min-h-0 flex">
     <%# The rail: w-64 ↔ w-16, collapse keyed off data-collapsed (cookie-persisted so the server
         renders the collapsed markup directly — no flash). data-ready gates the width transition. %>
     <div class="group/sidebar flex h-full w-64 flex-shrink-0 flex-col gap-3 overflow-hidden p-3 data-[collapsed]:w-16 data-[ready]:transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
@@ -42,9 +43,13 @@
       </div>
     </div>
 
-    <main class="min-h-0 min-w-0 flex-1 overflow-hidden"><%= yield %></main>
+    <main class="w-full h-full flex-shrink p-4 pl-1 overflow-hidden"><%= yield %></main>
   </div>
-  <%# Slot the service logs drawer replaces (Turbo Stream). %>
-  <div id="service_drawer"></div>
+  <%# The singleton modal + confirm shells — rendered once, driven by the `overlay` controller and
+      turbo_confirm.js. Any link with data: { turbo_frame: "modal" } loads into #modal; the overlay
+      controller opens the dialog when the frame gains content. %>
+  <%= component("dialog") %>
+  <%= component("confirm_dialog") %>
+  <%= component("drawer") %>
 </body>
 </html>

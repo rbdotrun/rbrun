@@ -6,7 +6,7 @@
       <% m.link repo.full_name, href: rbrun.switch_repo_path(repo: repo.full_name, base: repo.default_branch),
                 avatar: repo.full_name.split("/").last.to_s[0, 2].upcase,
                 active: (repo.full_name == current),
-                data: { turbo_method: :post } %>
+                data: { turbo_method: :post, turbo_frame: "_top" } %>
     <% end %>
   <% end %>
 <% else %>
