@@ -1,0 +1,38 @@
+<div class="flex flex-col gap-1.5">
+  <% if label %>
+    <span class="text-sm font-medium text-slate-700"><%= label %></span>
+  <% end %>
+
+  <%= tag.div(
+        class: "flex flex-col gap-2",
+        data: {
+          controller: "rich-text-area",
+          rich_text_area_content_value: value,
+          rich_text_area_placeholder_value: placeholder
+        }) do %>
+    <% if show_menubar %>
+      <div class="sticky flex items-center justify-between space-x-2 overflow-hidden rounded-lg bg-default-50 shadow-md shadow-default-100 ring-1 ring-default-200">
+        <div class="flex items-center divide-x divide-default-200">
+          <% tools.each do |t| %>
+            <%= tag.button(type: "button", class: button_class,
+                  data: { action: "rich-text-area#command", command: t[:command],
+                          rta_type: t[:type], level: t[:level] }) do %>
+              <%= lucide_icon(t[:icon], class: "size-3.5") %>
+            <% end %>
+          <% end %>
+          <%= tag.button(type: "button", class: button_class,
+                data: { action: "rich-text-area#link", rta_type: "link" }) do %>
+            <%= lucide_icon("link", class: "size-3.5") %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <%= tag.div("", data: { rich_text_area_target: "editor" }, class: editor_class, style: min_height) %>
+    <%= tag.input(type: "hidden", name: name, value: value, data: { rich_text_area_target: "input" }) %>
+  <% end %>
+
+  <% if error %>
+    <p class="text-xs text-red-600"><%= error %></p>
+  <% end %>
+</div>

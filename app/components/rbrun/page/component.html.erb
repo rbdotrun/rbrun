@@ -1,0 +1,37 @@
+<%# The card is a ROW, not a column: `side_panel` is a sibling of the page, beside it, sharing this one
+    border. (Two cards side by side would put two borders and a gap down the middle — the app has no
+    shadow, so that seam is all you would see.) With no panel the page column is flex-1 and fills the
+    card exactly as before. %>
+<div class="flex h-full min-h-0 rounded-lg border border-slate-200 bg-white"
+     <%= "data-controller=split-pane" if side_panel? %>>
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+    <%# ERB block form, not `{ actions }`: the helper forwards the block to `render`, which CAPTURES its
+        output — a block that merely returns the slot writes nothing to the buffer, and the actions vanish. %>
+    <%= custom("page_header", title: title, back: back) do %><%= actions %><% end %>
+
+    <%# Static strips below the header — tabs, filter toolbars. The page owns the divider + shrink;
+        the caller supplies only the inner content. %>
+    <% fixed_areas.each do |area| %>
+      <div class="flex-shrink-0 border-b border-slate-200"><%= area %></div>
+    <% end %>
+
+    <%# Body region. Scroll is declared by variant: bleed fills (body self-scrolls),
+        document/centered scroll here. %>
+    <div class="<%= class_names("flex min-h-0 flex-1 flex-col", ("overflow-y-auto" unless bleed?)) %>">
+      <% if centered? %>
+        <div class="mx-auto w-full max-w-3xl px-6 py-8"><%= body %></div>
+      <% else %>
+        <%= body %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# The second surface. It brings its own header and owns its own scroll; the page gives it half the
+      card, and the seam between them is the handle that resizes it. %>
+  <% if side_panel? %>
+    <div data-action="mousedown->split-pane#start"
+         class="relative w-px flex-shrink-0 cursor-col-resize bg-slate-200 transition-colors hover:bg-default-400
+                after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']"></div>
+    <div data-split-pane-target="panel" class="flex min-h-0 w-1/2 min-w-0 flex-col"><%= side_panel %></div>
+  <% end %>
+</div>

@@ -1,0 +1,36 @@
+<%# One box is the whole control: click anywhere (except clear) picks a file; drop works too. %>
+<div data-controller="single-upload"
+     data-single-upload-dragover-class="border-default-400 bg-default-50"
+     data-action="click->single-upload#trigger dragover->single-upload#dragover dragleave->single-upload#dragleave drop->single-upload#drop"
+     class="group flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 transition-colors duration-150 ease-out hover:bg-slate-100">
+  <div class="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
+    <img data-single-upload-target="preview" src="<%= preview_src %>" alt=""
+         class="absolute inset-0 size-full object-cover outline outline-1 -outline-offset-1 outline-black/10 <%= "hidden" unless image? %>">
+    <span data-single-upload-target="placeholder" class="text-slate-400 <%= "hidden" if image? %>">
+      <%= lucide_icon("image", class: "size-7") %>
+    </span>
+  </div>
+
+  <div class="min-w-0 flex-1">
+    <p class="text-sm font-medium text-slate-700"><%= label %></p>
+    <div class="mt-0.5 flex items-center gap-2">
+      <span data-single-upload-target="filename" data-default="<%= default_subtitle %>"
+            class="truncate text-sm text-slate-500"><%= filename %></span>
+      <button type="button" aria-label="Remove file"
+              data-single-upload-target="clear" data-action="single-upload#clear"
+              data-confirm="Remove this file?"
+              class="relative flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition after:absolute after:-inset-1 hover:text-red-600 hover:ring-red-200 active:scale-[0.96] motion-reduce:active:scale-100 <%= "hidden" unless attached? %>">
+        <%= lucide_icon("x", class: "size-3.5") %>
+      </button>
+    </div>
+    <% if hint %>
+      <p class="mt-0.5 text-xs text-slate-400"><%= hint %></p>
+    <% end %>
+  </div>
+
+  <input type="file" name="<%= name %>" accept="<%= accept %>" class="sr-only"
+         data-single-upload-target="input" data-action="change->single-upload#selected">
+  <% if remove_name %>
+    <input type="hidden" name="<%= remove_name %>" value="0" data-single-upload-target="removeInput">
+  <% end %>
+</div>

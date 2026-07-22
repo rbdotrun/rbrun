@@ -1,0 +1,26 @@
+<div class="flex flex-col gap-2.5"
+     data-controller="dropzone"
+     data-dropzone-dragover-class="border-default-400 bg-default-50"
+     data-action="dragover->dropzone#dragover dragleave->dropzone#dragleave drop->dropzone#drop">
+  <% if label %>
+    <span class="text-sm font-medium text-slate-700"><%= label %></span>
+  <% end %>
+  <%# One label wraps the whole zone so a click anywhere opens the picker; inner content is
+      pointer-events-none so drag events target the zone, not the text. %>
+  <label data-dropzone-target="zone"
+         class="group relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center transition-colors duration-150 ease-out hover:bg-slate-100">
+    <span class="pointer-events-none mb-1 flex size-10 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition-transform duration-150 ease-out group-hover:scale-105">
+      <%= lucide_icon("upload-cloud", class: "size-5") %>
+    </span>
+    <p class="pointer-events-none text-sm text-slate-600">
+      <span class="font-semibold text-default-600">Click to add</span> or drag and drop
+    </p>
+    <% if hint %>
+      <p class="pointer-events-none text-xs text-slate-400"><%= hint %></p>
+    <% end %>
+    <input type="file" name="<%= name %>" <%= "multiple" if multiple %> accept="<%= accept %>"
+           data-dropzone-target="input" data-action="change->dropzone#selected" class="sr-only">
+  </label>
+  <%# Client-side preview of files staged for the next save. %>
+  <ul data-dropzone-target="preview" hidden class="flex flex-wrap gap-1.5"></ul>
+</div>

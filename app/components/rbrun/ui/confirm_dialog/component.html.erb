@@ -1,0 +1,9 @@
+<dialog id="confirm-dialog" class="<%= classes %>">
+  <div class="flex flex-col gap-6 p-6">
+    <p class="text-sm text-slate-700" data-confirm-message></p>
+    <div class="flex justify-end gap-2.5">
+      <%= component("button", variant: :outline, size: :sm, data: { confirm_cancel: "" }) { "Cancel" } %>
+      <%= component("button", variant: :primary, size: :sm, data: { confirm_accept: "" }) { "Confirm" } %>
+    </div>
+  </div>
+</dialog>

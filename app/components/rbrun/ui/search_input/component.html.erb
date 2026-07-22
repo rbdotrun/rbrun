@@ -1,0 +1,11 @@
+<div id="<%= id %>" data-turbo-permanent class="relative min-w-56 flex-1" data-controller="search-bar">
+  <%= lucide_icon("search", class: "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400") %>
+  <input type="text" name="<%= name %>" value="<%= value %>" placeholder="<%= placeholder %>" autocomplete="off"
+         data-search-bar-target="input" data-action="input->search-bar#onInput"
+         class="form-input-base py-2 pl-9 pr-9">
+  <button type="button" aria-label="Clear search"
+          data-search-bar-target="clear" data-action="search-bar#clear"
+          class="<%= class_names("absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-slate-50 p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", ("hidden" if value.blank?)) %>">
+    <%= lucide_icon("x", class: "size-3.5") %>
+  </button>
+</div>

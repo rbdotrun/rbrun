@@ -1,0 +1,11 @@
+<turbo-frame id="modal">
+  <div class="p-6">
+    <% if title.present? %>
+      <h2 class="text-xl font-semibold tracking-tight text-slate-900"><%= title %></h2>
+    <% end %>
+    <% if description.present? %>
+      <p class="mt-1 text-sm text-slate-500"><%= description %></p>
+    <% end %>
+    <%= content %>
+  </div>
+</turbo-frame>

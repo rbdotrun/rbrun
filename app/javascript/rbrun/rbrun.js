@@ -1,4 +1,5 @@
 import "@hotwired/turbo-rails";
+import "./turbo_confirm"; // patches Turbo.config.forms.confirm → the styled <dialog id="confirm-dialog">
 import { Application } from "@hotwired/stimulus";
 import AutoscrollController from "./controllers/autoscroll_controller";
 import ComposerController from "./controllers/composer_controller";
@@ -9,6 +10,13 @@ import SidebarController from "./controllers/sidebar_controller";
 import CommandController from "./controllers/command_controller";
 import WorkflowController from "./controllers/workflow_controller";
 import DrawerController from "./controllers/drawer_controller";
+import OverlayController from "./controllers/overlay_controller";
+import SearchBarController from "./controllers/search_bar_controller";
+import OptionFilterController from "./controllers/option_filter_controller";
+import BulkSelectController from "./controllers/bulk_select_controller";
+import DropzoneController from "./controllers/dropzone_controller";
+import SingleUploadController from "./controllers/single_upload_controller";
+import RichTextAreaController from "./controllers/rich_text_area_controller";
 
 const application = Application.start();
 application.register("autoscroll", AutoscrollController);
@@ -20,4 +28,11 @@ application.register("sidebar", SidebarController);
 application.register("command", CommandController);
 application.register("workflow", WorkflowController);
 application.register("drawer", DrawerController);
+application.register("overlay", OverlayController);
+application.register("search-bar", SearchBarController);
+application.register("option-filter", OptionFilterController);
+application.register("bulk-select", BulkSelectController);
+application.register("dropzone", DropzoneController);
+application.register("single-upload", SingleUploadController);
+application.register("rich-text-area", RichTextAreaController);
 window.RbrunStimulus = application;

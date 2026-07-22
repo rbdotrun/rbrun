@@ -1,0 +1,25 @@
+<div class="flex flex-col gap-1.5">
+  <% if label.present? %>
+    <span class="text-sm font-medium text-slate-700"><%= label %></span>
+  <% end %>
+  <select name="<%= name %>" class="<%= Rbrun::Ui::Field::Component::INPUT %>"
+          <%= "onchange=this.form.requestSubmit()" if submit_on_change %>>
+    <% if include_blank %><option value="">—</option><% end %>
+    <% if grouped %>
+      <% options.each do |glabel, items| %>
+        <optgroup label="<%= glabel %>">
+          <% items.each do |lbl, val| %>
+            <option value="<%= val %>" <%= "selected" if val.to_s == value.to_s %>><%= lbl %></option>
+          <% end %>
+        </optgroup>
+      <% end %>
+    <% else %>
+      <% options.each do |lbl, val| %>
+        <option value="<%= val %>" <%= "selected" if val.to_s == value.to_s %>><%= lbl %></option>
+      <% end %>
+    <% end %>
+  </select>
+  <% if error.present? %>
+    <p class="text-xs text-red-600"><%= error %></p>
+  <% end %>
+</div>
