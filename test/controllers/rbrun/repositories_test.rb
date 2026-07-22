@@ -38,9 +38,9 @@ module Rbrun
       post "/rbrun/repos/switch", params: { repo: "acme/api" }
       assert_redirected_to "/rbrun/c"
 
-      # The session now carries the repo — the switcher face reflects it.
-      get "/rbrun/c"
-      assert_select "#repo_label", text: /acme\/api/
+      # The session now carries the repo — it's the active one in the results frame.
+      get "/rbrun/repos"
+      assert_select "a[aria-current=?]", "true", text: /acme\/api/
     end
 
     test "the current repo is marked active in the results" do
@@ -52,8 +52,9 @@ module Rbrun
     test "switching with a blank repo clears the workspace" do
       post "/rbrun/repos/switch", params: { repo: "acme/api" }
       post "/rbrun/repos/switch", params: { repo: "" }
-      get "/rbrun/c"
-      assert_select "#repo_label", text: /Select a repository/
+      get "/rbrun/repos"
+      # Nothing is active — the workspace is cleared.
+      assert_select "a[aria-current=?]", "true", count: 0
     end
   end
 end
