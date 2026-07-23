@@ -46,21 +46,14 @@ module Rbrun
       end
     end
 
-    test "reap_unauthored! drops scenarios + skills no longer authored, keeps authored ones" do
-      # @skill is release-notes (an authored builtin): one authored scenario + one that's no longer on disk.
-      kept  = @skill.workflows.create!(tenant: "acme", label: "Writes and saves release notes", prompt: "x")
-      stale = @skill.workflows.create!(tenant: "acme", label: "Ghost scenario", prompt: "y")
-      # a whole skill with no authored source
-      ghost = Rbrun::Skill.create!(tenant: "acme", slug: "no-such-skill", name: "Ghost")
-      ghost.workflows.create!(tenant: "acme", label: "whatever", prompt: "z")
-
-      reaped = Rbrun::SkillScenarios.reap_unauthored!("acme", Rbrun.config)
-
-      assert Rbrun::Workflow.exists?(kept.id),  "authored scenario kept"
-      refute Rbrun::Workflow.exists?(stale.id), "stale scenario reaped"
-      assert Rbrun::Skill.exists?(@skill.id),   "authored skill kept"
-      refute Rbrun::Skill.exists?(ghost.id),    "unauthored skill reaped"
-      assert_equal 3, reaped # stale scenario + ghost skill + ghost's workflow
+    test "ingest never deletes — a scenario absent from the folder is left intact (deletion is manual)" do
+      # A scenario in the DB with no matching YAML (e.g. authored in the UI, or its seed file was removed)
+      # must survive an ingest of an unrelated scenario. Dogfoods are tracked; only a human deletes them.
+      kept = @skill.workflows.create!(tenant: "acme", label: "Tracked scenario", prompt: "keep me")
+      with_scenarios(SCENARIO) do |dir|
+        Rbrun::SkillScenarios.ingest(@skill, dir)
+      end
+      assert Rbrun::Workflow.exists?(kept.id), "an unrelated scenario is never reaped by ingest"
     end
 
     test "scenarios/ is excluded from the staged archive (read_dir)" do
