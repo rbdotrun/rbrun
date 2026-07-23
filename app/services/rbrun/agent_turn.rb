@@ -58,6 +58,7 @@ module Rbrun
         skills: skills_dir,
         mcp: materialize_mcp,
         resume: @session.sdk_session_id,
+        auto: @session.auto?,
         tool_handler: method(:run_tool),
         on_event: method(:ingest)
       )
