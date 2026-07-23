@@ -129,10 +129,47 @@ survive. `#repo_label` is a stable id so a future tool broadcast could redraw th
 `_results` menu row's height, so the swap doesn't jump. Reused as the `[aria-busy]` state during search
 (§5).
 
-### 4.4 Results — `app/views/rbrun/repositories/{index,_results}.html.erb` (unchanged)
+### 4.4 Rows — a new `list_item` component + `_results` two-line rows
 
-`_results` already renders `component("menu")` rows, each a `switch_repo` POST with
-`data-turbo-frame="_top"` and the current repo marked `aria-current`. No change.
+Repo rows are **two-line**: a leading **avatar spanning both rows**, a **title** (`owner/name`, the full
+path) and a **subtitle** (the owning **org** = `owner`, the segment before `/`). All derivable from
+`full_name` — **`GithubRepos` and its `Repo` struct are untouched** (no API/data change).
+
+**New primitive `Rbrun::Ui::ListItem::Component`** (`app/components/rbrun/ui/list_item/component.rb`) —
+a reusable, keyboard-reachable two-line row:
+
+```
+component("list_item", title:, subtitle:, avatar:, href:, active:, **attrs)
+```
+
+- Renders an `<a role="menuitem" tabindex="-1" data-menu-target="item">` (so it drops straight into a
+  `role="menu"` container and inherits `menu_controller` roving-tabindex nav), or a `<div>` when no
+  `href`. Layout: leading avatar (`self-stretch`/centered, spans both text rows) · a stacked
+  title (medium, truncate) + subtitle (xs, muted, truncate) · optional trailing check when `active`.
+- `active` → `aria-current="true"` + the active background (mirrors `menu`'s `Link`), so the current
+  repo reads the same as before. `**attrs` carries `data:` (e.g. `turbo_method: :post`, `turbo_frame`).
+
+**`_results.html.erb`** renders a `role="menu"` container (`data-controller="menu"
+data-action="keydown->menu#navigate"`, matching `Ui::Menu`'s wrapper) looping `list_item` rows:
+
+```erb
+<div role="menu" class="p-1" data-controller="menu" data-action="keydown->menu#navigate">
+  <% repos.each do |repo| %>
+    <% org, name = repo.full_name.split("/", 2) %>
+    <%= component("list_item",
+          title: repo.full_name, subtitle: org,
+          avatar: name.to_s[0, 2].upcase,
+          href: rbrun.switch_repo_path(repo: repo.full_name, base: repo.default_branch),
+          active: (repo.full_name == current),
+          data: { turbo_method: :post, turbo_frame: "_top" }) %>
+  <% end %>
+</div>
+```
+
+The `switch_repo` POST + `data-turbo-frame="_top"` full-nav + `aria-current` behavior is unchanged from
+the old `menu`-link rows — the existing controller tests (`a[aria-current="true"]`, `a text: owner/name`)
+still pass, now against `list_item` anchors. The skeleton (§4.3) mirrors this two-line shape (avatar
+square + two stacked bars).
 
 ---
 
@@ -163,8 +200,9 @@ in the bundle for the footer user-menu dropdown, untouched.
   `Rbrun.github_repos` stubbed): click the trigger → dialog opens with the skeleton → rows appear →
   typing repoints the frame and narrows the list → picking a row updates the trigger face and scopes the
   conversation index. Fills the currently-empty `test/system/`.
-- **`test/components/rbrun/ui_primitives_test.rb`**: unchanged — no new primitive (the shell composes
-  `dialog_frame`). 
+- **`test/components/rbrun/ui_primitives_test.rb`**: add the new `list_item` primitive to the smoke
+  test (render with title/subtitle/avatar/active → assert `role="menuitem"`, both text lines, and the
+  `aria-current` active marker).
 
 ## 7. Dogfood — `lib/tasks/rbrun/dogfood/repo_switcher.rake` (update selectors)
 
