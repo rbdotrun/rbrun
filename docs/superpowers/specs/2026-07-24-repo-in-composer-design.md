@@ -63,10 +63,16 @@ work uniformly for conversations and, later, scenario runs.
 - `messages/_form` (the existing composer) renders the repo badge in its **locked** state (the chat has
   started), so you always see what repo the chat is bound to, read-only.
 
-### The conversation index is no longer repo-scoped
-- `SessionsController#index` currently filters by `current_repo`. With no global scope, it lists the
-  tenant's `:user` sessions (unscoped by repo) for now. **Full worktree-list navigation** (pick a
-  worktree → see its sessions) is a **later slice** (see Non-goals).
+### The index becomes a worktree list, grouped by repo
+- The root/index no longer filters sessions by a global `current_repo`. It lists the tenant's
+  **`Worktree`s grouped by their `repo`** — repo is the group header (`owner/name`), each worktree is a
+  row under it (its branch + a peek at its sessions). Opening a worktree shows **its** `:user` sessions.
+- Concretely: the root page renders the **compose** form (new worktree) **above** the grouped worktree
+  list (resume existing). A worktree row → the worktree's sessions (a `worktrees#show`, or the sessions
+  list filtered to that `worktree_id`). Bare worktrees (no repo) group under an "Unassigned / scratch"
+  header.
+- `current_repo` / `current_repo_base` / the `session[:rbrun_repo]` cookie are removed — grouping comes
+  from the worktrees' own `repo` column, not a global scope.
 
 ## Data model
 
@@ -79,21 +85,19 @@ repo is resolved to a worktree at chat creation from the composer's fields, exac
 ```
 ROOT COMPOSE (new)                         OPEN EXISTING (reuse)
 ─────────────────                          ─────────────────────
-root page composer                         open a worktree's chat (or worktree list, later)
-  badge: pick repo (or none)                 → session already belongs to a worktree
-  type first message                         → its repo is locked (shown read-only)
-  submit                                     → compose more turns in the SAME box
-    → new Worktree(repo,base)
-    → new Session
-    → first turn (AgentTurnJob)
+root page composer                         root list: worktrees grouped by repo
+  badge: pick repo (or none)                 owner/name
+  type first message                           └─ worktree (branch) → its sessions
+  submit                                   open one → a session in that worktree
+    → new Worktree(repo,base)                → repo is locked (shown read-only)
+    → new Session                            → compose more turns in the SAME box
+    → first turn (AgentTurnJob)               (a new session can join the same worktree)
     → redirect to chat (repo now locked)
 ```
 
 ## Non-goals (explicitly later / accepted)
 
 - **Multi-repo per chat** — single repo only, now.
-- **Worktree-list navigation** (list all worktrees → open → see its sessions). The index staying a flat
-  "all conversations" list is a deliberate stopgap; the worktree browser is its own slice.
 - **Concurrency safety** for multiple agents in one shared sandbox/branch — **accepted as-is** (shared
   mutable checkout). Not solving collisions here.
 - **Scenario runs consuming the composer repo** — `SkillScenarioRun` stays **bare** for now; once the
@@ -126,7 +130,9 @@ root page composer                         open a worktree's chat (or worktree l
 ## Plan slices
 
 1. **Repo badge + retargeted picker** (client-side selection into a compose form; remove `/repos/switch`
-   + the cookie + the sidebar trigger).
-2. **Root composer + new-worktree create** (compose first turn from root; `create` takes `repo`/`base`;
-   new worktree every time; index unscoped).
-3. **Lock-after-start** in the in-chat composer + the badge's read-only state.
+   + the `session[:rbrun_repo]` cookie + `current_repo`/`_base` + the sidebar trigger).
+2. **Root composer + new-worktree create** (compose first turn from root; `create` takes `repo`/`base` +
+   the first `message`; **new worktree every time**).
+3. **Grouped worktree index** (root lists `Worktree`s grouped by `repo`; open a worktree → its sessions —
+   `worktrees#show` filtered to `worktree_id`).
+4. **Lock-after-start** in the in-chat composer + the badge's read-only state.
