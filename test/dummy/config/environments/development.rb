@@ -6,6 +6,11 @@ Rails.application.configure do
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
 
+  # ViewComponent previews re-register their `preview_view_components` route on every routes reload,
+  # which collides with itself ("Invalid route name, already in use") and forces an app restart after
+  # each change. We don't use previews (the primitives smoke test covers rendering), so turn them off.
+  config.view_component.show_previews = false
+
   # Do not eager load code on boot.
   config.eager_load = false
 
