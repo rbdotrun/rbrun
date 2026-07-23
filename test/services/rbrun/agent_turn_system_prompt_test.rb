@@ -20,5 +20,22 @@ module Rbrun
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
       assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
     end
+
+    test "preferred_skills append a steer to the system prompt" do
+      @session.update!(preferred_skills: %w[create-skill])
+      runtime = SystemCapturingRuntime.new
+      Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
+
+      assert runtime.system.start_with?(Rbrun.config(@session.tenant).system_prompt.to_s)
+      assert_includes runtime.system, "prefer these skills"
+      assert_includes runtime.system, "create-skill"
+    end
+
+    test "empty preferred_skills leave the system prompt untouched" do
+      @session.update!(preferred_skills: [])
+      runtime = SystemCapturingRuntime.new
+      Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
+      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
+    end
   end
 end

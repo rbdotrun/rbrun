@@ -34,6 +34,18 @@ module Rbrun
 
     private
 
+    # The host system prompt, plus a per-session steer toward this conversation's `preferred_skills`
+    # (every skill still stages — this only TELLS the agent which to reach for). Empty prefs ⇒ untouched.
+    def system_prompt
+      base  = Rbrun.config(@session.tenant).system_prompt.to_s
+      prefs = Array(@session.preferred_skills).map(&:to_s).reject(&:blank?)
+      return base if prefs.empty?
+
+      note = "For this conversation, strongly prefer these skills and use them when they apply: " \
+             "#{prefs.join(', ')}. They are staged in your workspace under .claude/skills/."
+      base.empty? ? note : "#{base}\n\n#{note}"
+    end
+
     def call_client(prompt)
       runtime = @runtime || Rbrun.runtime(tenant: @session.tenant, sandbox: @session.sandbox)
       # Reconstruct .claude history on a fresh/lost box BEFORE resume — the turn survives box loss.
@@ -41,7 +53,7 @@ module Rbrun
       skills_dir = materialize_skills
       runtime.run(
         prompt: prompt,
-        system: Rbrun.config(@session.tenant).system_prompt,
+        system: system_prompt,
         tools: Rbrun::ApplicationTool.manifest,
         skills: skills_dir,
         mcp: materialize_mcp,
