@@ -26,6 +26,7 @@ module Rbrun
         assert_match "grid-template-columns", render_inline(Ui::Table::Component.new(columns: [ "Name" ])).to_html
         assert_match "Card", render_inline(Ui::VisualCard::Component.new(title: "Card")).to_html
         assert_match "Item", render_inline(Ui::ListCard::Component.new(title: "Item", icon: "star")).to_html
+        assert_match %{role="menuitem"}, render_inline(Ui::ListItem::Component.new(title: "o/n", subtitle: "o", avatar: "ON", href: "/x")).to_html
         assert_match "longtext", render_inline(Ui::Longtext::Component.new.with_content("# Hi")).to_html
 
         # Batch 2: drawer family + controller-driven primitives + uploads + native select/date.
