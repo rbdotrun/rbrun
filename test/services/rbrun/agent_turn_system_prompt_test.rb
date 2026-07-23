@@ -16,10 +16,13 @@ module Rbrun
       @session = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b").sessions.create!
     end
 
-    test "the turn's system prompt is the host prompt" do
+    test "the system prompt starts with the host prompt and names the exact working directory" do
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
-      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
+      assert runtime.system.start_with?(Rbrun.config(@session.tenant).system_prompt.to_s)
+      # the agent must be TOLD its absolute cwd (the checkout) so it never guesses the /workspace/ path
+      assert_includes runtime.system, "Your working directory"
+      assert_includes runtime.system, @session.worktree.checkout
     end
 
     test "preferred_skills append a steer to the system prompt" do
@@ -32,11 +35,11 @@ module Rbrun
       assert_includes runtime.system, "create-skill"
     end
 
-    test "empty preferred_skills leave the system prompt untouched" do
+    test "empty preferred_skills add no skills steer" do
       @session.update!(preferred_skills: [])
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
-      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
+      refute_includes runtime.system, "prefer these skills"
     end
 
     test "the session's auto flag flows to the runtime" do

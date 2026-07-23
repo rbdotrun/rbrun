@@ -38,9 +38,21 @@ module Rbrun
     # (every skill still stages — this only TELLS the agent which to reach for). Empty prefs ⇒ untouched.
     def system_prompt
       parts = [ Rbrun.config(@session.tenant).system_prompt.to_s ]
+      parts << workspace_note
       parts << preferred_skills_note
       parts << self_validation_note # autonomous scenario runs only
       parts.compact.reject(&:blank?).join("\n\n")
+    end
+
+    # The agent's Bash cwd is the checkout, but the file tools want ABSOLUTE paths and the agent can't
+    # infer the box's `/workspace/` nesting — so it guesses (e.g. `/home/daytona/dummy-rails` instead of
+    # `/home/daytona/workspace/dummy-rails`) and writes outside its cwd. Tell it the exact path.
+    def workspace_note
+      dir = @session.worktree.checkout
+      return nil if dir.blank?
+
+      "Your working directory (and Bash cwd) is `#{dir}`. For file tools that need an absolute path, " \
+        "build it under `#{dir}` — do NOT guess the path; and prefer paths relative to that directory."
     end
 
     def preferred_skills_note
