@@ -71,6 +71,8 @@ source:)` creates/points an immutable version; content-addressed, idempotent on 
   (the exposure ladder, CLAUDE.md #10), are later additive work.
 - **No live-React-app artifacts** (insitix's `bun_build` → self-contained page that fetches its own
   data). `content` here is opaque bytes; we do not build or execute it.
+- **No platform scenarios.** `SkillScenario.skill_id` is required — every scenario is about a skill.
+  insitix's skill-less "platform scenario" is dropped; add later if a platform-level need appears.
 
 ---
 
@@ -197,10 +199,10 @@ gates for a runner to drive.
 
 Mirrors insitix's `MarketplaceSkillScenario`, minus the gate DSL.
 
-Columns: `tenant` (Tenanted), `skill_id` (FK → `Rbrun::Skill`, **optional** — a nil skill is a
-platform scenario), `label` (unique per `[tenant, skill]`), `description`, `prompt` (text, the
-vague request to replay), `steps` (jsonb — ordered `[{label, description}]`), `attachments`
-(jsonb — repo-relative fixture paths).
+Columns: `tenant` (Tenanted), `skill_id` (FK → `Rbrun::Skill`, **required** — a scenario is always
+about a skill), `label` (unique per `[tenant, skill]`), `description`, `prompt` (text, the vague
+request to replay), `steps` (jsonb — ordered `[{label, description}]`), `attachments` (jsonb —
+repo-relative fixture paths).
 
 A step is just `{label, description}` where `description` is _what to validate_. It is the
 ground-truth **checklist**: the scenario declares the expected steps, the agent works and
