@@ -114,16 +114,18 @@ No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
 - **Archive is the only source of a skill's content** — Save assembles `SKILL.md` → promotes a version;
   Load parses the selected version's archive. Never a card/soft-hint column.
 - **DB is the source of truth** — the form writes `SkillVersion`s and `SkillScenario` rows directly.
-- **Compose primitives** — the form + dialog are `component(...)`/`custom(...)`, never raw markup.
+- **Compose primitives** — the form is built from `field`/`input`/`textarea`/`select`/`multi_select`/
+  `button` via `component(...)`, never raw `<input>`/`<form>` controls.
 - **Self-validating runs are tagged** — `kind: :skill_scenario` + `auto: true`; the human is out of the
   loop by identity, and those sessions are filtered from the conversation list.
 
 ## Testing
 
 - `SkillForm`: fields → `SKILL.md` (frontmatter round-trips every key incl. `preferred_*` lists + body);
-  parse a version's archive back to fields; a stub-v1 skill parses the label as `name`.
-- Controller: New dialog creates a stub skill (v1 present) → redirects to the form; `PATCH` promotes a
-  new version whose parsed fields match the submitted form; `?version=` loads that version's fields.
+  parse a version's archive back to fields (assemble/parse are inverses).
+- Controller: `POST skills` creates a skill with a v1 assembled from the form; `PATCH skills/:slug`
+  promotes a new version whose parsed fields match the submitted form; `?version=` loads that version's
+  fields into the edit form.
 - Session: `kind` defaults `:user`; the conversation index excludes `:skill_scenario`.
 - Scenarios: the sub-form writes `SkillScenario` rows (steps jsonb); **▶ Run** produces a
   `:skill_scenario` session, self-validates, sets `showcase_artifact_version_id`.
