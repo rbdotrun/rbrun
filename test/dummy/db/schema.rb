@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_24_100000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -251,8 +251,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_200000) do
     t.text "description"
     t.text "goal"
     t.string "label", null: false
+    t.text "prompt"
+    t.integer "showcase_artifact_version_id"
+    t.integer "skill_id"
     t.string "tenant", null: false
     t.datetime "updated_at", null: false
+    t.index ["showcase_artifact_version_id"], name: "index_rbrun_workflows_on_showcase_artifact_version_id"
+    t.index ["skill_id"], name: "index_rbrun_workflows_on_skill_id"
     t.index ["tenant"], name: "index_rbrun_workflows_on_tenant"
   end
 
@@ -298,4 +303,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_200000) do
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_workflow_steps", column: "workflow_step_id"
   add_foreign_key "rbrun_workflow_steps", "rbrun_workflows", column: "workflow_id"
+  add_foreign_key "rbrun_workflows", "rbrun_artifact_versions", column: "showcase_artifact_version_id"
+  add_foreign_key "rbrun_workflows", "rbrun_skills", column: "skill_id"
 end

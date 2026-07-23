@@ -14,6 +14,12 @@ module Rbrun
       skill
     end
 
+    test "a skill has_many workflows (its scenarios)" do
+      skill = Rbrun::Skill.create!(tenant: "acme", slug: "s", name: "S")
+      wf = Rbrun::Workflow.create!(tenant: "acme", label: "Case", skill:, prompt: "go")
+      assert_includes skill.workflows, wf
+    end
+
     test "promote! creates a version, points current, and clears both flags" do
       skill = Rbrun::Skill.create!(tenant: "rbrun", slug: "pdf", name: "PDF")
       skill.update!(divergence_digest: "x", dismissed_digest: "y")

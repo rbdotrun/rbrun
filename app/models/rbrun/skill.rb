@@ -13,6 +13,9 @@ module Rbrun
     has_many :versions, class_name: "Rbrun::SkillVersion", dependent: :destroy
     belongs_to :current_version, class_name: "Rbrun::SkillVersion", optional: true
 
+    # A skill's scenarios/examples ARE skill-bound workflows.
+    has_many :workflows, class_name: "Rbrun::Workflow", dependent: :destroy
+
     validates :slug, presence: true
     validates :name, presence: true
 

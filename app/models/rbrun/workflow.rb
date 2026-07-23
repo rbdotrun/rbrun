@@ -5,7 +5,18 @@ module Rbrun
     include Rbrun::Tenanted
 
     has_many :sessions, class_name: "Rbrun::Session", dependent: :nullify
-    has_many :steps, -> { order(:position) }, class_name: "Rbrun::WorkflowStep", dependent: :destroy
+    has_many :steps, -> { order(:position) }, class_name: "Rbrun::WorkflowStep",
+             inverse_of: :workflow, dependent: :destroy
+
+    # A skill-bound workflow IS that skill's scenario/example (skill_id set ⇒ scenario); showcase points
+    # at the artifact its last run produced. Both optional — a plain conversation workflow leaves them nil.
+    belongs_to :skill, class_name: "Rbrun::Skill", optional: true
+    belongs_to :showcase_artifact_version, class_name: "Rbrun::ArtifactVersion", optional: true
+
+    accepts_nested_attributes_for :steps, allow_destroy: true,
+      reject_if: ->(a) { a[:title].blank? && a[:description].blank? }
+
+    scope :scenarios, -> { where.not(skill_id: nil) }
 
     validates :label, presence: true
 

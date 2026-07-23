@@ -17,6 +17,36 @@ module Rbrun
       assert_includes wf.errors[:label], "can't be blank"
     end
 
+    test "a workflow can belong to a skill and carry a prompt (a scenario)" do
+      skill = Rbrun::Skill.create!(tenant: "acme", slug: "s", name: "S")
+      wf = Rbrun::Workflow.create!(tenant: "acme", label: "Case", skill:, prompt: "do the thing")
+      assert_equal skill, wf.skill
+      assert_includes Rbrun::Workflow.scenarios, wf
+    end
+
+    test "a plain workflow has no skill and is excluded from scenarios" do
+      wf = Rbrun::Workflow.create!(tenant: "acme", label: "Plain")
+      assert_nil wf.skill
+      refute_includes Rbrun::Workflow.scenarios, wf
+    end
+
+    test "nested steps_attributes build ordered steps; a fully blank row is rejected" do
+      wf = Rbrun::Workflow.create!(tenant: "acme", label: "W", steps_attributes: [
+        { position: 1, title: "One", description: "prove one" },
+        { position: 2, title: "",    description: "" } # all-blank → rejected
+      ])
+      assert_equal 1, wf.steps.count
+      assert_equal "One", wf.steps.first.title
+    end
+
+    test "a step with a description but no title is INVALID (surfaces a nested error)" do
+      wf = Rbrun::Workflow.new(tenant: "acme", label: "W", steps_attributes: [
+        { position: 1, title: "", description: "has content but no title" }
+      ])
+      refute wf.valid?
+      assert wf.steps.first.errors[:title].present?
+    end
+
     test "steps come back ordered" do
       wf = build_workflow(label: "Ship", steps: %w[a b c])
       assert_equal %w[a b c], wf.steps.map(&:title)
