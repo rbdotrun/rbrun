@@ -3,7 +3,8 @@ require "faraday"
 module Rbrun
   # Lists the repositories the configured github_pat can reach — the workspace directory behind the
   # sidebar repo switcher. The PAT is the source of truth (no local repo registry): an empty query
-  # returns the most-recently-updated repos, a query hits GitHub's search API. All outbound HTTP is
+  # returns the most-recently-updated repos, a query FILTERS those same reachable repos (never global
+  # GitHub search — the switcher only offers repos the token can actually act in). All outbound HTTP is
   # Faraday on the async-http adapter (fork-safe under Falcon; invariant #5). The connection is
   # injectable (conn:) so tests drive it with Faraday's test adapter — no network, no mocks.
   class GithubRepos
@@ -25,13 +26,15 @@ module Rbrun
       Array(body).map { |r| to_repo(r) }
     end
 
-    # A blank query lists; otherwise GitHub search across everything the token sees.
+    # Search the token's OWN reachable repos (owner + collaborator + org member) — NOT global GitHub. A
+    # blank query returns the recent list; otherwise fetch a generous page of the affiliation list and
+    # filter by full_name (case-insensitive substring). Scoping to what the PAT can see is the whole
+    # point of the switcher; global /search/repositories would surface the entire of GitHub.
     def search(query:, per_page: 30)
-      q = query.to_s.strip
+      q = query.to_s.strip.downcase
       return list(per_page:) if q.empty?
 
-      body = get("/search/repositories", q:, per_page:)
-      Array(body && body["items"]).map { |r| to_repo(r) }
+      list(per_page: 100).select { |r| r.full_name.downcase.include?(q) }.first(per_page)
     end
 
     private

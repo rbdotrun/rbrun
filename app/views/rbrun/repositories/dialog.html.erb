@@ -1,17 +1,28 @@
-<%# The dialog shell loaded into the singleton #modal frame when the switcher is clicked. Renders
-    THROUGH dialog_frame (so the header reads like every other modal), then a `command`-controlled
-    search box + a lazy #repo_results frame whose placeholder is the skeleton. No GitHub call happens
-    to build this — the lazy frame fires its own request (recent repos on open, search on typing). %>
-<%= component("dialog_frame", title: "Switch repository") do %>
-  <div class="mt-4 w-[28rem] max-w-full"
-       data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
-    <%= component("input", name: "q", placeholder: "Search repositories…", autocomplete: "off",
-                  data: { command_target: "input", action: "input->command#search" }) %>
-    <div class="mt-3 max-h-[52vh] overflow-y-auto">
-      <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
-                          data: { command_target: "frame" } do %>
-        <%= component("skeleton", variant: :list_item, rows: 6) %>
+<%# The repo switcher dialog. Renders THROUGH Ui::Surface (dialog chrome) so the title + search box sit
+    in the STATIC surface area — the header and a fixed strip below it — while ONLY the repo list scrolls
+    in the body. The `command` controller wraps the whole surface (display:contents keeps the flex height
+    chain unbroken); the search input (fixed strip) repoints the lazy #repo_results frame (body) at the
+    server-side GitHub search. No GitHub call builds this shell — the lazy frame fires its own request
+    (recent repos on open, search on typing). %>
+<turbo-frame id="modal">
+  <div class="contents" data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
+    <%# Fixed 60dvh, always — the surface height is constant (loading or loaded); the body just scrolls
+        more or less within it. dvh is viewport-relative, so it doesn't depend on content. %>
+    <%= component("surface", preset: :dialog, elevation: :lg, size: :md, title: "Switch repository",
+                  inset: :flush, css: "w-[34rem] max-w-full h-[60dvh]") do |s| %>
+      <% s.with_fixed_area do %>
+        <%# No padding here — the surface's fixed_area supplies the ONE normalized x-inset (see PADDING_X)
+            so the search box lines up with the title and the rows. %>
+        <%= component("search_input", placeholder: "Search repositories…") %>
       <% end %>
-    </div>
+      <% s.with_body do %>
+        <%# The skeleton the command controller clones back into the frame on every search. %>
+        <template data-command-target="skeleton"><%= component("skeleton", variant: :list_item, rows: 10, css: "p-1.5") %></template>
+        <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
+                            data: { command_target: "frame" } do %>
+          <%= component("skeleton", variant: :list_item, rows: 10, css: "p-1.5") %>
+        <% end %>
+      <% end %>
+    <% end %>
   </div>
-<% end %>
+</turbo-frame>

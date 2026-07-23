@@ -44,12 +44,19 @@ module Rbrun
       assert_selector "turbo-frame#repo_results a[role=menuitem]", text: "rbdotrun/rbrun"
       assert_selector "turbo-frame#repo_results a[role=menuitem]", text: "acme/api"
 
-      # Typing narrows the server-side list.
+      # Typing narrows the (PAT-scoped) list.
       fill_in "q", with: "acme"
       assert_selector "turbo-frame#repo_results a[role=menuitem]", text: "acme/api"
       assert_no_selector "turbo-frame#repo_results a[role=menuitem]", text: "rbdotrun/rbrun"
 
+      # The clear (X) appears once the field has a value + results are in; clicking it resets the list.
+      find("[data-command-target=clear]").click
+      assert_selector "turbo-frame#repo_results a[role=menuitem]", text: "rbdotrun/rbrun"
+      assert_selector "turbo-frame#repo_results a[role=menuitem]", text: "acme/api"
+      assert_equal "", find("input[name=q]").value
+
       # Picking a repo full-navigates and updates the trigger face.
+      fill_in "q", with: "acme"
       find("a[role=menuitem]", text: "acme/api").click
       assert_no_selector "dialog[open]"
       assert_selector "#repo_label", text: "acme/api"

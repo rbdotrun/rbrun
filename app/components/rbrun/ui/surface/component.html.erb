@@ -34,20 +34,19 @@
   <% end %>
 
   <% fixed_areas.each do |area| %>
-    <div class="flex-shrink-0 border-b border-slate-200"><%= area %></div>
+    <div class="<%= fixed_area_class %>"><%= area %></div>
   <% end %>
 
   <%= tag.div id: body_id, class: body_class do %>
     <% if inset == :centered %>
-      <div class="mx-auto w-full max-w-3xl px-6 py-8"><%= body %></div>
+      <div class="mx-auto w-full max-w-3xl <%= padding_x %> py-8"><%= body %></div>
     <% else %>
       <%= body %>
     <% end %>
   <% end %>
 
   <% if footer? %>
-    <%= tag.footer id: footer_id,
-          class: "flex flex-shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-6 py-4" do %>
+    <%= tag.footer id: footer_id, class: footer_class do %>
       <%= footer %>
     <% end %>
   <% end %>

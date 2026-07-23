@@ -41,7 +41,7 @@ module Rbrun
         assert_match %(id="drawer_body"), dp_html
         assert_match %(id="drawer_actions"), dp_html
         assert_match "SAVE", dp_html
-        assert_match "search-bar", render_inline(Ui::SearchInput::Component.new(id: "s")).to_html
+        assert_match %(data-command-target="input"), render_inline(Ui::SearchInput::Component.new).to_html
         assert_match "option-filter", render_inline(Ui::MultiSelect::Component.new(label: "L", name: "x[]", options: [ [ "G", [ [ "a", "a" ] ] ] ], grouped: true)).to_html
         assert_match "bulk-select", render_inline(Ui::BulkBar::Component.new(singular: "row", plural: "rows")).to_html
         assert_match "dropzone", render_inline(Ui::Dropzone::Component.new(name: "f")).to_html

@@ -69,7 +69,9 @@ export default class extends Controller {
   }
 
   #onVisible([entry]) {
-    if (entry.isIntersecting) this.#first()
+    // Reset the roving tabindex to the top when the menu appears, but DON'T focus — appearing must
+    // never steal focus (the search box keeps it) nor light up the first row. Focus moves on nav.
+    if (entry.isIntersecting) this.#first(false)
   }
 
   #prev() {
@@ -86,14 +88,9 @@ export default class extends Controller {
     }
   }
 
-  #first() {
-    if (this.#visibleItems.length === 0) {
-      this.indexValue = -1
-      this.#update()
-      return
-    }
-    this.indexValue = 0
-    this.#update()
+  #first(focus = true) {
+    this.indexValue = this.#visibleItems.length === 0 ? -1 : 0
+    this.#update(focus)
   }
 
   #last() {
@@ -106,13 +103,13 @@ export default class extends Controller {
     this.#update()
   }
 
-  #update() {
+  #update(focus = true) {
     const visibleItems = this.#visibleItems
     this.itemTargets.forEach(item => { item.tabIndex = -1 })
     visibleItems.forEach((item, index) => {
       item.tabIndex = index === this.indexValue ? 0 : -1
     })
-    visibleItems[this.indexValue]?.focus()
+    if (focus) visibleItems[this.indexValue]?.focus()
   }
 
   get #visibleItems() {

@@ -1,11 +1,17 @@
-<div id="<%= id %>" data-turbo-permanent class="relative min-w-56 flex-1" data-controller="search-bar">
+<div class="relative min-w-56 flex-1">
   <%= lucide_icon("search", class: "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400") %>
   <input type="text" name="<%= name %>" value="<%= value %>" placeholder="<%= placeholder %>" autocomplete="off"
-         data-search-bar-target="input" data-action="input->search-bar#onInput"
+         data-command-target="input" data-action="input->command#search"
          class="form-input-base py-2 pl-9 pr-9">
+
+  <%# Right-side affordance — the command controller shows exactly one: the spinner while a search
+      request is in flight, the clear (X) when the field has a value at rest. Both start hidden. %>
+  <span data-command-target="spinner" class="absolute right-3 top-1/2 hidden -translate-y-1/2 flex items-center">
+    <%= component("spinner", size: :sm) %>
+  </span>
   <button type="button" aria-label="Clear search"
-          data-search-bar-target="clear" data-action="search-bar#clear"
-          class="<%= class_names("absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-slate-50 p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600", ("hidden" if value.blank?)) %>">
+          data-command-target="clear" data-action="command#clear"
+          class="absolute right-2 top-1/2 hidden -translate-y-1/2 flex items-center justify-center rounded-full bg-slate-50 p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
     <%= lucide_icon("x", class: "size-3.5") %>
   </button>
 </div>
