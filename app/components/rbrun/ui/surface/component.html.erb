@@ -1,6 +1,6 @@
 <%= tag.div class: root_class do %>
   <% if header? %>
-    <header class="flex min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-6 py-3">
+    <header class="<%= header_class %>">
       <div class="flex min-w-0 items-center gap-3">
         <% if back.present? %>
           <%= link_to back, "aria-label": "Back",
@@ -8,13 +8,13 @@
             <%= lucide_icon("arrow-left", class: "size-4") %>
           <% end %>
         <% end %>
-        <% if title.present? || description.present? %>
+        <% if title.present? || subtitle.present? %>
           <div class="min-w-0">
             <% if title.present? %>
-              <h2 class="truncate text-xl font-semibold tracking-tight text-slate-800"><%= title %></h2>
+              <%= content_tag(heading, title, class: title_class) %>
             <% end %>
-            <% if description.present? %>
-              <p class="mt-0.5 truncate text-sm text-slate-500"><%= description %></p>
+            <% if subtitle.present? %>
+              <p class="mt-0.5 truncate text-sm text-slate-500"><%= subtitle %></p>
             <% end %>
           </div>
         <% end %>

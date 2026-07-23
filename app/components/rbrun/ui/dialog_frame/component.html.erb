@@ -1,7 +1,7 @@
 <%# The modal's content: a Surface (dialog chrome) inside the #modal frame. Header = title/description;
     body = the caller's block. Every modal view still renders THROUGH component("dialog_frame", …). %>
 <turbo-frame id="modal">
-  <%= component("surface", preset: :dialog, elevation: :lg, title: title, description: description) do |s| %>
+  <%= component("surface", preset: :dialog, elevation: :lg, title: title, subtitle: description) do |s| %>
     <% s.with_body do %><%= content %><% end %>
   <% end %>
 </turbo-frame>

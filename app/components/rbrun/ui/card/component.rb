@@ -13,7 +13,7 @@ module Rbrun
 
         def call
           component("surface", preset: :card, elevation: :md,
-                    title: @title, description: @subtitle, css: @css) do |s|
+                    title: @title, subtitle: @subtitle, css: @css) do |s|
             s.with_body { content }
           end
         end

@@ -17,8 +17,8 @@ module Rbrun
       refute_match "h-full", html          # never imposes its own height
     end
 
-    test "header renders title, back, description, close and actions; body scrolls" do
-      html = render_surface(title: "T", back: "/x", description: "D", close: true) do |s|
+    test "header renders title, back, subtitle, close and actions; body scrolls" do
+      html = render_surface(title: "T", back: "/x", subtitle: "D", close: true) do |s|
         s.with_actions { "ACT" }
         s.with_body { "BODY" }
       end.to_html
@@ -59,6 +59,20 @@ module Rbrun
 
     test "elevation adds a shadow" do
       assert_match "shadow-xl", render_surface(elevation: :lg) { |s| s.with_body { "B" } }.to_html
+    end
+
+    test "heading level: defaults to h2, honors :h1" do
+      assert_match "<h2", render_surface(title: "T").to_html
+      assert_match "<h1", render_surface(title: "T", heading: :h1).to_html
+    end
+
+    test "size preset scales the header (declared height, no vertical padding) + title type" do
+      lg = render_surface(title: "T", size: :lg).to_html
+      assert_match "h-16", lg
+      assert_match "text-xl", lg
+      md = render_surface(title: "T", size: :md).to_html
+      assert_match "h-14", md
+      assert_match "text-lg", md
     end
   end
 end

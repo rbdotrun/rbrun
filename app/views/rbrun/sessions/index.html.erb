@@ -1,4 +1,4 @@
-<%= component("surface", title: "Conversations", inset: :centered) do |s| %>
+<%= component("surface", title: "Conversations", heading: :h1, inset: :centered) do |s| %>
   <% s.with_actions do %>
     <%= button_to "New conversation", rbrun.sessions_path, method: :post,
           class: "rounded-md bg-default-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-default-500 cursor-pointer" %>

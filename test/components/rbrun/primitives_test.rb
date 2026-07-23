@@ -27,12 +27,14 @@ class PrimitivesTest < ActiveSupport::TestCase
     assert_includes out, "bg-red-50"
   end
 
-  test "card renders title + block content, css override wins" do
-    out = html(Rbrun::Ui::Card::Component.new(title: "T", css: "p-10")) { "body" }
+  test "card renders title + block content, css override wins on the surface root" do
+    # Card is a thin Surface wrapper (preset :card → rounded-lg on the root). A css: override
+    # tailwind-merges onto the root, so it beats the preset's own radius.
+    out = html(Rbrun::Ui::Card::Component.new(title: "T", css: "rounded-none")) { "body" }
     assert_includes out, "T"
     assert_includes out, "body"
-    assert_includes out, "p-10"
-    refute_includes out, "p-6"
+    assert_includes out, "rounded-none"
+    refute_includes out, "rounded-lg"
   end
 
   test "code_block renders escaped code with the language" do

@@ -25,7 +25,7 @@ module Rbrun
         # onto the surface's body/footer regions so Turbo streams still swap a REGION, never the frame.
         erb_template <<~ERB
           <%= helpers.turbo_frame_tag "drawer" do %>
-            <%= component("surface", preset: :drawer, elevation: :lg, title: title, close: true,
+            <%= component("surface", preset: :drawer, elevation: :lg, size: :md, title: title, close: true,
                           inset: (padded ? :padded : :flush),
                           body_id: BODY_ID, footer_id: ACTIONS_ID) do |s| %>
               <% s.with_body do %><%= content %><% end %>

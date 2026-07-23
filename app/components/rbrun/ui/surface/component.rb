@@ -17,13 +17,24 @@ module Rbrun
         # Body padding by inset. :centered pads via an inner max-w column (ERB) so the column scrolls.
         INSET = { padded: "p-6", centered: nil, flush: nil }.freeze
 
-        def initialize(title: nil, back: nil, close: false, description: nil,
+        # Header scale preset: a DECLARED bar height (items-center does the vertical centering — NO
+        # vertical padding) + the title type size. The meaningful header knob (the heading TAG, :h1/:h2,
+        # is only semantics). :lg = page/dialog, :md = the more compact drawer.
+        HEADER = {
+          lg: { bar: "h-16", title: "text-xl" },
+          md: { bar: "h-14", title: "text-lg" },
+          sm: { bar: "h-12", title: "text-base" }
+        }.freeze
+
+        def initialize(title: nil, subtitle: nil, back: nil, close: false, heading: :h2, size: :lg,
                        preset: :card, inset: :padded, elevation: :none,
                        body_id: nil, footer_id: nil, css: nil)
           @title = title
+          @subtitle = subtitle
           @back = back
           @close = close
-          @description = description
+          @heading = heading
+          @size = size
           @preset = preset
           @inset = inset
           @elevation = elevation
@@ -32,7 +43,7 @@ module Rbrun
           @css = css
         end
 
-        attr_reader :title, :back, :close, :description, :inset, :body_id, :footer_id
+        attr_reader :title, :subtitle, :back, :close, :heading, :inset, :body_id, :footer_id
 
         style do
           base { "flex min-h-0 min-w-0 flex-auto flex-col" }
@@ -54,9 +65,19 @@ module Rbrun
 
         def root_class = cn(style(preset: @preset, elevation: @elevation), @css)
 
+        # Fixed-height, items-centered header bar — horizontal px only, no vertical padding.
+        def header_class
+          class_names("flex flex-shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-6",
+                      HEADER.fetch(@size)[:bar])
+        end
+
+        def title_class
+          class_names("truncate font-semibold tracking-tight text-slate-800", HEADER.fetch(@size)[:title])
+        end
+
         def body_class = class_names("min-h-0 flex-1 overflow-y-auto", INSET[@inset])
 
-        def header? = title.present? || back.present? || close || description.present? || actions?
+        def header? = title.present? || subtitle.present? || back.present? || close || actions?
       end
     end
   end
