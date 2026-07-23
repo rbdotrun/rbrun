@@ -27,6 +27,7 @@ module Rbrun
       Rbrun.register_tool(Rbrun::Tools::AskUser) # built-in custom gate (autoload ready here, not in initializers)
       [ Rbrun::Tools::WorkflowCreate, Rbrun::Tools::ValidateStep, Rbrun::Tools::CancelWorkflow,
         Rbrun::Tools::WorkflowSearch, Rbrun::Tools::UseWorkflow ].each { |t| Rbrun.register_tool(t) }
+      Rbrun.register_tool(Rbrun::Tools::SaveArtifact) # ungated: a produced deliverable is leaf output
       [ Rbrun::Tools::DeployConfig, Rbrun::Tools::ListDeploySecrets, Rbrun::Tools::ProvisionServer,
         Rbrun::Tools::CreateDeployDns, Rbrun::Tools::Deploy, Rbrun::Tools::DeployStatus,
         Rbrun::Tools::DeployLogs, Rbrun::Tools::DeployExec,

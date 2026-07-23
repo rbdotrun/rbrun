@@ -23,11 +23,23 @@
 ### Task 1: Artifact models + migrations
 
 **Files:**
+- Create: `test/dummy/db/migrate/*_create_active_storage_tables.active_storage.rb` (via installer)
 - Create: `db/migrate/20260723120000_create_rbrun_artifacts.rb`
 - Create: `db/migrate/20260723120001_create_rbrun_artifact_versions.rb`
 - Create: `app/models/rbrun/artifact.rb`
 - Create: `app/models/rbrun/artifact_version.rb`
 - Test: `test/models/rbrun/artifact_test.rb`
+
+> **Discovered during execution:** ActiveStorage tables were NOT installed in the dummy app
+> (empty in both `schema.rb` and the live DB). `has_one_attached` requires them, so install
+> ActiveStorage first — this is a real prerequisite, not optional.
+
+- [ ] **Step 0: Install ActiveStorage in the dummy app**
+
+Run: `bin/rails app:active_storage:install` (the `app:` prefix is required — the engine wraps the
+dummy's framework tasks). This copies a `create_active_storage_tables` migration into
+`test/dummy/db/migrate/`.
+Expected: `Copied migration …_create_active_storage_tables.active_storage.rb from active_storage`.
 
 **Interfaces:**
 - Produces:
