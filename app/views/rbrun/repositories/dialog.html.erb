@@ -6,8 +6,10 @@
     (recent repos on open, search on typing). %>
 <turbo-frame id="modal">
   <div class="contents" data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
-    <%= component("surface", preset: :dialog, elevation: :lg, size: :md,
-                  title: "Switch repository", inset: :flush, css: "w-[34rem] max-w-full") do |s| %>
+    <%# Fixed 60dvh, always — the surface height is constant (loading or loaded); the body just scrolls
+        more or less within it. dvh is viewport-relative, so it doesn't depend on content. %>
+    <%= component("surface", preset: :dialog, elevation: :lg, size: :md, title: "Switch repository",
+                  inset: :flush, css: "w-[34rem] max-w-full h-[60dvh]") do |s| %>
       <% s.with_fixed_area do %>
         <div class="p-3">
           <%= component("search_input", placeholder: "Search repositories…") %>
