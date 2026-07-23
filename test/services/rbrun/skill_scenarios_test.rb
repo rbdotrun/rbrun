@@ -27,16 +27,16 @@ module Rbrun
           description: calls save_skill and the skill is promoted
     YAML
 
-    test "ingest upserts a scenario row keyed [skill, label], idempotent" do
+    test "ingest upserts one skill-bound workflow keyed [skill, label], idempotent" do
       with_scenarios(SCENARIO) do |dir|
         assert_equal 1, Rbrun::SkillScenarios.ingest(@skill, dir)
         assert_equal 1, Rbrun::SkillScenarios.ingest(@skill, dir) # idempotent (find-or-init)
 
-        scenario = Rbrun::SkillScenario.for_tenant("acme").find_by!(skill: @skill, label: "Builds a dad-joke skill")
-        assert_equal "Make me a skill that tells a dad joke.", scenario.prompt
-        assert_equal 2, scenario.step_list.size
-        assert_equal "Author the folder", scenario.step_list.first["label"]
-        assert_equal 1, Rbrun::SkillScenario.for_tenant("acme").where(skill: @skill).count
+        wf = @skill.workflows.for_tenant("acme").find_by!(label: "Builds a dad-joke skill")
+        assert_equal "Make me a skill that tells a dad joke.", wf.prompt
+        assert_equal 2, wf.steps.count
+        assert_equal "Author the folder", wf.steps.first.title
+        assert_equal 1, @skill.workflows.count
       end
     end
 

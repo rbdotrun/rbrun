@@ -3,10 +3,10 @@
 require_relative "support"
 
 # THE dogfood board — the scenario way (like insitix). Every skill's hand-authored scenarios/*.yml is
-# seeded as a SkillScenario (prompt + the steps it should produce, each step's description = what to
-# validate); this seeds the skills, ingests the scenarios, replays each as a SELF-VALIDATING autonomous
-# run (the agent does the work, validates each step against its own tool-call evidence, self-approves via
-# auto mode), and prints the verdict. Real Claude + real Daytona. Creds from .env.
+# seeded as a skill-bound Rbrun::Workflow (prompt + the steps it should produce, each step's description
+# = what to validate); this seeds the skills, ingests the scenarios, replays each as a SELF-VALIDATING
+# autonomous run (the agent does the work, validates each step against its own tool-call evidence,
+# self-approves via auto mode), and prints the verdict. Real Claude + real Daytona. Creds from .env.
 #
 #   bin/rails app:dogfood:scenarios
 namespace :dogfood do
@@ -27,22 +27,21 @@ namespace :dogfood do
     ingested = Rbrun::SkillScenarios.ingest_all(tenant, Rbrun.config)
     dog.ok "scenarios ingested", ingested.positive?
 
-    scenarios = Rbrun::SkillScenario.for_tenant(tenant).includes(:skill).order(:skill_id, :label)
+    scenarios = Rbrun::Workflow.for_tenant(tenant).scenarios.includes(:skill).order(:skill_id, :label)
     if scenarios.empty?
       puts "no scenarios seeded — add scenarios/*.yml under a skill folder."
       next
     end
 
     passed = 0
-    scenarios.each do |scenario|
-      dog.header "#{scenario.skill.slug} · #{scenario.label}"
-      record = Rbrun::SkillScenarioRun.run(scenario, tenant:)
+    scenarios.each do |workflow|
+      dog.header "#{workflow.skill.slug} · #{workflow.label}"
+      record = Rbrun::SkillScenarioRun.run(workflow, tenant:)
       passed += 1 if record[:pass]
-      record[:steps].each do |step|
-        dog.ok "#{step[:label]}", step[:done]
-      end
+      record[:steps].each { |step| dog.ok step[:label], step[:done] }
+      dog.info "showcase", (record[:showcase] ? "artifact ##{record[:showcase].artifact_id} v#{record[:showcase].number}" : "—")
       mark = record[:pass] ? "✓" : "✗"
-      puts format("%s  %s · %-32s  %s/%s", mark, scenario.skill.slug, scenario.label, record[:done], record[:total])
+      puts format("%s  %s · %-32s  %s/%s", mark, workflow.skill.slug, workflow.label, record[:done], record[:total])
     end
 
     puts "\n— #{passed}/#{scenarios.size} scenarios passed"
