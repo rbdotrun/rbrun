@@ -31,8 +31,11 @@ import { z } from "zod";
 
 const SERVER = "rbrun";
 
-// cwd is the session's workspace; the runner staged the skills under its .claude/.
-const SKILLS_DIR = join(process.cwd(), ".claude", "skills");
+// The runner staged skills + settings under the WORKSPACE's .claude/ (CLAUDE_CONFIG_DIR) — which is a
+// SIBLING of the agent's cwd (the repo checkout), NOT under it. Key off CLAUDE_CONFIG_DIR, never
+// process.cwd(), or a real-repo session looks for skills under the checkout and finds none.
+const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR ?? join(process.cwd(), ".claude");
+const SKILLS_DIR = join(CLAUDE_DIR, "skills");
 
 // Whatever the runner staged into <workspace>/.claude/skills/ — read off the directory, never
 // listed here. A skill is a folder in app/skills/: dropping one in is the whole of adding a
@@ -87,6 +90,9 @@ interface Config {
   // Autonomous run: no human on the gate, so canUseTool AUTO-APPROVES every needs_approval call
   // (ruby + mcp) instead of parking. Scoped to a disposable, reaped box — the box is the boundary.
   auto?: boolean;
+  // The agent's working directory (the repo checkout). Passed to query() so the SDK KNOWS its cwd and
+  // surfaces it to the agent — otherwise the agent can't infer the box's /workspace/ nesting and guesses.
+  cwd?: string;
   attachments?: Attachment[];
   mcp?: {
     servers?: Record<string, unknown>;
@@ -369,6 +375,7 @@ async function main(): Promise<void> {
     options: {
       systemPrompt: config.system_prompt,
       model: config.model,
+      cwd: config.cwd ?? process.cwd(), // the SDK's working dir — surfaced to the agent so it never guesses paths
       // A tool-heavy agent (build audience → fetch roster → draft) needs headroom to REACH its
       // final structured emit; the SDK default cap cuts the turn off mid-work, yielding a
       // null structured_output. Generous by default, overridable per run.

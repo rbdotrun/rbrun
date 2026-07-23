@@ -4,10 +4,11 @@ module Rbrun
   class AgentTurnSystemPromptTest < ActiveSupport::TestCase
     # A runtime double (injected via the designed `runtime:` seam) that captures the system prompt.
     class SystemCapturingRuntime
-      attr_reader :system, :auto
+      attr_reader :system, :auto, :cwd
       def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         @system = system
         @auto = auto
+        @cwd = cwd
         on_event.call({ "type" => "result", "session_id" => "sdk-1" })
       end
     end
@@ -16,13 +17,10 @@ module Rbrun
       @session = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b").sessions.create!
     end
 
-    test "the system prompt starts with the host prompt and names the exact working directory" do
+    test "the turn's system prompt is the host prompt (cwd is passed via the SDK option, not the prompt)" do
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
-      assert runtime.system.start_with?(Rbrun.config(@session.tenant).system_prompt.to_s)
-      # the agent must be TOLD its absolute cwd (the checkout) so it never guesses the /workspace/ path
-      assert_includes runtime.system, "Your working directory"
-      assert_includes runtime.system, @session.worktree.checkout
+      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
     end
 
     test "preferred_skills append a steer to the system prompt" do
@@ -40,6 +38,12 @@ module Rbrun
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
       refute_includes runtime.system, "prefer these skills"
+    end
+
+    test "the checkout is passed to the runtime as cwd (the SDK's working dir)" do
+      runtime = SystemCapturingRuntime.new
+      Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
+      assert_equal @session.worktree.checkout, runtime.cwd
     end
 
     test "the session's auto flag flows to the runtime" do
