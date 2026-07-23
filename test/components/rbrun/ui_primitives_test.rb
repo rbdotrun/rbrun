@@ -24,10 +24,21 @@ module Rbrun
         assert_match "nav", render_inline(Ui::Pagination::Component.new(page: 2, total_pages: 5, href: ->(n) { "/#{n}" })).to_html
         assert_match "nav", render_inline(Ui::Tabs::Component.new(tabs: [ { label: "A", href: "/", key: "a", active: true } ])).to_html
         assert_match "grid-template-columns", render_inline(Ui::Table::Component.new(columns: [ "Name" ])).to_html
+        row = Ui::TableRow::Component.new(id: "r_1", template: "1fr 1fr")
+        row.with_content("cells")
+        row_html = render_inline(row).to_html
+        assert_match %(id="r_1"), row_html
+        assert_match "grid-template-columns: 1fr 1fr", row_html
         assert_match "Card", render_inline(Ui::VisualCard::Component.new(title: "Card")).to_html
         assert_match "Item", render_inline(Ui::ListCard::Component.new(title: "Item", icon: "star")).to_html
         assert_match %(role="menuitem"), render_inline(Ui::ListItem::Component.new(title: "o/n", subtitle: "o", avatar: "ON", href: "/x")).to_html
         assert_match "animate-pulse", render_inline(Ui::Skeleton::Component.new(variant: :list_item, rows: 2)).to_html
+        empty = Ui::Empty::Component.new(title: "Nothing here", subtitle: "Add one")
+        empty.with_cta { "GO" }
+        empty_html = render_inline(empty).to_html
+        assert_match "border-dashed", empty_html
+        assert_match "Nothing here", empty_html
+        assert_match "GO", empty_html
         surface = Ui::Surface::Component.new(title: "S", preset: :dialog)
         surface.with_body { "B" }
         assert_match "rounded-xl", render_inline(surface).to_html

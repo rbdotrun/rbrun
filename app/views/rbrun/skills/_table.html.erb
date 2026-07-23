@@ -1,19 +1,18 @@
-<%# The skills list as the table primitive. Extracted so the promote broadcast can replace #skills_table. %>
-<% if rows.empty? %>
-  <p class="text-sm text-slate-400">No skills yet. Click <strong>New skill</strong> to build one with the assistant, or add a <code>c.skill</code> / <code>c.skills_path</code> folder and reseed.</p>
-<% else %>
-  <%= component("table", columns: ["Name", "Slug", "Version", "Source", "Status"],
-                template: "minmax(0,2fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)") do |t| %>
-    <% rows.each do |r| %>
-      <% skill = r[:skill] %>
-      <% t.with_row do %>
-        <span class="truncate font-medium text-slate-800"><%= skill.name %></span>
-        <span class="truncate font-mono text-xs text-slate-500"><%= skill.slug %></span>
-        <span class="truncate text-xs text-slate-500"><%= skill.current_version ? "v#{skill.current_version.digest[0, 7]}" : "—" %></span>
-        <span class="truncate text-xs text-slate-500"><%= skill.current_version&.source || "—" %></span>
-        <span>
-          <%= component("badge", label: r[:state].to_s, color: (r[:state] == :clean ? :slate : :amber)) %>
-        </span>
+<%# The skills list — the table primitive in its streamable form: a collection of dom_id-keyed rows in
+    a stable container (Skill::ROWS_ID). Skill#broadcast_row appends/replaces single rows into it. The
+    empty slot shows only while the container has no rows (auto-hides on the first streamed row). %>
+<%= component("table", columns: ["Name", "Slug", "Version", "Source"],
+              template: Rbrun::Skill::TABLE_TEMPLATE, id: Rbrun::Skill::ROWS_ID,
+              collection: skills, row: "rbrun/skills/skill_row", row_as: :skill) do |t| %>
+  <% t.with_empty do %>
+    <%= component("empty", title: "No skills yet",
+                  subtitle: "Build one with the assistant, or add a c.skill / c.skills_path folder and reseed.") do |e| %>
+      <% e.with_cta do %>
+        <%= form_with url: rbrun.build_skill_path, method: :post, data: { turbo_frame: "drawer" } do %>
+          <%= component("button", variant: :primary, size: :sm, type: "submit") do %>
+            <%= lucide_icon("plus", class: "size-4") %> New skill
+          <% end %>
+        <% end %>
       <% end %>
     <% end %>
   <% end %>
