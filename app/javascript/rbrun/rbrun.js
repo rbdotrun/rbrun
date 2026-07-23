@@ -17,6 +17,7 @@ import BulkSelectController from "./controllers/bulk_select_controller";
 import DropzoneController from "./controllers/dropzone_controller";
 import SingleUploadController from "./controllers/single_upload_controller";
 import RichTextAreaController from "./controllers/rich_text_area_controller";
+import NestedForm from "@stimulus-components/rails-nested-form";
 
 const application = Application.start();
 application.register("autoscroll", AutoscrollController);
@@ -35,4 +36,5 @@ application.register("bulk-select", BulkSelectController);
 application.register("dropzone", DropzoneController);
 application.register("single-upload", SingleUploadController);
 application.register("rich-text-area", RichTextAreaController);
+application.register("nested-form", NestedForm);
 window.RbrunStimulus = application;

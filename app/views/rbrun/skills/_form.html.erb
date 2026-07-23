@@ -44,5 +44,30 @@
         <% end %>
       </div>
     <% end %>
+
+    <% if skill %>
+      <div class="mt-8">
+        <%= component("form_section", title: "Scenarios", description: "Runnable examples that self-validate this skill.") do %>
+          <div class="flex flex-col gap-2">
+            <% skill.workflows.order(:label).each do |wf| %>
+              <div class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium text-slate-800"><%= wf.label %></p>
+                  <p class="text-xs text-slate-500"><%= pluralize(wf.steps.size, "step") %><%= " · showcase ✓" if wf.showcase_artifact_version_id %></p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <%= button_to "▶ Run", rbrun.run_skill_workflow_path(skill.slug, wf), method: :post,
+                        class: "text-xs rounded-md px-2 py-1 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer" %>
+                  <%= link_to "Edit", rbrun.edit_skill_workflow_path(skill.slug, wf), class: "text-xs text-default-600 hover:underline" %>
+                </div>
+              </div>
+            <% end %>
+            <%= component("button", href: rbrun.new_skill_workflow_path(skill.slug), variant: :white, size: :sm, css: "self-start") do %>
+              + New scenario
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   <% end %>
 <% end %>

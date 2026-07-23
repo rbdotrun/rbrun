@@ -24,6 +24,10 @@ Rbrun::Engine.routes.draw do
   # Skills panel: list + the authoring form (new/create/edit/update) + reconcile a divergence (keep|reload).
   resources :skills, param: :slug, only: %i[index new create edit update] do
     member { post :reconcile }
+    # A skill's scenarios are skill-bound workflows: author via nested form, replay via ▶ Run.
+    resources :workflows, only: %i[new create edit update destroy] do
+      member { post :run }
+    end
   end
 
   root to: "sessions#index"

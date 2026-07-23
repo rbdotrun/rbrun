@@ -1,0 +1,39 @@
+<%# locals: skill, workflow %>
+<%= component("surface", title: workflow.persisted? ? "Edit scenario" : "New scenario", heading: :h1, inset: :centered) do |s| %>
+  <% s.with_body do %>
+    <%= form_with url: (workflow.persisted? ? rbrun.skill_workflow_path(skill.slug, workflow) : rbrun.skill_workflows_path(skill.slug)),
+                  method: (workflow.persisted? ? :patch : :post),
+                  data: { controller: "nested-form" }, class: "flex flex-col gap-6" do %>
+
+      <%= component("field", label: "Label", name: "workflow[label]", value: workflow.label,
+            error: workflow.errors[:label].first) %>
+      <%= component("field", label: "Example prompt", name: "workflow[prompt]", value: workflow.prompt,
+            required: false, placeholder: "the vague request that should make the skill fire") %>
+      <%= component("textarea", label: "Goal", name: "workflow[goal]", value: workflow.goal, rows: 2) %>
+
+      <div class="flex flex-col gap-3">
+        <p class="text-sm font-semibold text-slate-800">Steps to validate</p>
+        <% workflow.steps.each_with_index do |step, i| %>
+          <%= render "rbrun/workflows/step_fields", index: i, step: step %>
+        <% end %>
+
+        <template data-nested-form-target="template">
+          <%= render "rbrun/workflows/step_fields", index: "NEW_RECORD", step: nil %>
+        </template>
+
+        <%# new rows insert just before this anchor (beforebegin) → after the existing rows %>
+        <div data-nested-form-target="target"></div>
+
+        <%= component("button", type: "button", variant: :white, size: :sm,
+              data: { action: "nested-form#add" }, css: "self-start") { "+ Add step" } %>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <%= component("button", href: rbrun.edit_skill_path(skill.slug), variant: :ghost) { "Cancel" } %>
+        <%= component("button", type: "submit", variant: :primary) do %>
+          <%= workflow.persisted? ? "Save scenario" : "Create scenario" %>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,0 +1,18 @@
+<%# locals: index, step (a WorkflowStep or nil). Row conventions match @stimulus-components/rails-nested-form:
+    .nested-form-wrapper + data-new-record; remove flips _destroy for persisted rows, drops new ones. %>
+<div class="nested-form-wrapper flex items-start gap-3 rounded-lg border border-slate-200 p-3"
+     data-new-record="<%= step&.persisted? ? 'false' : 'true' %>">
+  <% if step&.persisted? %>
+    <input type="hidden" name="workflow[steps_attributes][<%= index %>][id]" value="<%= step.id %>">
+  <% end %>
+  <input type="hidden" name="workflow[steps_attributes][<%= index %>][position]" value="<%= step&.position || (index.to_i + 1) %>">
+  <div class="flex-1 flex flex-col gap-2">
+    <%= component("field", label: "Step title", name: "workflow[steps_attributes][#{index}][title]",
+          value: step&.title, required: false, error: step&.errors&.[](:title)&.first) %>
+    <%= component("textarea", label: "What to validate", rows: 2,
+          name: "workflow[steps_attributes][#{index}][description]", value: step&.description) %>
+  </div>
+  <input type="hidden" name="workflow[steps_attributes][<%= index %>][_destroy]" value="0">
+  <%= component("button", type: "button", variant: :ghost, size: :sm,
+        data: { action: "nested-form#remove" }) { "Remove" } %>
+</div>
