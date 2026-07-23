@@ -48,6 +48,11 @@ module Rbrun
         # snapshot (content-addressed by this Dockerfile's digest), so every box inherits it and an
         # unchanged image is reused. Hosts that need more (python, Office readers) inject their own via
         # config[:dockerfile].
+        # The command-line dev tools available in the box (bun from the base image; the rest baked into
+        # DEFAULT_DOCKERFILE below). Kept next to the Dockerfile so the two never drift, and surfaced to
+        # the agent in the system prompt so it knows what it can reach via Bash.
+        TOOLCHAIN = %w[git gh curl jq bun].freeze
+
         DEFAULT_DOCKERFILE = <<~DOCKER
           FROM oven/bun:1-debian
           RUN apt-get update \\

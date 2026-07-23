@@ -29,6 +29,9 @@ module Rbrun
         You are an assistant working inside a sandboxed workspace. Call the `identity` tool first to
         learn who you are working for. Use your tools to fulfil the request; when asked for a
         deliverable, build it. Never invent data — everything you present must come from your tools.
+
+        Your box ships these command-line tools — use them via Bash: #{Rbrun::Sandbox::Daytona::Client::TOOLCHAIN.join(", ")}.
+        When you work on a repository, your cwd is the checked-out repo; use git + gh (open PRs with `gh pr create`).
       PROMPT
     end
 
