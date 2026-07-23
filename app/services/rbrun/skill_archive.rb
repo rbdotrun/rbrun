@@ -64,12 +64,19 @@ module Rbrun
     end
 
     # Read a folder into a { relative-path => bytes } map (files only).
+    # `scenarios/` holds hand-authored dogfood seeds (SkillScenario YAML) — they drive the eval board,
+    # never the agent's workspace, so they are EXCLUDED from the staged archive (and thus the digest).
+    STAGE_EXCLUDE = "scenarios/"
+
     def read_dir(dir)
       root = File.expand_path(dir)
       Dir.glob(File.join(root, "**", "*")).select { |f| File.file?(f) }.each_with_object({}) do |path, map|
+        rel = path.delete_prefix("#{root}/")
+        next if rel.start_with?(STAGE_EXCLUDE)
+
         # UTF-8 (not binread's ASCII-8BIT) so it matches files() and renders — bytes are unchanged, so the
         # content digest is identical; this just keeps the encoding consistent across pack/unpack.
-        map[path.delete_prefix("#{root}/")] = File.binread(path).force_encoding("UTF-8")
+        map[rel] = File.binread(path).force_encoding("UTF-8")
       end
     end
   end
