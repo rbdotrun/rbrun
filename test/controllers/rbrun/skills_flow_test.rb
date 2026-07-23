@@ -61,28 +61,86 @@ module Rbrun
       assert_select ".border-amber-300", count: 0
     end
 
-    test "the index shows a New skill button that targets the drawer" do
+    test "the index's New skill button links to the authoring form" do
       get "/rbrun/skills"
       assert_response :success
-      assert_select "form[action=?][data-turbo-frame=drawer]", "/rbrun/skills/new"
+      assert_select "a[href=?]", "/rbrun/skills/new", text: /New skill/
     end
 
-    test "New skill opens a create-skill conversation in the drawer" do
-      assert_difference("Rbrun::Session.count", 1) do
-        post "/rbrun/skills/new"
-      end
-      session = Rbrun::Session.order(:id).last
-      assert_equal %w[create-skill], session.preferred_skills
-      assert_equal Rbrun::SkillsController::SKILLS_REPO, session.worktree.repo
+    test "GET new renders an empty skill form" do
+      get "/rbrun/skills/new"
       assert_response :success
-      assert_select "turbo-frame#drawer"
+      assert_select "form[action=?][method=post]", "/rbrun/skills"
+      assert_select "input[name=?]", "skill[name]"
+      assert_select "textarea[name=?]", "skill[body]"
     end
 
-    test "New skill reuses one skills worktree per tenant" do
-      assert_difference("Rbrun::Worktree.count", 1) do
-        post "/rbrun/skills/new"
-        post "/rbrun/skills/new"
+    test "POST skills creates a skill with a v1 assembled from the form" do
+      assert_difference("Rbrun::Skill.count", 1) do
+        post "/rbrun/skills", params: { skill: {
+          name: "Changelog", label: "Changelog writer", description: "PRs → notes",
+          body: "# Changelog\n\nDo it.", preferred_skills: [ "", "create-skill" ], preferred_tools: [ "" ]
+        } }
       end
+      skill = Rbrun::Skill.for_tenant("rbrun").find_by!(slug: "changelog")
+      assert_equal "Changelog", skill.name
+      assert skill.current_version.present?
+      assert_equal "ui", skill.current_version.source
+      md = Rbrun::SkillArchive.files(skill.current_version.archive)["SKILL.md"]
+      assert_includes md, "name: Changelog"
+      assert_includes md, "# Changelog"
+      assert_redirected_to "/rbrun/skills/changelog/edit"
     end
+
+    test "GET edit loads the current version's fields" do
+      create_ui_skill("editme", name: "Edit Me", body: "original body")
+      get "/rbrun/skills/editme/edit"
+      assert_response :success
+      assert_select "input[name=?][value=?]", "skill[name]", "Edit Me"
+      assert_select "textarea[name=?]", "skill[body]", text: /original body/
+    end
+
+    test "PATCH skills promotes a new version, preserving the base version's other files" do
+      skill = create_ui_skill("editme", name: "Edit Me", body: "v1 body",
+                              extra: { "reference.md" => "keep me" })
+      assert_difference("skill.versions.count", 1) do
+        patch "/rbrun/skills/editme", params: { skill: { name: "Edit Me", body: "v2 body" } }
+      end
+      skill.reload
+      files = Rbrun::SkillArchive.files(skill.current_version.archive)
+      assert_includes files["SKILL.md"], "v2 body"
+      assert_equal "keep me", files["reference.md"], "non-SKILL.md files survive an edit"
+      assert_redirected_to "/rbrun/skills/editme/edit"
+    end
+
+    test "GET edit?version= loads that specific version into the form" do
+      skill = create_ui_skill("editme", name: "Edit Me", body: "v1 body")
+      v1 = skill.current_version
+      patch "/rbrun/skills/editme", params: { skill: { name: "Edit Me", body: "v2 body" } }
+
+      get "/rbrun/skills/editme/edit", params: { version: v1.id }
+      assert_response :success
+      assert_select "textarea[name=?]", "skill[body]", text: /v1 body/
+    end
+
+    test "POST skills with a taken slug re-renders new with an error (no clobber)" do
+      create_ui_skill("changelog", name: "Changelog", body: "b")
+      assert_no_difference("Rbrun::Skill.count") do
+        post "/rbrun/skills", params: { skill: { name: "Changelog", body: "dupe" } }
+      end
+      assert_response :unprocessable_entity
+    end
+
+    private
+
+      # A skill whose current version is a UI-authored SKILL.md (+ optional extra files).
+      def create_ui_skill(slug, name:, body:, extra: {})
+        skill = Rbrun::Skill.create!(tenant: "rbrun", slug:, name:)
+        md    = Rbrun::SkillForm.new(name:, body:).skill_md
+        files = { "SKILL.md" => md }.merge(extra)
+        skill.promote!(digest: Rbrun::SkillArchive.digest_files(files),
+                       archive: Rbrun::SkillArchive.pack_files(files), source: :ui)
+        skill
+      end
   end
 end

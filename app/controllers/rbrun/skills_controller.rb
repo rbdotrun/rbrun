@@ -1,23 +1,57 @@
 module Rbrun
-  # The Skills panel: surface the tenant's skills and, for any that diverge from their authored
-  # source (or fail to parse), the diff + a Keep-stored / Reload resolution. Never clobbers — Reload
-  # is an explicit, versioned adopt; Keep stored records the reviewed digest.
+  # The Skills panel: surface the tenant's skills, author/edit them through a form (each Save promotes a
+  # new SkillVersion), and reconcile any that diverge from their authored source. Never clobbers —
+  # Reload is an explicit, versioned adopt; Keep stored records the reviewed digest.
   class SkillsController < Rbrun::ApplicationController
-    # The tenant's dedicated skill-authoring worktree — a bare sandbox (never provisioned/cloned), one
-    # per tenant, under which each "New skill" click opens a fresh create-skill conversation.
-    SKILLS_REPO = "rbrun/skills"
+    helper_method :skill_options, :tool_options
 
     def index
       @skills = Rbrun::Skill.for_tenant(current_tenant).order(:slug)
       @authored = authored_by_slug
     end
 
-    # Open a create-skill conversation in the app-wide drawer: a fresh session under the tenant's
-    # skills worktree, steered to the create-skill skill via preferred_skills.
-    def build
-      worktree = Rbrun::Worktree.for_tenant(current_tenant).create_with(bare: true).find_or_create_by!(repo: SKILLS_REPO)
-      @session = worktree.sessions.create!(preferred_skills: %w[create-skill])
-      render :build, layout: false
+    def new
+      @skill = nil
+      @form  = Rbrun::SkillForm.new
+    end
+
+    def create
+      @form = Rbrun::SkillForm.new(form_params)
+      slug  = @form.name.to_s.parameterize
+      if slug.blank?
+        @skill = nil
+        flash.now[:alert] = "A skill needs a name."
+        return render :new, status: :unprocessable_entity
+      end
+
+      skill = Rbrun::Skill.new(tenant: current_tenant, slug:, name: @form.name)
+      files = { "SKILL.md" => @form.skill_md }
+      skill.save!
+      skill.promote!(digest: Rbrun::SkillArchive.digest_files(files),
+                     archive: Rbrun::SkillArchive.pack_files(files), source: :ui)
+      redirect_to rbrun.edit_skill_path(skill.slug), notice: "Skill created."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
+      @skill = nil
+      flash.now[:alert] = "Couldn't create the skill: #{e.message}"
+      render :new, status: :unprocessable_entity
+    end
+
+    def edit
+      @skill   = find_skill
+      @version = params[:version].present? ? @skill.versions.find(params[:version]) : @skill.current_version
+      @form    = Rbrun::SkillForm.from_version(@version)
+    end
+
+    def update
+      @skill = find_skill
+      @form  = Rbrun::SkillForm.new(form_params)
+      base   = @skill.current_version ? Rbrun::SkillArchive.files(@skill.current_version.archive) : {}
+      files  = base.merge("SKILL.md" => @form.skill_md)
+
+      @skill.update!(name: @form.name.presence || @skill.name)
+      @skill.promote!(digest: Rbrun::SkillArchive.digest_files(files),
+                      archive: Rbrun::SkillArchive.pack_files(files), source: :ui)
+      redirect_to rbrun.edit_skill_path(@skill.slug), notice: "New version promoted."
     end
 
     def reconcile
@@ -28,6 +62,19 @@ module Rbrun
     end
 
     private
+
+      def find_skill
+        Rbrun::Skill.for_tenant(current_tenant).find_by!(slug: params[:slug])
+      end
+
+      def form_params
+        params.require(:skill).permit(:name, :label, :tagline, :icon, :kind, :example,
+                                      :description, :body, preferred_skills: [], preferred_tools: [])
+      end
+
+      # Soft-hint options (author/display only). Skills = the tenant's slugs; tools = the tool manifest.
+      def skill_options = Rbrun::Skill.for_tenant(current_tenant).order(:slug).pluck(:name, :slug)
+      def tool_options  = Rbrun::ApplicationTool.manifest.map { |t| [ t["name"], t["name"] ] }
 
       def authored_by_slug
         Rbrun::SkillSeeder.authored_from_config(Rbrun.config(current_tenant)).index_by { |a| a[:slug] }

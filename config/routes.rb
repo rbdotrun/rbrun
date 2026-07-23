@@ -21,11 +21,10 @@ Rbrun::Engine.routes.draw do
   get  "repos",        to: "repositories#index",  as: :repos
   post "repos/switch", to: "repositories#switch", as: :switch_repo
 
-  # Skills panel: list + reconcile a divergence (keep|reload). `new` opens a create-skill
-  # conversation in the app-wide drawer.
-  get  "skills",                 to: "skills#index",     as: :skills
-  post "skills/new",             to: "skills#build",     as: :build_skill
-  post "skills/:slug/reconcile", to: "skills#reconcile", as: :reconcile_skill
+  # Skills panel: list + the authoring form (new/create/edit/update) + reconcile a divergence (keep|reload).
+  resources :skills, param: :slug, only: %i[index new create edit update] do
+    member { post :reconcile }
+  end
 
   root to: "sessions#index"
 end
