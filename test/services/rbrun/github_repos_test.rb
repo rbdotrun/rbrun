@@ -28,17 +28,20 @@ module Rbrun
       assert repos.last.private
     end
 
-    test "search hits /search/repositories and maps .items" do
+    test "search filters the token's OWN repos (never global /search/repositories)" do
+      # Only /user/repos is stubbed — if search reached the global /search/repositories, the test
+      # adapter would raise (no stub), so a passing result proves the search is scoped to the PAT.
       conn = conn_for do |s|
-        s.get("/search/repositories") do |env|
-          assert_equal "rb", env.params["q"]
+        s.get("/user/repos") do |_env|
           [ 200, { "Content-Type" => "application/json" },
-            { "items" => [ { "full_name" => "rbdotrun/rbrun", "default_branch" => "main" } ] }.to_json ]
+            [ { "full_name" => "rbdotrun/rbrun", "default_branch" => "main" },
+              { "full_name" => "acme/api",       "default_branch" => "develop" },
+              { "full_name" => "other/thing",    "default_branch" => "main" } ].to_json ]
         end
       end
 
-      repos = Rbrun::GithubRepos.new(pat: "x", conn:).search(query: "rb")
-      assert_equal [ "rbdotrun/rbrun" ], repos.map(&:full_name)
+      repos = Rbrun::GithubRepos.new(pat: "x", conn:).search(query: "AC") # case-insensitive
+      assert_equal [ "acme/api" ], repos.map(&:full_name)
     end
 
     test "a blank query lists instead of searching" do

@@ -1,25 +1,39 @@
-# Skill authoring & self-validating eval — design
+# Artifacts, skill authoring & self-validating eval — design
 
 **Date:** 2026-07-23
-**Status:** design (one spec, two implementation plans)
+**Status:** design (one spec, three implementation plans)
 
 ## Purpose
 
-Let the agent **author a skill from inside a conversation** and have it land, durably, in
-rbrun's own skill store — then let a hand-authored **scenario** replay that skill and
-self-validate, so a skill's correctness is provable the way a dogfood is.
+Give the agent two independent, both-fundamental low-level primitives — **produce a deliverable**
+and **author a skill** — plus a way to **prove a skill works**:
 
-This is deliberately **not** a port of Anthropic's `skill-creator` repo. That skill's eval
-half (two subagents per test — with-skill vs baseline — driven by nested `claude -p`) needs a
-second Claude runtime and a live token inside the sandbox, both of which rbrun keeps closed by
-design. The prior art we port instead lives in the sibling `insitix` repo, whose skill model is
-already the one rbrun uses (a folder ⇄ one gzipped-tar archive, versioned in the app DB) and
-whose eval is a **single-turn self-validation** that fits rbrun's runtime with no new machinery.
+- **Artifacts** — the agent produces a **single-file deliverable** (a report, a document) that is
+  saved as a first-class, **versioned, addressable** thing instead of scrolling away as chat text.
+- **Skill authoring** — the agent authors a **skill folder** and promotes it, durably, into rbrun's
+  own skill store.
+- **Scenario eval** — a hand-authored **scenario** replays a skill and self-validates, so a skill's
+  correctness is provable the way a dogfood is.
 
-The work splits into two plans that share one write-path contract, hence one spec:
+`save_artifact` and `save_skill` are **separate primitives, not coupled**. An artifact is one file
+(single `content_type`, so a previewer can dispatch on it); a skill is a folder (SKILL.md + files).
+Neither is derived from the other. The `skill-creator` skill *instructs* the agent to also emit a
+summary artifact — a prose relationship, never a schema one. (This deliberately drops insitix's
+coupling, where a skill example's result literally *is* an artifact version.)
 
-- **Plan A — Authoring.** The agent writes a skill folder in its workspace; a `save_skill` tool
-  packs it into the tarball archive and `promote!`s it into the DB, behind an inline approval gate.
+The eval half is deliberately **not** a port of Anthropic's `skill-creator` repo. That skill's eval
+(two subagents per test — with-skill vs baseline — driven by nested `claude -p`) needs a second
+Claude runtime and a live token inside the sandbox, both of which rbrun keeps closed by design. The
+prior art we port instead lives in the sibling `insitix` repo, whose skill model is already the one
+rbrun uses (a folder ⇄ one gzipped-tar archive, versioned in the app DB) and whose eval is a
+**single-turn self-validation** that fits rbrun's runtime with no new machinery.
+
+The work splits into three plans under one spec, built in this order:
+
+- **Plan C — Artifacts (foundation).** `Rbrun::Artifact` + `Rbrun::ArtifactVersion` (ActiveStorage
+  blob per version) and a `save_artifact(path:)` tool. Ungated. Built first; the eval report is one.
+- **Plan A — Skill authoring.** The agent writes a skill folder; a `save_skill(folder_path:)` tool
+  packs it into the tarball archive and `promote!`s it into the store, behind an inline approval gate.
 - **Plan B — Scenario eval.** A new `SkillScenario` model + ingestion, and an orchestrator that
   seeds a workflow from the scenario's steps and replays it, the agent self-validating each step.
 
@@ -49,7 +63,64 @@ The work splits into two plans that share one write-path contract, hence one spe
   in-engine "create skill" action is deferred.
 - **No `SkillExample` (prompt → showcased result) model** in this spec. It is insitix's
   marketing/showcase concept, orthogonal to correctness; add later if a marketplace surface wants it.
-- **Artifacts** (insitix's editable-React-app outputs) are a separate subsystem, not touched here.
+- **No multi-file artifacts.** An artifact is one file, on purpose (a single `content_type` is what
+  makes it previewable). A multi-file artifact is a *different* construct — different storage,
+  different preview story — built later if a real need appears. Not this.
+- **No previewer, no artifact UI, no publish/share** in this spec. The primitive is the model + the
+  `save_artifact` tool. Rendering a previewer per `content_type`, and a gated publish/share step
+  (the exposure ladder, CLAUDE.md #10), are later additive work.
+- **No live-React-app artifacts** (insitix's `bun_build` → self-contained page that fetches its own
+  data). `content` here is opaque bytes; we do not build or execute it.
+
+---
+
+## Plan C — Artifacts (foundation)
+
+The strong low-level primitive: the agent produces a **single-file deliverable** and commits it as a
+versioned, addressable artifact. Built first — Plan B's eval report is a `save_artifact` output.
+
+### Models
+
+- `Rbrun::Artifact` — `Tenanted`, `belongs_to :session`, `name`, `has_many :versions`,
+  `belongs_to :current_version`. **No `kind`, no `content`** — just identity + history. The artifact
+  never classifies itself; the content-type lives on the blob and a previewer dispatches on it later.
+- `Rbrun::ArtifactVersion` — `belongs_to :artifact`, `number` (unique per artifact, incrementing),
+  **`has_one_attached :file`** (one ActiveStorage blob). Immutable snapshot. `content_type` and
+  `byte_size` are read off the blob (Marcel infers the type), never a passed argument.
+
+### `save_artifact` tool contract
+
+```
+save_artifact(path:, name: nil, artifact_id: nil)
+  → { data: { artifact_id, name, version, content_type, byte_size } }
+```
+
+- Reads **one** workspace file at `<workspace>/<path>` (the file the agent just wrote), attaches it
+  as a new `ArtifactVersion.file`. The bytes travel via the workspace file, never through the
+  tool-call payload — so long reports don't bloat the tool arg or tax the NDJSON bridge.
+- `artifact_id` omitted → new `Artifact` (name defaults to the file basename); present → a new
+  immutable version of that artifact, `current_version` advances.
+- **Ungated.** Producing a deliverable is a private-to-tenant leaf output — it changes nothing about
+  how the agent behaves (unlike promoting a skill, which is injected into every future turn). Any
+  human checkpoint belongs on a *future publish/share* step, not on creation. Ungated creation is
+  also what lets autonomous/scenario runs (Plan B) emit a report artifact without parking.
+
+### Storage / durability
+
+ActiveStorage blobs must survive — skills deliberately avoid ActiveStorage in insitix because that
+app's data DB is trashed on `insiti:pull`. rbrun's DB model differs (own DB + tenancy, CLAUDE.md #8),
+so ActiveStorage is fine — the plan pins **which storage service** artifacts bind to and confirms it
+is durable (not a scratch/disposable disk).
+
+### Testing (C)
+
+- Tool test against a fixture workspace file: `save_artifact` creates the `Artifact` + version 1,
+  the blob is attached, `content_type`/`byte_size` match the file; a second call with `artifact_id`
+  makes version 2 and advances `current_version`; a call without `artifact_id` makes a distinct
+  artifact.
+- Tenancy: the artifact inherits the session's tenant; `Artifact.for_tenant` scopes it.
+- Dogfood: a real turn writes a markdown report and calls `save_artifact`; assert a versioned
+  artifact with the blob exists for the tenant. Reaps prior fixture artifacts at start (idempotency).
 
 ---
 
@@ -61,19 +132,21 @@ The work splits into two plans that share one write-path contract, hence one spe
    writing guide, under the same permissive LICENSE) teaches the agent how to structure a skill:
    the `SKILL.md` frontmatter (name/description), progressive disclosure, `references/` layout, and
    the rbrun-specific fact that **a finished skill is saved with `save_skill`, not left as files**.
-2. The agent authors the folder under `<workspace>/<slug>/` using its normal `Write`/`Edit` tools
+2. The agent authors the folder under `<workspace>/<folder>/` using its normal `Write`/`Edit` tools
    (already path-scoped to the workspace).
-3. The agent calls `save_skill(slug:)`. The tool reads that folder, packs it with
+3. The agent calls `save_skill(folder_path:)`. The tool reads that folder, packs it with
    `SkillArchive.pack_files`, computes the digest, and promotes it for the current tenant.
 
 ### `save_skill` tool contract
 
 ```
-save_skill(slug:) → { data: { slug:, name:, digest:, files: [rel paths], created: bool } }
+save_skill(folder_path:) → { data: { slug:, name:, digest:, files: [rel paths], created: bool } }
 ```
 
-- Reads `<workspace>/<slug>/` (must contain `SKILL.md`; error if absent or the folder is empty).
-- `name` comes from the `SKILL.md` frontmatter `name:` (falls back to a titleized slug).
+- Reads `<workspace>/<folder_path>/` (a **folder** — a skill is multi-file; must contain `SKILL.md`;
+  error if absent or the folder is empty). Parallel to but independent of `save_artifact` (one file).
+- `slug` and `name` come from the `SKILL.md` frontmatter (`name:`); `slug` falls back to the folder
+  basename, `name` to a titleized slug.
 - Find-or-create the `Rbrun::Skill` row by `[tenant, slug]`, then `promote!(digest:, archive:,
   source: :agent)` — a **new `source` value** distinguishing agent-authored from `:file`/`:inline`.
 - `created` reports whether the Skill row was new (first save of this slug) vs a re-save.
@@ -189,5 +262,7 @@ HTML, per CLAUDE.md). Trigger: a rake task first (`app:dogfood`-style), a Skills
   at start and destroy at end.
 - **Compose primitives (banner)** — any eval UI is `Rbrun::Ui::*`, never raw HTML.
 - **Approval gate for sensitive mutation** — promoting a live skill parks for a human, like the
-  exposure ladder's `share_public`.
-```
+  exposure ladder's `share_public`. `save_artifact` is deliberately **not** gated — it is leaf output.
+- **`save_artifact` and `save_skill` are separate primitives** — one file vs one folder, ungated vs
+  gated, artifact store vs skill store. No schema coupling; the `skill-creator` skill only *instructs*
+  the agent to also emit a summary artifact.

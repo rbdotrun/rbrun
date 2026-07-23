@@ -10,11 +10,12 @@
                   title: "Switch repository", inset: :flush, css: "w-[34rem] max-w-full") do |s| %>
       <% s.with_fixed_area do %>
         <div class="p-3">
-          <%= component("input", name: "q", placeholder: "Search repositories…", autocomplete: "off",
-                        data: { command_target: "input", action: "input->command#search" }) %>
+          <%= component("search_input", placeholder: "Search repositories…") %>
         </div>
       <% end %>
       <% s.with_body do %>
+        <%# The skeleton the command controller clones back into the frame on every search. %>
+        <template data-command-target="skeleton"><%= component("skeleton", variant: :list_item, rows: 6) %></template>
         <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
                             data: { command_target: "frame" } do %>
           <%= component("skeleton", variant: :list_item, rows: 6) %>
