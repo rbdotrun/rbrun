@@ -1,0 +1,13 @@
+<%# Placeholder shown inside the lazy #repo_results frame until the real rows stream in. Mirrors a
+    list_item row (avatar square + two stacked bars) so the swap doesn't jump. %>
+<div role="menu" class="p-1" aria-busy="true">
+  <% 6.times do %>
+    <div class="flex items-center gap-2.5 rounded-md px-2.5 py-1.5">
+      <div class="size-9 shrink-0 animate-pulse rounded bg-slate-100"></div>
+      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-slate-100"></div>
+        <div class="h-2.5 w-24 max-w-full animate-pulse rounded bg-slate-100"></div>
+      </div>
+    </div>
+  <% end %>
+</div>

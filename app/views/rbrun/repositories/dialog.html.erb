@@ -1,0 +1,18 @@
+<%# The dialog shell loaded into the singleton #modal frame when the switcher is clicked. Renders
+    THROUGH dialog_frame (so the header reads like every other modal), then a `command`-controlled
+    search box + a lazy #repo_results frame whose placeholder is the skeleton. No GitHub call happens
+    to build this — the lazy frame fires its own request (recent repos on open, search on typing). %>
+<%= component("dialog_frame", title: "Switch repository") do %>
+  <div class="mt-4 w-[28rem] max-w-full"
+       data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
+    <input type="text" name="q" autocomplete="off" placeholder="Search repositories…"
+           data-command-target="input" data-action="input->command#search"
+           class="form-input-base w-full">
+    <div class="mt-3 max-h-[52vh] overflow-y-auto">
+      <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
+                          data: { command_target: "frame" } do %>
+        <%= render "rbrun/repositories/skeleton" %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

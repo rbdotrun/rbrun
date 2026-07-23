@@ -34,6 +34,23 @@ module Rbrun
       assert_select "a", text: /acme\/api/
     end
 
+    test "a request from the #modal frame renders the dialog shell without hitting GitHub" do
+      get "/rbrun/repos", headers: { "Turbo-Frame" => "modal" }
+      assert_response :success
+      assert_nil @fake.last_query, "the shell must not call GithubRepos"
+      assert_select "h2", text: "Switch repository"
+      assert_select "input[data-command-target=?]", "input"
+      assert_select "turbo-frame#repo_results[loading=?]", "lazy"
+      assert_select "turbo-frame#repo_results[src]"
+    end
+
+    test "a request from the #repo_results frame renders the GitHub rows" do
+      get "/rbrun/repos", params: { q: "rb" }, headers: { "Turbo-Frame" => "repo_results" }
+      assert_response :success
+      assert_equal "rb", @fake.last_query
+      assert_select "turbo-frame#repo_results"
+    end
+
     test "switch sets the session repo and redirects to the conversation index" do
       post "/rbrun/repos/switch", params: { repo: "acme/api" }
       assert_redirected_to "/rbrun/c"
