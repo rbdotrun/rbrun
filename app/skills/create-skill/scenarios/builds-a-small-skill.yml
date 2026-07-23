@@ -1,0 +1,15 @@
+label: Builds and promotes a small skill
+description: create-skill authors a tiny skill folder and promotes it via save_skill
+prompt: >
+  I want a skill called dad-joke that makes you tell a single dad joke whenever the user asks for one.
+  Build it and save it.
+steps:
+  - label: Author the skill folder
+    description: >
+      Prove you created a dad-joke/ folder in the workspace containing a SKILL.md with YAML frontmatter
+      (a name and a description that says when to trigger) and a short body — via your Write tool. Point
+      at the write you actually made.
+  - label: Promote the skill
+    description: >
+      Prove you called save_skill on the dad-joke folder and it succeeded — the dad-joke skill is now in
+      the store with a current version. Point at the save_skill call and its result.
