@@ -76,10 +76,23 @@ module Rbrun
       pat = Rbrun.config(tenant).github_pat
       url = "https://x-access-token:#{pat}@github.com/#{repo}.git"
       dir = checkout
+      # Clone with a token-embedded URL (for the initial fetch), then hand auth to gh: `gh auth
+      # login --with-token` stores the token in gh's own keyring and `gh auth setup-git` makes git use
+      # it — so the agent's Bash (which does NOT inherit the run env) has working git AND gh without
+      # ever handling the token itself. Reset origin to a CLEAN url so the token isn't left in
+      # .git/config. Then DERIVE the git identity from the token's own GitHub user (best-effort — a
+      # `{ …; true; }` group so a failure can't break the chain; the image's baked identity is the
+      # fallback), so commits are attributed to whoever the PAT belongs to, not a generic bot.
       <<~SH.strip
         mkdir -p #{dir} && cd #{dir} && \
-        (git rev-parse --git-dir >/dev/null 2>&1 || (git clone #{url} . && git remote set-url origin #{url})) && \
+        (git rev-parse --git-dir >/dev/null 2>&1 || git clone #{url} .) && \
         git fetch origin #{base} && git checkout #{base} && git checkout -B #{branch} && \
+        printf '%s' "#{pat}" | gh auth login --with-token && gh auth setup-git && \
+        git remote set-url origin https://github.com/#{repo}.git && \
+        { u=$(gh api user --jq .login 2>/dev/null); \
+          e=$(gh api user --jq '.email // ((.id|tostring) + "+" + .login + "@users.noreply.github.com")' 2>/dev/null); \
+          [ -n "$u" ] && git config user.name "$u"; \
+          [ -n "$e" ] && git config user.email "$e"; true; } && \
         git push -u origin #{branch}
       SH
     end

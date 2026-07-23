@@ -60,6 +60,23 @@ module Rbrun
       wt&.sandbox&.destroy!
     end
 
+    test "provision! sets up gh auth, cleans the token off origin, and derives the git identity" do
+      Rbrun.config.github_pat = "ghp_TOKEN"
+      wt = Worktree.create!(tenant: "acme", repo: "acme/webapp")
+      cmd = wt.provision_command
+      # gh gets the token (so the agent's Bash has working gh without handling secrets)…
+      assert_includes cmd, "gh auth login --with-token"
+      assert_includes cmd, "gh auth setup-git"
+      # …origin is reset to a CLEAN url (no token left in .git/config)…
+      assert_includes cmd, "git remote set-url origin https://github.com/acme/webapp.git"
+      refute_match(%r{set-url origin https://x-access-token}, cmd)
+      # …and the identity is DERIVED from the token's own GitHub user (best-effort).
+      assert_includes cmd, "gh api user --jq .login"
+      assert_includes cmd, "git config user.name"
+    ensure
+      wt&.sandbox&.destroy!
+    end
+
     test "provision! RAISES on a worktree with no repo — never a silent bare box" do
       wt = Worktree.create!(tenant: "acme", repo: "acme/webapp")
       wt.update_columns(repo: "")

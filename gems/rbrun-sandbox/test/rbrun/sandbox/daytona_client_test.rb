@@ -37,4 +37,11 @@ class DaytonaClientTest < Minitest::Test
     assert_match(/apt-get install[^\n]* gh\b/, df, "the GitHub CLI (gh) must be baked in")
     assert_includes df, "cli.github.com/packages", "gh needs its apt source added"
   end
+
+  def test_default_image_bakes_in_a_git_identity
+    df = Rbrun::Sandbox::Daytona::Client::DEFAULT_DOCKERFILE
+    # So commits never fail for lack of a user.name/user.email — the agent shouldn't have to set one.
+    assert_includes df, %(git config --system user.name "rbrun agent")
+    assert_includes df, %(git config --system user.email "agent@rb.run")
+  end
 end

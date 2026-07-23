@@ -62,6 +62,8 @@ module Rbrun
             && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \\
             && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \\
             && apt-get update && apt-get install -y --no-install-recommends gh \\
+            && git config --system user.name "rbrun agent" \\
+            && git config --system user.email "agent@rb.run" \\
             && useradd -m daytona \\
             && mkdir -p /home/daytona/workspace && chown -R daytona:daytona /home/daytona \\
             && apt-get clean && rm -rf /var/lib/apt/lists/*
