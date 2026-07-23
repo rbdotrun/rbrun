@@ -16,7 +16,28 @@ module Rbrun
     validates :slug, presence: true
     validates :name, presence: true
 
+    # The Skills table's grid tracks + rows-container id. Shared by the view (the table) and the row
+    # broadcast (a standalone row must match the header's tracks). `dom_id(skill)` is each row's id.
+    TABLE_TEMPLATE = "minmax(0,2fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)"
+    ROWS_ID = "skills_rows"
+
+    # The model streams its OWN row — append the first time it gains a version, replace on every later
+    # promote. One row over the wire, never the whole table. No subscribers (boot seeding) ⇒ discarded.
+    after_update_commit :broadcast_row, if: :saved_change_to_current_version_id?
+
     def diverged? = divergence_digest.present?
+
+    # Live reconcile state against an authored config source's files (`nil` = no config source):
+    # :clean (no source, or it matches current/dismissed) · :diverged (source differs) · :issue
+    # (source unreadable — missing/broken SKILL.md). Domain logic — the panel asks the model, not a
+    # presenter.
+    def reconcile_status(authored_files)
+      return :clean if authored_files.nil?
+      return :issue unless authored_files.is_a?(Hash) && authored_files.key?("SKILL.md")
+
+      digest = Rbrun::SkillArchive.digest_files(authored_files)
+      [ current_version&.digest, dismissed_digest ].include?(digest) ? :clean : :diverged
+    end
 
     # Adopt an authored source as the live version: find-or-create the version, point `current` at it,
     # and clear both divergence flags. Idempotent on digest.
@@ -32,6 +53,21 @@ module Rbrun
     # the seeder stops warning until the source changes to a new digest.
     def keep_stored!(digest:)
       update!(dismissed_digest: digest, divergence_digest: nil)
+    end
+
+    private
+
+    def broadcast_row
+      stream = [ "rbrun", tenant, "skills" ]
+      locals = { skill: self, template: TABLE_TEMPLATE }
+      if current_version_id_before_last_save.nil? # first version → the row is new
+        ::Turbo::StreamsChannel.broadcast_append_to(stream, target: ROWS_ID,
+                                                    partial: "rbrun/skills/skill_row", locals: locals)
+      else
+        ::Turbo::StreamsChannel.broadcast_replace_to(stream,
+                                                    target: ActionView::RecordIdentifier.dom_id(self),
+                                                    partial: "rbrun/skills/skill_row", locals: locals)
+      end
     end
   end
 end

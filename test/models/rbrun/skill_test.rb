@@ -53,6 +53,24 @@ module Rbrun
       end
     end
 
+    test "promoting appends the row the first time, replaces it after" do
+      skill = Rbrun::Skill.create!(tenant: "acme", slug: "greet", name: "Greet")
+      stream = [ "rbrun", "acme", "skills" ]
+
+      first = capture_turbo_stream_broadcasts(stream) do
+        skill.promote!(digest: "d1", archive: Rbrun::SkillArchive.pack_files({ "SKILL.md" => "hi" }), source: :ui)
+      end
+      assert_equal 1, first.size
+      assert_equal "append", first.first["action"]
+      assert_equal Rbrun::Skill::ROWS_ID, first.first["target"]
+
+      second = capture_turbo_stream_broadcasts(stream) do
+        skill.promote!(digest: "d2", archive: Rbrun::SkillArchive.pack_files({ "SKILL.md" => "hi2" }), source: :ui)
+      end
+      assert_equal "replace", second.first["action"]
+      assert_equal ActionView::RecordIdentifier.dom_id(skill), second.first["target"]
+    end
+
     def unpack_current(skill)
       require "tmpdir"
       Dir.mktmpdir do |dir|

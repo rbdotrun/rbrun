@@ -1,0 +1,9 @@
+<%# ONE skills-table row — a dom_id-keyed table_row so it is append/replace-addressable. Rendered by
+    the table's collection (inside a component) AND by Skill#broadcast_row (a view), so it composes the
+    table_row via render(Component.new) — works in both contexts; `template` matches the header tracks. %>
+<%= render(Rbrun::Ui::TableRow::Component.new(id: dom_id(skill), template: template)) do %>
+  <span class="truncate font-medium text-slate-800"><%= skill.name %></span>
+  <span class="truncate font-mono text-xs text-slate-500"><%= skill.slug %></span>
+  <span class="truncate text-xs text-slate-500"><%= skill.current_version ? "v#{skill.current_version.digest[0, 7]}" : "—" %></span>
+  <span class="truncate text-xs text-slate-500"><%= skill.current_version&.source || "—" %></span>
+<% end %>

@@ -3,9 +3,21 @@ module Rbrun
   # source (or fail to parse), the diff + a Keep-stored / Reload resolution. Never clobbers — Reload
   # is an explicit, versioned adopt; Keep stored records the reviewed digest.
   class SkillsController < Rbrun::ApplicationController
+    # The tenant's dedicated skill-authoring worktree — a bare sandbox (never provisioned/cloned), one
+    # per tenant, under which each "New skill" click opens a fresh create-skill conversation.
+    SKILLS_REPO = "rbrun/skills"
+
     def index
-      authored = authored_by_slug
-      @rows = Rbrun::Skill.for_tenant(current_tenant).order(:slug).map { |s| row_for(s, authored[s.slug]) }
+      @skills = Rbrun::Skill.for_tenant(current_tenant).order(:slug)
+      @authored = authored_by_slug
+    end
+
+    # Open a create-skill conversation in the app-wide drawer: a fresh session under the tenant's
+    # skills worktree, steered to the create-skill skill via preferred_skills.
+    def build
+      worktree = Rbrun::Worktree.for_tenant(current_tenant).find_or_create_by!(repo: SKILLS_REPO)
+      @session = worktree.sessions.create!(preferred_skills: %w[create-skill])
+      render :build, layout: false
     end
 
     def reconcile
@@ -30,19 +42,6 @@ module Rbrun
       when "keep"
         skill.keep_stored!(digest: digest)
       end
-    end
-
-    # A view row: the skill + its live state (:clean | :diverged | :issue) + the SKILL.md bodies to diff.
-    def row_for(skill, authored)
-      current_md = skill.current_version && Rbrun::SkillArchive.files(skill.current_version.archive)["SKILL.md"]
-      return { skill: skill, state: :clean, current_md: current_md, authored_md: nil } if authored.nil?
-
-      files = authored[:files]
-      return { skill: skill, state: :issue, current_md: current_md, authored_md: nil } unless files.is_a?(Hash) && files.key?("SKILL.md")
-
-      digest = Rbrun::SkillArchive.digest_files(files)
-      clean = [ skill.current_version&.digest, skill.dismissed_digest ].include?(digest)
-      { skill: skill, state: clean ? :clean : :diverged, current_md: current_md, authored_md: files["SKILL.md"] }
     end
   end
 end
