@@ -5,9 +5,8 @@
 <%= component("dialog_frame", title: "Switch repository") do %>
   <div class="mt-4 w-[28rem] max-w-full"
        data-controller="command" data-command-url-value="<%= rbrun.repos_path %>">
-    <input type="text" name="q" autocomplete="off" placeholder="Search repositories…"
-           data-command-target="input" data-action="input->command#search"
-           class="form-input-base w-full">
+    <%= component("input", name: "q", placeholder: "Search repositories…", autocomplete: "off",
+                  data: { command_target: "input", action: "input->command#search" }) %>
     <div class="mt-3 max-h-[52vh] overflow-y-auto">
       <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
                           data: { command_target: "frame" } do %>
