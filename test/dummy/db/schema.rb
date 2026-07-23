@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_160001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_170000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -244,6 +244,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_160001) do
 
   create_table "rbrun_worktrees", force: :cascade do |t|
     t.datetime "archived_at"
+    t.boolean "bare", default: false, null: false
     t.string "base", default: "main", null: false
     t.string "branch", null: false
     t.datetime "created_at", null: false

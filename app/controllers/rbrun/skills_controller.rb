@@ -15,7 +15,7 @@ module Rbrun
     # Open a create-skill conversation in the app-wide drawer: a fresh session under the tenant's
     # skills worktree, steered to the create-skill skill via preferred_skills.
     def build
-      worktree = Rbrun::Worktree.for_tenant(current_tenant).find_or_create_by!(repo: SKILLS_REPO)
+      worktree = Rbrun::Worktree.for_tenant(current_tenant).create_with(bare: true).find_or_create_by!(repo: SKILLS_REPO)
       @session = worktree.sessions.create!(preferred_skills: %w[create-skill])
       render :build, layout: false
     end

@@ -6,7 +6,7 @@ module Rbrun
     # step through the real tool path (validate_step), exactly as auto mode would let the SDK do.
     class SelfValidatingRuntime
       def initialize = @n = 0
-      def run(prompt:, tool_handler:, on_event:, system: nil, tools: [], skills: nil, mcp: nil, resume: nil, auto: nil)
+      def run(prompt:, tool_handler:, on_event:, system: nil, tools: [], skills: nil, mcp: nil, resume: nil, auto: nil, cwd: nil)
         @n += 1
         tool_handler.call({ id: "v#{@n}", name: "validate_step", args: { summary: "did it" } })
         on_event.call({ "type" => "result", "session_id" => "sdk-#{@n}" })

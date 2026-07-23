@@ -5,7 +5,7 @@ module Rbrun
     # A runtime double (injected via the designed `runtime:` seam) that captures the system prompt.
     class SystemCapturingRuntime
       attr_reader :system, :auto
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         @system = system
         @auto = auto
         on_event.call({ "type" => "result", "session_id" => "sdk-1" })

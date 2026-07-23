@@ -40,7 +40,7 @@ module Rbrun
       # events: tool_request → tool_handler (run in Ruby, answered on stdin); everything else →
       # on_event; result/error → terminal. Returns the terminal result event. The config.json (with
       # the api_key) is removed in ensure — the key never outlives the turn.
-      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, auto: false, tool_handler: nil, on_event: nil)
+      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, auto: false, cwd: nil, tool_handler: nil, on_event: nil)
         config_path = nil
         begin
           stage_client
@@ -48,7 +48,7 @@ module Rbrun
           prewarm_mcp(mcp)
           stage_settings
           config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp, auto: auto)
-          run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
+          run_over_session(run_command(config_path, cwd: cwd), tool_handler: tool_handler, on_event: on_event)
         ensure
           @sandbox.exec("rm -f #{config_path}") if config_path
         end
@@ -130,9 +130,13 @@ module Rbrun
       # The detached run command. CLAUDE_CONFIG_DIR points the SDK at the workspace's project settings
       # (not the dev's ~/.claude). The GitHub PAT is injected as PROCESS-SCOPED env — a git credential
       # helper via GIT_CONFIG_* env, so nothing is written to the host's global git config or HOME.
-      def run_command(config_path)
+      # cwd is the agent's working directory (the repo checkout for a normal worktree, the workspace for
+      # a bare one); CLAUDE_CONFIG_DIR always points at the workspace's own .claude — the SIBLING of the
+      # checkout — so skills/settings/session resolve there regardless of where the agent stands.
+      def run_command(config_path, cwd: nil)
         workspace = @sandbox.workspace
-        cmd = +"cd #{workspace} && CLAUDE_CONFIG_DIR=#{File.join(workspace, ".claude")} "
+        dir = cwd.presence || workspace
+        cmd = +"cd #{dir} && CLAUDE_CONFIG_DIR=#{File.join(workspace, ".claude")} "
         if @github_pat && !@github_pat.to_s.empty?
           cmd << "GH_TOKEN=#{@github_pat} GITHUB_TOKEN=#{@github_pat} "
           cmd << "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper "

@@ -17,7 +17,7 @@ module Rbrun
     end
 
     def run
-      worktree = Rbrun::Worktree.create!(tenant: @tenant, repo: "rbrun/scenarios")
+      worktree = Rbrun::Worktree.create!(tenant: @tenant, repo: "rbrun/scenarios", bare: true)
       workflow = seed_workflow
       session  = worktree.sessions.create!(tenant: @tenant, auto: true, workflow: workflow,
                                            workflow_status: "active", preferred_skills: [ @scenario.skill.slug ])

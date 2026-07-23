@@ -76,8 +76,23 @@ module Rbrun
       TXT
     end
 
+    # Clone the worktree's repo into the box before the turn — the whole point of a worktree is its
+    # checkout, yet the box is born empty. Idempotent + box-loss-SELF-HEALING: `head_sha` is nil only
+    # when the checkout has no repo (fresh box, or one lost and recreated), so this clones exactly once
+    # per box lifecycle and skips otherwise. It does NOT swallow failures — a repo that can't be
+    # provisioned is a broken conversation, so provision! RAISES and the turn fails loudly (the UI
+    # surfaces it via flash). Bare worktrees (skills/scenarios) have no repo and provision! is a no-op.
+    def ensure_provisioned
+      return if @runtime # injected fake (tests) — no real box
+      return if @session.worktree.bare?
+      return if @session.worktree.head_sha.present?
+
+      @session.worktree.provision!
+    end
+
     def call_client(prompt)
       runtime = @runtime || Rbrun.runtime(tenant: @session.tenant, sandbox: @session.sandbox)
+      ensure_provisioned
       # Reconstruct .claude history on a fresh/lost box BEFORE resume — the turn survives box loss.
       Rbrun::ClaudeSnapshot.new(@session).restore_if_lost!
       skills_dir = materialize_skills
@@ -89,6 +104,7 @@ module Rbrun
         mcp: materialize_mcp,
         resume: @session.sdk_session_id,
         auto: @session.auto?,
+        cwd: @session.worktree.checkout,
         tool_handler: method(:run_tool),
         on_event: method(:ingest)
       )
