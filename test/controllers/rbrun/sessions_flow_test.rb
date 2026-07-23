@@ -33,6 +33,13 @@ module Rbrun
       refute_match(/data-collapsed/, @response.body)
     end
 
+    test "the repo switcher trigger opens the modal and shows the current repo" do
+      get "/rbrun/c"
+      assert_response :success
+      assert_select "#repo_switcher a[href$=?][data-turbo-frame=?]", "/repos", "modal"
+      assert_select "#repo_label", text: "a/b"
+    end
+
     test "the sidebar_collapsed cookie makes the server render the collapsed rail" do
       cookies[:sidebar_collapsed] = "1"
       get "/rbrun/c"

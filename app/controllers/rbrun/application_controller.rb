@@ -19,5 +19,11 @@ module Rbrun
     def turbo_frame_request?
       request.headers["Accept"].to_s.include?("text/vnd.turbo-frame.html")
     end
+
+    # The DOM id of the <turbo-frame> that issued this navigation (Turbo sends it as the Turbo-Frame
+    # request header), or nil for a non-frame request. Used to pick which view a shared endpoint renders.
+    def turbo_frame_id
+      request.headers["Turbo-Frame"].presence
+    end
   end
 end

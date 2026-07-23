@@ -1,14 +1,20 @@
-<%# The repo rows — a menu whose links each POST to switch_repo (turbo), the current repo checked.
+<%# The repo rows — a role="menu" list of two-line list_items (Menu controller drives keyboard nav).
+    title = owner/name, subtitle = owner (the org), avatar = repo-name initials. Each row POSTs to
+    switch_repo and full-navigates (data-turbo-frame="_top"), the current repo marked active.
     Rendered inside the #repo_results Turbo frame. Locals: repos ([GithubRepos::Repo]), current (str). %>
 <% if repos.any? %>
-  <%= component("menu") do |m| %>
+  <div role="menu" class="p-1" data-controller="menu" data-action="keydown->menu#navigate">
     <% repos.each do |repo| %>
-      <% m.link repo.full_name, href: rbrun.switch_repo_path(repo: repo.full_name, base: repo.default_branch),
-                avatar: repo.full_name.split("/").last.to_s[0, 2].upcase,
-                active: (repo.full_name == current),
-                data: { turbo_method: :post, turbo_frame: "_top" } %>
+      <% org, name = repo.full_name.split("/", 2) %>
+      <%= component("list_item",
+            title: repo.full_name,
+            subtitle: org,
+            avatar: name.to_s[0, 2].upcase,
+            href: rbrun.switch_repo_path(repo: repo.full_name, base: repo.default_branch),
+            active: (repo.full_name == current),
+            data: { turbo_method: :post, turbo_frame: "_top" }) %>
     <% end %>
-  <% end %>
+  </div>
 <% else %>
   <p class="px-3 py-6 text-center text-sm text-slate-400">No repositories found.</p>
 <% end %>

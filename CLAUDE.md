@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> # 🛑 USE THE PRIMITIVES. ALWAYS. 🛑
+>
+> **This engine ships a full ported design system — `Rbrun::Ui::*` primitives + `Rbrun::` preset/folder
+> components — reached through the `component(...)` / `preset(...)` / `custom(...)` helpers. Building UI
+> means COMPOSING THESE. It does not mean writing HTML.**
+>
+> **NEVER hand-roll a raw HTML control when a primitive exists.** No bare `<input>`, `<button>`,
+> `<select>`, `<textarea>`, `<dialog>`, `<table>`, menu, card, badge, avatar, tab, spinner, skeleton,
+> list row, search box, dropzone — every one of these is already a primitive. `<input class="form-input-base">`
+> is a BUG; it is `component("input", …)`. A raw `<button class="…">` is a BUG; it is `component("button", …)`.
+>
+> **Before writing ANY markup:** open `app/components/rbrun/ui/` and use what's there. If a primitive is
+> *close but missing a prop*, extend the primitive (add the option, keep the API clean) — do not fork it
+> into inline HTML. If a shape genuinely does not exist yet (e.g. a new skeleton/table variant), BUILD IT
+> as a primitive (`Rbrun::Ui::<Name>::Component`, preset-based where variants apply), add it to the
+> primitives smoke test, and compose that — so the next person inherits it too.
+>
+> **Why this is non-negotiable:** the primitives own the class strings that Tailwind actually scans and
+> the design tokens/behaviours (a11y roles, keyboard nav, focus, motion) that raw HTML silently drops.
+> Hand-rolled markup drifts, breaks theming, and skips the Stimulus wiring. One system, one surface —
+> enforced here, not case by case.
+
 ## What this is
 
 `rbrun` is a **mountable Rails engine** that is, conceptually, a standalone agentic-runner application — it owns its own database, assets, and (optional) auth, and mounts into a host app only for deployment convenience. It packages an agentic Claude SDK runner — agentic runner + skill pattern + sandbox backend — as provider sub-gems under a batteries-included engine.

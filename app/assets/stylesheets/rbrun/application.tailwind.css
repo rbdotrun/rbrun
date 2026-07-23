@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
-/* Scan the engine's components + views for classes. */
-@source "../../components/rbrun/**/*.{rb,erb}";
-@source "../../../app/views/**/*.erb";
+/* Scan the engine's class-bearing sources. Paths are relative to THIS file
+   (app/assets/stylesheets/rbrun/), so `../../../` is the engine's `app/` dir. The old paths were
+   off by one — `../../components/…` → app/assets/components (missing) and `../../../app/views` →
+   app/app/views (missing) — so NOTHING was scanned via @source and class names authored in Ruby
+   (e.g. Ui::Dialog's `data-[open]:opacity-100` %w[] array) never reached the bundle. Explicit and
+   correct beats CWD auto-detection, which an engine can't rely on (the build may run from any host). */
+@source "../../../components/rbrun/**/*.{rb,erb}";
+@source "../../../views/**/*.erb";
+@source "../../../helpers/rbrun/**/*.rb";
 
 /* ── collapse-empty ──────────────────────────────────────────────────────────
    Opt-in for a WRAPPER that should take no layout space when it holds no element

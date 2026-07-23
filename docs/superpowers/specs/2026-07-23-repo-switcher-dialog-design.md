@@ -123,11 +123,13 @@ survive. `#repo_label` is a stable id so a future tool broadcast could redraw th
   req #2 lands. `command` controller focuses the input on open (its existing IntersectionObserver) and
   repoints `frame.src` on debounced input.
 
-### 4.3 Skeleton — `app/views/rbrun/repositories/_skeleton.html.erb` (new)
+### 4.3 Skeleton — `Rbrun::Ui::Skeleton::Component` (new primitive)
 
-~6 shimmer rows (`animate-pulse` + `bg-slate-100` bars, avatar square + name bar) matching a
-`_results` menu row's height, so the swap doesn't jump. Reused as the `[aria-busy]` state during search
-(§5).
+A **preset-based primitive**, not an inline partial: `component("skeleton", variant: :list_item,
+rows: 6)`. `variant` selects the shape being skeletonized (today `:list_item` — avatar square + two
+stacked `animate-pulse` bars mirroring a `list_item` row; future `:table`/etc. add their own `*_row`
+builder + a `when`). It's `aria-hidden` (a transient placeholder, not content). The dialog's lazy frame
+renders it as its inline block; also reusable as the `[aria-busy]` state during search (§5).
 
 ### 4.4 Rows — a new `list_item` component + `_results` two-line rows
 
