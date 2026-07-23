@@ -1,0 +1,15 @@
+<div id="<%= dom_id %>" class="mt-1 flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-2.5">
+  <div class="text-xs text-slate-400"><%= duration_label %> · <%= tool_label %></div>
+
+  <% if reported? %>
+    <span class="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+      <%= lucide_icon("circle-check", class: "size-3.5") %> Reported
+    </span>
+  <% else %>
+    <%= link_to helpers.rbrun.new_report_path(user_message.session_id, user_message.id),
+                data: { turbo_frame: "modal" },
+                class: "flex items-center gap-1.5 text-xs text-slate-400 transition hover:text-red-600" do %>
+      <%= lucide_icon("flag", class: "size-3.5") %> Report an error
+    <% end %>
+  <% end %>
+</div>

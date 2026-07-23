@@ -1,0 +1,5 @@
+<%# Flip the footer to "Reported" in place, and close the modal (empty frame → the overlay closes). %>
+<%= turbo_stream.replace "turn_footer_#{@lead.id}" do %>
+  <%= custom("sessions/turn_footer", user_message: @lead) %>
+<% end %>
+<%= turbo_stream.update "modal", "" %>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -200,6 +200,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_180000) do
     t.index ["tenant", "slug"], name: "index_rbrun_skills_on_tenant_and_slug", unique: true
   end
 
+  create_table "rbrun_turn_reports", force: :cascade do |t|
+    t.text "comment"
+    t.datetime "created_at", null: false
+    t.integer "session_id", null: false
+    t.string "tenant", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_message_id", null: false
+    t.index ["session_id"], name: "index_rbrun_turn_reports_on_session_id"
+    t.index ["tenant", "user_message_id"], name: "idx_rbrun_turn_reports_unique", unique: true
+    t.index ["user_message_id"], name: "index_rbrun_turn_reports_on_user_message_id"
+  end
+
   create_table "rbrun_users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
@@ -278,6 +290,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_180000) do
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_skill_scenarios", "rbrun_skills", column: "skill_id"
   add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"
+  add_foreign_key "rbrun_turn_reports", "rbrun_session_messages", column: "user_message_id"
+  add_foreign_key "rbrun_turn_reports", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_session_messages", column: "user_message_id", on_delete: :nullify
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_workflow_steps", column: "workflow_step_id"
