@@ -17,9 +17,9 @@ and **author a skill** — plus a way to **prove a skill works**:
 
 `save_artifact` and `save_skill` are **separate primitives, not coupled**. An artifact is one file
 (single `content_type`, so a previewer can dispatch on it); a skill is a folder (SKILL.md + files).
-Neither is derived from the other. The `skill-creator` skill *instructs* the agent to also emit a
+Neither is derived from the other. The `skill-creator` skill _instructs_ the agent to also emit a
 summary artifact — a prose relationship, never a schema one. (This deliberately drops insitix's
-coupling, where a skill example's result literally *is* an artifact version.)
+coupling, where a skill example's result literally _is_ an artifact version.)
 
 The eval half is deliberately **not** a port of Anthropic's `skill-creator` repo. That skill's eval
 (two subagents per test — with-skill vs baseline — driven by nested `claude -p`) needs a second
@@ -40,7 +40,7 @@ The work splits into three plans under one spec, built in this order:
 ## What already exists (do not rebuild)
 
 - `Rbrun::Skill` + `Rbrun::SkillVersion` — the skill store. `Skill#promote!(digest:, archive:,
-  source:)` creates/points an immutable version; content-addressed, idempotent on digest.
+source:)` creates/points an immutable version; content-addressed, idempotent on digest.
 - `Rbrun::SkillArchive` — folder ⇄ gzipped-tar blob + digest (`pack_files`, `files`, `unpack`,
   `digest`).
 - `Rbrun::AgentTurn#materialize_skills` — stages the tenant's promoted skills into a temp dir the
@@ -64,7 +64,7 @@ The work splits into three plans under one spec, built in this order:
 - **No `SkillExample` (prompt → showcased result) model** in this spec. It is insitix's
   marketing/showcase concept, orthogonal to correctness; add later if a marketplace surface wants it.
 - **No multi-file artifacts.** An artifact is one file, on purpose (a single `content_type` is what
-  makes it previewable). A multi-file artifact is a *different* construct — different storage,
+  makes it previewable). A multi-file artifact is a _different_ construct — different storage,
   different preview story — built later if a real need appears. Not this.
 - **No previewer, no artifact UI, no publish/share** in this spec. The primitive is the model + the
   `save_artifact` tool. Rendering a previewer per `content_type`, and a gated publish/share step
@@ -81,12 +81,20 @@ versioned, addressable artifact. Built first — Plan B's eval report is a `save
 
 ### Models
 
-- `Rbrun::Artifact` — `Tenanted`, `belongs_to :session`, `name`, `has_many :versions`,
-  `belongs_to :current_version`. **No `kind`, no `content`** — just identity + history. The artifact
-  never classifies itself; the content-type lives on the blob and a previewer dispatches on it later.
-- `Rbrun::ArtifactVersion` — `belongs_to :artifact`, `number` (unique per artifact, incrementing),
-  **`has_one_attached :file`** (one ActiveStorage blob). Immutable snapshot. `content_type` and
-  `byte_size` are read off the blob (Marcel infers the type), never a passed argument.
+**An artifact has no ownership.** Provenance lives on the *version*, through the message that
+produced it — so the artifact itself is just identity + history, and context is always *derived*
+(`version.message.session`), never *owned* by a link on the artifact. A single artifact may accrue
+versions across different turns (even different sessions); each version carries its own provenance.
+
+- `Rbrun::Artifact` — `Tenanted`, `name`, `has_many :versions`, `belongs_to :current_version`.
+  **No `belongs_to :session`, no user, no `kind`, no `content`** — the artifact never classifies or
+  owns itself. Tenant is present only as a *scope* (invariant #8, every record carries a tenant
+  slug), inherited at creation from the version's message's session — not ownership.
+- `Rbrun::ArtifactVersion` — `belongs_to :artifact`, **`belongs_to :message`** (the user message
+  that leads a turn — the "turn" handle, `session.open_turn_lead`; this is where provenance lives),
+  `number` (unique per artifact, incrementing), **`has_one_attached :file`** (one ActiveStorage
+  blob). Immutable snapshot. `content_type`/`byte_size` are read off the blob (Marcel infers the
+  type), never a passed argument. Session/worktree/context all derive via `message.session`.
 
 ### `save_artifact` tool contract
 
@@ -98,11 +106,14 @@ save_artifact(path:, name: nil, artifact_id: nil)
 - Reads **one** workspace file at `<workspace>/<path>` (the file the agent just wrote), attaches it
   as a new `ArtifactVersion.file`. The bytes travel via the workspace file, never through the
   tool-call payload — so long reports don't bloat the tool arg or tax the NDJSON bridge.
-- `artifact_id` omitted → new `Artifact` (name defaults to the file basename); present → a new
-  immutable version of that artifact, `current_version` advances.
+- The new version is stamped with the running turn's lead message (`session.open_turn_lead`) as its
+  `message` — that is the artifact's only provenance link.
+- `artifact_id` omitted → new `Artifact` (name defaults to the file basename, tenant inherited from
+  the message's session); present → a new immutable version of that artifact, `current_version`
+  advances. (Re-versioning an existing artifact is scoped to the same tenant.)
 - **Ungated.** Producing a deliverable is a private-to-tenant leaf output — it changes nothing about
   how the agent behaves (unlike promoting a skill, which is injected into every future turn). Any
-  human checkpoint belongs on a *future publish/share* step, not on creation. Ungated creation is
+  human checkpoint belongs on a _future publish/share_ step, not on creation. Ungated creation is
   also what lets autonomous/scenario runs (Plan B) emit a report artifact without parking.
 
 ### Storage / durability
@@ -148,7 +159,7 @@ save_skill(folder_path:) → { data: { slug:, name:, digest:, files: [rel paths]
 - `slug` and `name` come from the `SKILL.md` frontmatter (`name:`); `slug` falls back to the folder
   basename, `name` to a titleized slug.
 - Find-or-create the `Rbrun::Skill` row by `[tenant, slug]`, then `promote!(digest:, archive:,
-  source: :agent)` — a **new `source` value** distinguishing agent-authored from `:file`/`:inline`.
+source: :agent)` — a **new `source` value** distinguishing agent-authored from `:file`/`:inline`.
 - `created` reports whether the Skill row was new (first save of this slug) vs a re-save.
 
 ### Approval semantics — inline gate
@@ -176,17 +187,24 @@ safe: history is never lost, "replace" means "a new version becomes current."
 
 ## Plan B — Scenario self-validation
 
+**No validation DSL.** insitix's scenario carried a `gate:` DSL and a *runner-side* validator
+(the orchestrator confirmed a gate fired and resolved it `approve/refuse/expect`). We drop that
+entirely: **validation is 100% the agent's**, and the runner asserts nothing. This is possible
+because of session **auto mode** (below), which removes the human from every gate — so there are no
+gates for a runner to drive.
+
 ### Model — `Rbrun::SkillScenario`
 
-Mirrors insitix's `MarketplaceSkillScenario`, adapted to rbrun naming.
+Mirrors insitix's `MarketplaceSkillScenario`, minus the gate DSL.
 
 Columns: `tenant` (Tenanted), `skill_id` (FK → `Rbrun::Skill`, **optional** — a nil skill is a
 platform scenario), `label` (unique per `[tenant, skill]`), `description`, `prompt` (text, the
-vague request to replay), `steps` (jsonb — ordered `[{label, description, gate?}]`), `attachments`
+vague request to replay), `steps` (jsonb — ordered `[{label, description}]`), `attachments`
 (jsonb — repo-relative fixture paths).
 
-A step is `{label, description}` where `description` is *what to validate*. An optional
-`gate: {tool, resolve}` marks a runner-driven step (`resolve ∈ approve|refuse|expect`).
+A step is just `{label, description}` where `description` is _what to validate_. It is the
+ground-truth **checklist**: the scenario declares the expected steps, the agent works and
+self-validates against them. No `gate`, no `resolve` — nothing the runner interprets.
 
 ### Ingestion
 
@@ -198,39 +216,47 @@ gets a scenarios-excluding filter, or the packer already scopes to known skill f
 
 Driven from a rake task alongside the existing skill seeding.
 
+### Session **auto mode** (a runtime capability, reused here)
+
+A new session-level flag — `Rbrun::Session#auto` (autonomous). **When on, the approval gate never
+parks: every `needs_approval!` call auto-resolves and the turn proceeds.** It threads
+`Session → AgentTurn → client.ts` so the `canUseTool` path auto-approves instead of emitting
+`needs_approval`. This is a general capability (any autonomous run), not eval-specific; Plan B is
+its first consumer.
+
+Consequence, chosen deliberately: in auto mode a skill-under-test that reaches a *genuinely
+sensitive* tool proceeds too — nothing parks. That is acceptable because an eval runs in an
+**isolated, reaped sandbox**: the blast radius is the disposable box, destroyed in `ensure`. Auto
+mode means "no human, full autonomy," and the sandbox is the boundary.
+
 ### Orchestrator — `Rbrun::SkillScenarioRun`
 
-Ports insitix's `Dogfood::Orchestrator` onto rbrun's spine. It asserts almost nothing itself: it
-seeds a workflow from the scenario's steps, opens a turn with the scenario's **own prompt** (never
-the plan — spoon-feeding the plan defeats the point), and reads back what the agent self-validated.
+Ports insitix's `Dogfood::Orchestrator` onto rbrun's spine, minus all gate machinery (auto mode
+subsumes it). It asserts nothing: it seeds a workflow from the scenario's steps, opens a turn with
+the scenario's **own prompt** (never the plan — spoon-feeding the plan defeats the point), and reads
+back what the agent self-validated.
 
-1. Create a Session under a fresh worktree/sandbox for the tenant, marked as a self-validating run
-   (a `dogfood`/`autonomous` flag on the Session, or a `system_append` carrying the demo guidance —
-   see below).
+1. Create a Session under a **fresh worktree/sandbox** for the tenant, in **auto mode**, carrying the
+   demo guidance (below).
 2. Seed a `Rbrun::Workflow` from the scenario steps (`WorkflowStep` per entry), bind it to the
    Session, set `workflow_status: active`.
 3. Attach fixtures (`attachments`) to the opening turn exactly like a user dropping files.
-4. `run_turn(scenario.prompt)`, then **`advance`**: while steps remain and the run is not frozen,
-   drain any gate, then nudge the next turn with a neutral "continue" (never the plan). Bounded by
-   `steps.size + GATE_GUARD` turns and a two-idle-turns stuck-detector.
-5. `record`: per-step `{label, description, done, verdict, report, gate_ok}` + end summary + overall
-   `pass` (all steps done AND every gate step validated *by the runner*, not self-approved).
+4. `run_turn(scenario.prompt)`, then **`advance`**: while steps remain, nudge the next turn with a
+   neutral "continue" (never the plan). Bounded by `steps.size + GUARD` turns and a two-idle-turns
+   (nothing newly validated) stuck-detector. No gate draining — auto mode already let every
+   `validate_step` through.
+5. `record`: per-step `{label, description, done, verdict, report}` + end summary + overall
+   `pass` (**all steps self-validated by the agent** — no runner verdicts in the mix).
 
-**Self-validation without a human.** rbrun's `validate_step` is `needs_approval!` (a user
-normally approves). In a scenario run there is no human, so the orchestrator **plays the approver**:
-it auto-resolves the `validate_step` gate the same way it drives scenario gates. This reuses the
-existing tool and gate path with **no new agent-facing tool** — the orchestrator is the only new
-authority. (Alternative considered: a separate autonomous `self_validate_step` tool as in insitix.
-Rejected for this spec — auto-approving the existing gate is less surface.)
+**How a step completes.** The agent does the work and calls `validate_step` to mark it done. That
+tool is `needs_approval!`, but auto mode auto-resolves it — so the agent's own judgment lands with
+no human and no runner participation. The trust anchor is the demo guidance: the verdict is worth
+only the evidence (logged tool-call ids) the agent grounds it in.
 
 **Demo guidance.** The orchestrator injects a short system append into every turn it drives (and
 only those): "this is a self-validated run; your validation is worth only the proof behind it —
 ground each step in the tool calls you actually made." Carried on the Session so all turns share it
 (prompt-cache stable), never in the main agent prompt.
-
-**Gate steps.** A `gate:` step is validated by the **runner**, not the agent: it confirms the gate
-fired on the declared tool and resolves it (approve/refuse/expect). If such a step is instead marked
-done by the agent, the gate never fired — a false pass — and `record` flags `gate_ok: false`.
 
 ### Surfacing
 
@@ -241,10 +267,12 @@ HTML, per CLAUDE.md). Trigger: a rake task first (`app:dogfood`-style), a Skills
 
 ### Testing (B)
 
+- Auto mode: a session in auto mode auto-resolves a `needs_approval!` call instead of parking
+  (`validate_step` completes with no human); a non-auto session still parks (regression guard).
 - `SkillScenarios` ingestion: `scenarios/*.yml` → rows, idempotent upsert, `scenarios/` excluded
   from the packed archive.
-- Orchestrator unit test with a stubbed turn: seeds the workflow, advances, records per-step
-  verdicts, flags a self-approved gate step as `gate_ok: false`, respects the idle/stuck bound.
+- Orchestrator unit test with a stubbed turn: seeds the workflow, advances via neutral nudges,
+  records per-step verdicts, `pass` iff all steps self-validated, respects the idle/stuck bound.
 - Dogfood: a real scenario replays a real (previously saved) skill end-to-end and reports `pass`.
   Reaps prior run state at start, destroys its sandbox in `ensure` (idempotency #11).
 
@@ -256,13 +284,15 @@ HTML, per CLAUDE.md). Trigger: a rake task first (`app:dogfood`-style), a Skills
   only seed). `save_skill` is the DB write-path.
 - **No second Claude runtime / no token in the box** — eval is a self-validating rbrun Session on
   the existing transport; no nested `claude`, no SDK client inside the sandbox.
-- **No subagents** — the runtime strips Task/Agent tools; the orchestrator drives *sequential turns*
+- **No subagents** — the runtime strips Task/Agent tools; the orchestrator drives _sequential turns_
   of one session, not fan-out.
 - **Idempotency (#11)** — ingestion upserts, `promote!` is find-or-create on digest, dogfoods reap
   at start and destroy at end.
 - **Compose primitives (banner)** — any eval UI is `Rbrun::Ui::*`, never raw HTML.
 - **Approval gate for sensitive mutation** — promoting a live skill parks for a human, like the
   exposure ladder's `share_public`. `save_artifact` is deliberately **not** gated — it is leaf output.
+  **Auto mode** is the one deliberate bypass: a session marked autonomous auto-resolves every gate,
+  scoped to a disposable, reaped sandbox — the human is removed only where the box is the boundary.
 - **`save_artifact` and `save_skill` are separate primitives** — one file vs one folder, ungated vs
-  gated, artifact store vs skill store. No schema coupling; the `skill-creator` skill only *instructs*
+  gated, artifact store vs skill store. No schema coupling; the `skill-creator` skill only _instructs_
   the agent to also emit a summary artifact.
