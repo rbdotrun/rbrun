@@ -404,6 +404,11 @@ GEM
     ruby_llm-schema (0.4.0)
     securerandom (0.4.1)
     sin_lru_redux (2.5.2)
+    solid_cable (4.0.2)
+      actioncable (>= 7.2)
+      activejob (>= 7.2)
+      activerecord (>= 7.2)
+      railties (>= 7.2)
     sqlite3 (2.9.5-arm64-darwin)
     sshkey (3.0.0)
     sshkit (1.25.0)
@@ -466,6 +471,7 @@ DEPENDENCIES
   rbrun-sandbox!
   rbrun-server!
   rubocop-rails-omakase
+  solid_cable
   sqlite3
   webmock
 
