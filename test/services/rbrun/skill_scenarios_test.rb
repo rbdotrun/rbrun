@@ -3,7 +3,7 @@ require "test_helper"
 module Rbrun
   class SkillScenariosTest < ActiveSupport::TestCase
     setup do
-      @skill = Rbrun::Skill.create!(tenant: "acme", slug: "create-skill", name: "Create Skill")
+      @skill = Rbrun::Skill.create!(tenant: "acme", slug: "release-notes", name: "Release Notes")
     end
 
     def with_scenarios(*yamls)
@@ -17,14 +17,14 @@ module Rbrun
     end
 
     SCENARIO = <<~YAML
-      label: Builds a dad-joke skill
-      description: create-skill authors and promotes a small skill
-      prompt: Make me a skill that tells a dad joke.
+      label: Writes release notes
+      description: the release-notes skill drafts notes and saves them as an artifact
+      prompt: Write release notes for our v1.2 release and save them.
       steps:
-        - label: Author the folder
-          description: writes SKILL.md with frontmatter
-        - label: Promote it
-          description: calls save_skill and the skill is promoted
+        - label: Draft the notes
+          description: writes a NOTES.md with a version title
+        - label: Save the artifact
+          description: calls save_artifact and a version exists
     YAML
 
     test "ingest upserts one skill-bound workflow keyed [skill, label], idempotent" do
@@ -32,10 +32,10 @@ module Rbrun
         assert_equal 1, Rbrun::SkillScenarios.ingest(@skill, dir)
         assert_equal 1, Rbrun::SkillScenarios.ingest(@skill, dir) # idempotent (find-or-init)
 
-        wf = @skill.workflows.for_tenant("acme").find_by!(label: "Builds a dad-joke skill")
-        assert_equal "Make me a skill that tells a dad joke.", wf.prompt
+        wf = @skill.workflows.for_tenant("acme").find_by!(label: "Writes release notes")
+        assert_equal "Write release notes for our v1.2 release and save them.", wf.prompt
         assert_equal 2, wf.steps.count
-        assert_equal "Author the folder", wf.steps.first.title
+        assert_equal "Draft the notes", wf.steps.first.title
         assert_equal 1, @skill.workflows.count
       end
     end

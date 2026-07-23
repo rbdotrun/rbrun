@@ -8,7 +8,7 @@ module Rbrun
         icon: "scroll", kind: "artifact", example: "summarize what shipped this week",
         description: "Turn merged PRs into a human changelog.",
         body: "# Changelog\n\nDo the thing.\n",
-        preferred_skills: %w[create-skill], preferred_tools: %w[save_artifact validate_step]
+        preferred_skills: %w[release-notes], preferred_tools: %w[save_artifact validate_step]
       )
 
       parsed = Rbrun::SkillForm.parse(form.skill_md)
@@ -20,7 +20,7 @@ module Rbrun
       assert_equal "artifact", parsed.kind
       assert_equal "summarize what shipped this week", parsed.example
       assert_equal "Turn merged PRs into a human changelog.", parsed.description
-      assert_equal %w[create-skill], parsed.preferred_skills
+      assert_equal %w[release-notes], parsed.preferred_skills
       assert_equal %w[save_artifact validate_step], parsed.preferred_tools
       assert_includes parsed.body, "# Changelog"
       assert_includes parsed.body, "Do the thing."
@@ -36,8 +36,8 @@ module Rbrun
     end
 
     test "list fields reject blank entries (the multi_select hidden \"\" is dropped)" do
-      form = Rbrun::SkillForm.new(name: "X", preferred_skills: [ "", "create-skill", "" ])
-      assert_equal %w[create-skill], form.preferred_skills
+      form = Rbrun::SkillForm.new(name: "X", preferred_skills: [ "", "release-notes", "" ])
+      assert_equal %w[release-notes], form.preferred_skills
     end
 
     test "from_version parses the archived SKILL.md; nil version is an empty form" do

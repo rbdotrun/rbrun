@@ -26,13 +26,13 @@ module Rbrun
     end
 
     test "preferred_skills append a steer to the system prompt" do
-      @session.update!(preferred_skills: %w[create-skill])
+      @session.update!(preferred_skills: %w[release-notes])
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime:).run("go")
 
       assert runtime.system.start_with?(Rbrun.config(@session.tenant).system_prompt.to_s)
       assert_includes runtime.system, "prefer these skills"
-      assert_includes runtime.system, "create-skill"
+      assert_includes runtime.system, "release-notes"
     end
 
     test "empty preferred_skills add no skills steer" do

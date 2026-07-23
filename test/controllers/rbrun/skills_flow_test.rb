@@ -79,7 +79,7 @@ module Rbrun
       assert_difference("Rbrun::Skill.count", 1) do
         post "/rbrun/skills", params: { skill: {
           name: "Changelog", label: "Changelog writer", description: "PRs → notes",
-          body: "# Changelog\n\nDo it.", preferred_skills: [ "", "create-skill" ], preferred_tools: [ "" ]
+          body: "# Changelog\n\nDo it.", preferred_skills: [ "", "release-notes" ], preferred_tools: [ "" ]
         } }
       end
       skill = Rbrun::Skill.for_tenant("rbrun").find_by!(slug: "changelog")

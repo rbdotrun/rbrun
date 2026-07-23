@@ -1,0 +1,15 @@
+label: Writes and saves release notes
+description: the release-notes skill drafts notes and saves them as an artifact
+prompt: >
+  Write release notes for our v1.2 release — it added a dark mode toggle and fixed a login redirect bug —
+  and save them.
+steps:
+  - label: Draft the notes
+    description: >
+      Prove you wrote a NOTES.md (or similarly named markdown file) in the workspace containing a version
+      title and BOTH the dark-mode feature and the login-bug fix — via your Write tool. Point at the write
+      you actually made.
+  - label: Save the artifact
+    description: >
+      Prove you called save_artifact on that file and it succeeded — a versioned artifact now exists in
+      the store. Point at the save_artifact call and its result.

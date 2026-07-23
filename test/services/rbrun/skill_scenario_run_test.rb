@@ -22,7 +22,7 @@ module Rbrun
     end
 
     setup do
-      @skill = Rbrun::Skill.create!(tenant: "acme", slug: "create-skill", name: "Create Skill")
+      @skill = Rbrun::Skill.create!(tenant: "acme", slug: "release-notes", name: "Release Notes")
       @workflow = Rbrun::Workflow.create!(
         tenant: "acme", skill: @skill, label: "Two steps", goal: "prove it", prompt: "do the thing",
         steps_attributes: [
