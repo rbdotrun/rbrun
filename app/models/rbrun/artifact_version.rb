@@ -4,7 +4,9 @@ module Rbrun
   # `content_type`/`byte_size` are read off the blob; there is no `kind` column.
   class ArtifactVersion < ApplicationRecord
     belongs_to :artifact, class_name: "Rbrun::Artifact"
-    belongs_to :message,  class_name: "Rbrun::SessionMessage"
+    # Provenance, not ownership: optional + on_delete :nullify so a version outlives its producing
+    # message (the artifact must survive its session's deletion).
+    belongs_to :message, class_name: "Rbrun::SessionMessage", optional: true
 
     has_one_attached :file
 

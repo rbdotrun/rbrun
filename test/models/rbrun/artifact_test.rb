@@ -45,6 +45,17 @@ module Rbrun
       assert_equal "Quarterly report", version.artifact.name
     end
 
+    test "deleting the producing message nullifies provenance but the artifact survives" do
+      version = Rbrun::Artifact.append_version!(
+        tenant: "acme", message: @message, io: StringIO.new("x"), filename: "notes.txt"
+      )
+      @message.destroy!
+
+      assert Rbrun::ArtifactVersion.exists?(version.id), "the version must outlive its message"
+      assert_nil version.reload.message_id
+      assert version.file.attached?
+    end
+
     test "append_version! rejects another tenant's artifact_id" do
       other = Rbrun::Artifact.append_version!(
         tenant: "other", message: @message, io: StringIO.new("x"), filename: "notes.txt"

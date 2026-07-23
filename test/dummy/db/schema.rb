@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_120002) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -42,7 +42,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_120001) do
   create_table "rbrun_artifact_versions", force: :cascade do |t|
     t.integer "artifact_id", null: false
     t.datetime "created_at", null: false
-    t.integer "message_id", null: false
+    t.integer "message_id"
     t.integer "number", null: false
     t.datetime "updated_at", null: false
     t.index ["artifact_id", "number"], name: "index_rbrun_artifact_versions_on_artifact_id_and_number", unique: true
@@ -240,7 +240,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_120001) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "rbrun_artifact_versions", "rbrun_artifacts", column: "artifact_id"
-  add_foreign_key "rbrun_artifact_versions", "rbrun_session_messages", column: "message_id"
+  add_foreign_key "rbrun_artifact_versions", "rbrun_session_messages", column: "message_id", on_delete: :nullify
   add_foreign_key "rbrun_commits", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_commits", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_deploy_targets", "rbrun_worktrees", column: "worktree_id"
