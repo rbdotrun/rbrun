@@ -17,10 +17,10 @@
       <% end %>
       <% s.with_body do %>
         <%# The skeleton the command controller clones back into the frame on every search. %>
-        <template data-command-target="skeleton"><%= component("skeleton", variant: :list_item, rows: 6) %></template>
+        <template data-command-target="skeleton"><%= component("skeleton", variant: :list_item, rows: 10) %></template>
         <%= turbo_frame_tag "repo_results", src: rbrun.repos_path, loading: :lazy,
                             data: { command_target: "frame" } do %>
-          <%= component("skeleton", variant: :list_item, rows: 6) %>
+          <%= component("skeleton", variant: :list_item, rows: 10) %>
         <% end %>
       <% end %>
     <% end %>
