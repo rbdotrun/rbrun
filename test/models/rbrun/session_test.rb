@@ -17,6 +17,16 @@ module Rbrun
       assert s.needs_approval?
     end
 
+    test "kind defaults to :user and skill_scenario is a valid kind" do
+      s = rbrun_session(tenant: "acme")
+      assert s.user?
+      assert_equal "user", s.kind
+
+      wt = rbrun_worktree(tenant: "acme")
+      scenario = Rbrun::Session.create!(worktree: wt, kind: :skill_scenario)
+      assert scenario.skill_scenario?
+    end
+
     test "has_many messages ordered, dependent destroy" do
       s = rbrun_session(tenant: "acme")
       s.messages.create!(role: "user", event_type: "text", content: "hi")

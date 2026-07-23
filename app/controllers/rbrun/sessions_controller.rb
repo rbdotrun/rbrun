@@ -8,6 +8,7 @@ module Rbrun
         if current_repo
           Rbrun::Session.for_tenant(current_tenant)
                         .joins(:worktree).where(rbrun_worktrees: { repo: current_repo })
+                        .where(kind: "user")
                         .order(created_at: :desc)
         else
           Rbrun::Session.none

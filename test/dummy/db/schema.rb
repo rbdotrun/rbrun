@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_200000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -151,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
     t.datetime "archived_at"
     t.boolean "auto", default: false, null: false
     t.datetime "created_at", null: false
+    t.string "kind", default: "user", null: false
     t.json "preferred_skills", default: [], null: false
     t.string "sdk_session_id"
     t.string "status", default: "idle", null: false
@@ -159,6 +160,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
     t.integer "workflow_id"
     t.string "workflow_status"
     t.integer "worktree_id", null: false
+    t.index ["kind"], name: "index_rbrun_sessions_on_kind"
     t.index ["tenant"], name: "index_rbrun_sessions_on_tenant"
     t.index ["workflow_id"], name: "index_rbrun_sessions_on_workflow_id"
     t.index ["worktree_id"], name: "index_rbrun_sessions_on_worktree_id"
