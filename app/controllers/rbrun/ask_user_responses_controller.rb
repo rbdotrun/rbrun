@@ -28,15 +28,15 @@ module Rbrun
 
     private
 
-    # The raw submission, string-keyed with array values — passed to the validator as-is (so unknown
-    # keys are caught), then sliced to the declared keys once validated. The spec is the boundary, not
-    # a permit-list.
-    def submitted_answers
-      raw = params[:answers]
-      return {} if raw.blank?
+      # The raw submission, string-keyed with array values — passed to the validator as-is (so unknown
+      # keys are caught), then sliced to the declared keys once validated. The spec is the boundary, not
+      # a permit-list.
+      def submitted_answers
+        raw = params[:answers]
+        return {} if raw.blank?
 
-      hash = raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw
-      hash.to_h { |key, value| [ key.to_s, Array(value).map(&:to_s).reject(&:blank?) ] }
-    end
+        hash = raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw
+        hash.to_h { |key, value| [ key.to_s, Array(value).map(&:to_s).reject(&:blank?) ] }
+      end
   end
 end

@@ -49,7 +49,7 @@ namespace :dogfood do
       config: { api_key: daytona_key, api_url: ENV["DAYTONA_API_URL"] },
       labels: { dogfood: "runtime" }
     )
-    runtime = Rbrun::Runtime.new(provider: :claude_sdk, sandbox: sandbox,
+    runtime = Rbrun::Runtime.new(provider: :claude_sdk, sandbox:,
                                  config: { anthropic_api_key: key, model: "sonnet", max_turns: 12 })
 
     events = []
@@ -58,7 +58,7 @@ namespace :dogfood do
         prompt: "Use the add tool to compute 2 + 3, then tell me the result as a sentence.",
         system: "You are a precise assistant. When arithmetic is needed, you MUST call the add tool rather than computing it yourself.",
         tools: manifest,
-        skills: skills,
+        skills:,
         tool_handler: handler,
         on_event: ->(e) { events << e }
       )

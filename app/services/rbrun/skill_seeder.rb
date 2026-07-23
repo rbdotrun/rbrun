@@ -19,7 +19,7 @@ module Rbrun
 
       Dir.glob(BUILTIN_DIR.join("*").to_s).select { |d| File.directory?(d) }.sort.map do |folder|
         slug = File.basename(folder)
-        { slug: slug, name: slug, files: Rbrun::SkillArchive.read_dir(folder), source: :file }
+        { slug:, name: slug, files: Rbrun::SkillArchive.read_dir(folder), source: :file }
       end
     end
 
@@ -32,7 +32,7 @@ module Rbrun
       if dir.present? && Dir.exist?(dir)
         Dir.glob(File.join(dir, "*")).select { |d| File.directory?(d) }.sort.each do |folder|
           slug = File.basename(folder)
-          authored << { slug: slug, name: slug, files: Rbrun::SkillArchive.read_dir(folder), source: :file }
+          authored << { slug:, name: slug, files: Rbrun::SkillArchive.read_dir(folder), source: :file }
         end
       end
       config.skills.each { |s| authored << s.merge(source: :inline) }
@@ -40,7 +40,7 @@ module Rbrun
     end
 
     def self.from_config(config, tenant:)
-      new(tenant: tenant, authored: authored_from_config(config))
+      new(tenant:, authored: authored_from_config(config))
     end
 
     # Boot hook (engine after_initialize): seed the self-host tenant from config. Fails LOUD on a
@@ -73,26 +73,26 @@ module Rbrun
 
     private
 
-    def seed_one(authored)
-      slug, name, files, source = authored.values_at(:slug, :name, :files, :source)
-      return Result.new(slug, :issue, "missing SKILL.md") unless files.is_a?(Hash) && files.key?("SKILL.md")
+      def seed_one(authored)
+        slug, name, files, source = authored.values_at(:slug, :name, :files, :source)
+        return Result.new(slug, :issue, "missing SKILL.md") unless files.is_a?(Hash) && files.key?("SKILL.md")
 
-      digest = Rbrun::SkillArchive.digest_files(files)
-      skill = Rbrun::Skill.for_tenant(@tenant).find_by(slug: slug)
+        digest = Rbrun::SkillArchive.digest_files(files)
+        skill = Rbrun::Skill.for_tenant(@tenant).find_by(slug:)
 
-      if skill.nil?
-        skill = Rbrun::Skill.create!(tenant: @tenant, slug: slug, name: name)
-        skill.promote!(digest: digest, archive: Rbrun::SkillArchive.pack_files(files), source: source)
-        Result.new(slug, :created, nil)
-      elsif [ skill.current_version&.digest, skill.dismissed_digest ].include?(digest)
-        skill.update!(divergence_digest: nil) if skill.diverged?
-        Result.new(slug, :unchanged, nil)
-      else
-        skill.update!(divergence_digest: digest)
-        Result.new(slug, :diverged, "authored source differs from the stored version")
+        if skill.nil?
+          skill = Rbrun::Skill.create!(tenant: @tenant, slug:, name:)
+          skill.promote!(digest:, archive: Rbrun::SkillArchive.pack_files(files), source:)
+          Result.new(slug, :created, nil)
+        elsif [ skill.current_version&.digest, skill.dismissed_digest ].include?(digest)
+          skill.update!(divergence_digest: nil) if skill.diverged?
+          Result.new(slug, :unchanged, nil)
+        else
+          skill.update!(divergence_digest: digest)
+          Result.new(slug, :diverged, "authored source differs from the stored version")
+        end
+      rescue StandardError => e
+        Result.new(authored[:slug], :issue, e.message)
       end
-    rescue StandardError => e
-      Result.new(authored[:slug], :issue, e.message)
-    end
   end
 end

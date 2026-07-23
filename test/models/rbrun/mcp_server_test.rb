@@ -4,7 +4,7 @@ module Rbrun
   class McpServerTest < ActiveSupport::TestCase
     def make(tenant: "rbrun", name: "stripe", **attrs)
       Rbrun::McpServer.create!({
-        tenant: tenant, name: name, transport: "stdio", auth: "api_key", command: "npx",
+        tenant:, name:, transport: "stdio", auth: "api_key", command: "npx",
         args: [ "-y", "@stripe/mcp" ], env: { "STRIPE_KEY" => "sk_test" }, tools: %w[a b],
         tool_permissions: { "default" => "needs_approval" }
       }.merge(attrs))

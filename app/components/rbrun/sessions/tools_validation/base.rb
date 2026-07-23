@@ -12,10 +12,10 @@ module Rbrun
 
         private
 
-        # NOT attr_reader :call — `call` is ViewComponent's own render method.
-        def tool_use_id = @call.tool_use_id
-        def input = @call.payload["input"] || {}
-        def tool_name = @call.payload["name"]
+          # NOT attr_reader :call — `call` is ViewComponent's own render method.
+          def tool_use_id = @call.tool_use_id
+          def input = @call.payload["input"] || {}
+          def tool_name = @call.payload["name"]
       end
     end
   end

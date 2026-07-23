@@ -18,6 +18,6 @@ module Rbrun
 
     private
 
-    def inherit_tenant = self[Rbrun.config.tenancy_key] ||= worktree&.tenant
+      def inherit_tenant = self[Rbrun.config.tenancy_key] ||= worktree&.tenant
   end
 end

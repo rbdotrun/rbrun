@@ -7,7 +7,7 @@ module Rbrun
     Result = Data.define(:name, :status) # :created | :unchanged | :diverged
 
     def self.from_config(config, tenant:)
-      new(tenant: tenant, authored: config.mcp_servers)
+      new(tenant:, authored: config.mcp_servers)
     end
 
     # Boot hook (engine after_initialize): warn-only, self-host tenant. No-ops (silent) when nothing is
@@ -34,18 +34,18 @@ module Rbrun
 
     private
 
-    def seed_one(authored)
-      candidate = Rbrun::McpServer.new(authored.merge(tenant: @tenant))
-      row = Rbrun::McpServer.for_tenant(@tenant).find_by(name: authored[:name])
+      def seed_one(authored)
+        candidate = Rbrun::McpServer.new(authored.merge(tenant: @tenant))
+        row = Rbrun::McpServer.for_tenant(@tenant).find_by(name: authored[:name])
 
-      if row.nil?
-        candidate.save!
-        Result.new(authored[:name], :created)
-      elsif row.config_digest == candidate.compute_digest
-        Result.new(authored[:name], :unchanged)
-      else
-        Result.new(authored[:name], :diverged) # never overwrite an edited row
+        if row.nil?
+          candidate.save!
+          Result.new(authored[:name], :created)
+        elsif row.config_digest == candidate.compute_digest
+          Result.new(authored[:name], :unchanged)
+        else
+          Result.new(authored[:name], :diverged) # never overwrite an edited row
+        end
       end
-    end
   end
 end

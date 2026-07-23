@@ -61,7 +61,7 @@ namespace :dogfood do
     page = Capybara::Session.new(:rbrun)
     shot = ->(name) { page.save_screenshot(shots.join("browser_#{name}.png").to_s); dog.info "screenshot", "tmp/dogfood/browser_#{name}.png" }
 
-    wt = Rbrun::Worktree.create!(tenant: "rbrun", repo: repo, base: "main")
+    wt = Rbrun::Worktree.create!(tenant: "rbrun", repo:, base: "main")
     begin
       dog.header "provisioning the worktree"
       wt.provision!

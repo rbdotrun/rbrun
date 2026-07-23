@@ -25,8 +25,8 @@ module Rbrun
 
         bytes   = session.sandbox.read(path)
         version = Rbrun::Artifact.append_version!(
-          tenant: tenant, message: message, io: StringIO.new(bytes),
-          filename: File.basename(path), name: name, artifact_id: artifact_id
+          tenant:, message:, io: StringIO.new(bytes),
+          filename: File.basename(path), name:, artifact_id:
         )
         { "data" => { "artifact_id" => version.artifact_id, "name" => version.artifact.name,
                       "version" => version.number, "content_type" => version.content_type,

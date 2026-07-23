@@ -25,7 +25,7 @@ namespace :dogfood do
       c.runtime_provider = { default: :claude_sdk, claude_sdk: { anthropic_api_key: ENV["ANTHROPIC_OAUTH_TOKEN"], model: "sonnet", max_turns: 20 } }
     end
 
-    wt = Rbrun::Worktree.create!(tenant: "dogfood", repo: repo, base: "main")
+    wt = Rbrun::Worktree.create!(tenant: "dogfood", repo:, base: "main")
     begin
       dog.header "provisioning"
       wt.provision!

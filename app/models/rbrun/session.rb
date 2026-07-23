@@ -36,7 +36,7 @@ module Rbrun
     def run_turn(content, runtime: nil)
       working!
       before = worktree.head_sha
-      turn = Rbrun::AgentTurn.new(session: self, runtime: runtime)
+      turn = Rbrun::AgentTurn.new(session: self, runtime:)
       turn.run(content)
       record_commits!(before)
       turn.gated? ? needs_approval! : done!
@@ -51,7 +51,7 @@ module Rbrun
     # user message (they clicked a button): the decision is logged as an `internal` row.
     def continue_turn!(nudge, runtime: nil)
       working!
-      turn = Rbrun::AgentTurn.new(session: self, runtime: runtime)
+      turn = Rbrun::AgentTurn.new(session: self, runtime:)
       turn.continue(nudge)
       turn.gated? ? needs_approval! : done!
       turn
@@ -63,7 +63,7 @@ module Rbrun
     # Resume a failed/retried turn — the SDK session holds the partial state, so it picks up mid-work.
     def resume_turn!(runtime: nil)
       working!
-      turn = Rbrun::AgentTurn.new(session: self, runtime: runtime)
+      turn = Rbrun::AgentTurn.new(session: self, runtime:)
       turn.resume
       turn.gated? ? needs_approval! : done!
       turn
@@ -97,9 +97,9 @@ module Rbrun
 
       if created && timeline.anchor?(message)
         kind, payload = timeline.segment_at(index)
-        segment = { kind: kind, payload: payload, results: timeline.results, open: timeline.open_at?(index) }
+        segment = { kind:, payload:, results: timeline.results, open: timeline.open_at?(index) }
         ::Turbo::StreamsChannel.broadcast_append_to("rbrun_session_#{id}",
-          target: "timeline_#{user_message.id}", partial: "rbrun/sessions/segment", locals: { segment: segment })
+          target: "timeline_#{user_message.id}", partial: "rbrun/sessions/segment", locals: { segment: })
       else
         loc = segment_locals_for(message)
         ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}",
@@ -119,47 +119,47 @@ module Rbrun
 
       kind, payload = timeline.segment_at(index)
       { dom_id: timeline.dom_id_at(index),
-        segment: { kind: kind, payload: payload, results: timeline.results, open: timeline.open_at?(index) } }
+        segment: { kind:, payload:, results: timeline.results, open: timeline.open_at?(index) } }
     end
 
     private
 
-    def inherit_tenant = self.tenant ||= worktree&.tenant
+      def inherit_tenant = self.tenant ||= worktree&.tenant
 
-    # Read the commits the agent pushed during the turn (HEAD before → after) and record them.
-    # Guarded: a non-git sandbox (unit tests, un-provisioned worktrees) records nothing.
-    def record_commits!(before)
-      after = worktree.head_sha
-      return if after.nil? || after == before
+      # Read the commits the agent pushed during the turn (HEAD before → after) and record them.
+      # Guarded: a non-git sandbox (unit tests, un-provisioned worktrees) records nothing.
+      def record_commits!(before)
+        after = worktree.head_sha
+        return if after.nil? || after == before
 
-      range = before ? "#{before}..#{after}" : after
-      out = worktree.sandbox.exec("cd #{worktree.sandbox.workspace} && git log --format='%H%x09%s' #{range} 2>/dev/null")
-      return unless out.success?
+        range = before ? "#{before}..#{after}" : after
+        out = worktree.sandbox.exec("cd #{worktree.sandbox.workspace} && git log --format='%H%x09%s' #{range} 2>/dev/null")
+        return unless out.success?
 
-      out.stdout.each_line do |line|
-        sha, message = line.strip.split("\t", 2)
-        next if sha.to_s.empty?
+        out.stdout.each_line do |line|
+          sha, message = line.strip.split("\t", 2)
+          next if sha.to_s.empty?
 
-        worktree.commits.find_or_create_by!(sha: sha) { |c| c.session = self; c.message = message }
+          worktree.commits.find_or_create_by!(sha:) { |c| c.session = self; c.message = message }
+        end
       end
-    end
 
-    # On every working↔done flip: swap the composer (input ⇄ spinner) + the working indicator.
-    def broadcast_status
-      broadcast_composer
-      broadcast_working
-    end
+      # On every working↔done flip: swap the composer (input ⇄ spinner) + the working indicator.
+      def broadcast_status
+        broadcast_composer
+        broadcast_working
+      end
 
-    # Repaint ONLY the message form (#composer_form) — not the whole #composer. The workflow band is a
-    # sibling in the same card, with its own target, so a status flip never wipes it.
-    def broadcast_composer
-      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}", target: "composer_form",
-        partial: "rbrun/messages/form", locals: { session: self, working: working? })
-    end
+      # Repaint ONLY the message form (#composer_form) — not the whole #composer. The workflow band is a
+      # sibling in the same card, with its own target, so a status flip never wipes it.
+      def broadcast_composer
+        ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}", target: "composer_form",
+          partial: "rbrun/messages/form", locals: { session: self, working: working? })
+      end
 
-    def broadcast_working
-      ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}",
-        target: "agent_working_#{id}", partial: "rbrun/sessions/working", locals: { session: self })
-    end
+      def broadcast_working
+        ::Turbo::StreamsChannel.broadcast_replace_to("rbrun_session_#{id}",
+          target: "agent_working_#{id}", partial: "rbrun/sessions/working", locals: { session: self })
+      end
   end
 end

@@ -57,7 +57,7 @@ module Rbrun
                      archive: Rbrun::SkillArchive.pack_files(files), source: :inline)
 
       runtime = SkillsCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
 
       assert_equal({ "pdf/SKILL.md" => "# staged\n" }, runtime.staged,
                    "the current version's folder is staged under <slug>/")
@@ -77,7 +77,7 @@ module Rbrun
       Rbrun::McpServer.create!(tenant: "acme", name: "stripe", transport: "stdio", command: "npx",
                                args: [ "-y", "x" ], env: { "K" => "v" })
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
 
       assert_equal({ "command" => "npx", "args" => [ "-y", "x" ], "env" => { "K" => "v" } },
                    runtime.mcp.dig("servers", "stripe"))
@@ -96,7 +96,7 @@ module Rbrun
 
     test "no MCP servers ⇒ mcp is nil" do
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
       assert_nil runtime.mcp
     end
 
@@ -150,7 +150,7 @@ module Rbrun
         approval_status: "approved", payload: { "name" => "mcp__stripe__pay", "tool_kind" => "mcp" })
 
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("continue")
+      AgentTurn.new(session: @session, runtime:).run("continue")
       assert_includes runtime.mcp["approved"], "mcp__stripe__pay"
     end
 

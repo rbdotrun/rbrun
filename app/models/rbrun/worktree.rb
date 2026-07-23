@@ -24,7 +24,7 @@ module Rbrun
     # resolves the SAME box. Without it the row silently resolved to whatever that process defaulted to —
     # quietly creating a new empty box instead of finding the real one. If the process can't build that
     # provider (missing credentials), this now fails LOUDLY rather than drifting to another backend.
-    def sandbox = @sandbox ||= Rbrun.sandbox(sandbox_provider&.to_sym, tenant: tenant, labels: { worktree: id.to_s })
+    def sandbox = @sandbox ||= Rbrun.sandbox(sandbox_provider&.to_sym, tenant:, labels: { worktree: id.to_s })
 
     # The agent's working directory inside the box. A normal worktree clones its repo into a SUBDIR of
     # the workspace (so the checkout sits SIDE BY SIDE with the sibling .claude/, never colliding with
@@ -46,12 +46,12 @@ module Rbrun
       if (target = deploy_target)
         server_name = "rbrun-w#{id}"
         begin
-          Rbrun.server(tenant: tenant).destroy_server(name: server_name)
+          Rbrun.server(tenant:).destroy_server(name: server_name)
         rescue StandardError
           nil
         end
         begin
-          Rbrun.dns(tenant: tenant).remove(name: target.host, type: "A") if target.host.present?
+          Rbrun.dns(tenant:).remove(name: target.host, type: "A") if target.host.present?
         rescue StandardError
           nil
         end
@@ -106,11 +106,11 @@ module Rbrun
 
     private
 
-    def assign_branch = self.branch ||= "rbrun/wt-#{SecureRandom.hex(4)}"
+      def assign_branch = self.branch ||= "rbrun/wt-#{SecureRandom.hex(4)}"
 
-    # Record the backend this worktree's box is created on, so every later process resolves the same one.
-    def assign_sandbox_provider
-      self.sandbox_provider ||= Rbrun.config(tenant).sandbox_provider[:default]&.to_s
-    end
+      # Record the backend this worktree's box is created on, so every later process resolves the same one.
+      def assign_sandbox_provider
+        self.sandbox_provider ||= Rbrun.config(tenant).sandbox_provider[:default]&.to_s
+      end
   end
 end

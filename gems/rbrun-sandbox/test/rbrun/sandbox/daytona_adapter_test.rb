@@ -18,7 +18,7 @@ class DaytonaAdapterTest < Minitest::Test
   end
 
   def json(body, status: 200)
-    { status: status, body: body.to_json, headers: { "Content-Type" => "application/json" } }
+    { status:, body: body.to_json, headers: { "Content-Type" => "application/json" } }
   end
 
   def build

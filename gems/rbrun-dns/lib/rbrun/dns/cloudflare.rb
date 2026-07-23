@@ -53,7 +53,7 @@ module Rbrun
       # duplicates. Returns the resulting Record.
       def upsert(name:, type:, content:, proxied: false)
         body = { "type" => type, "name" => name, "content" => content, "proxied" => proxied }
-        existing = find(name: name, type: type)
+        existing = find(name:, type:)
 
         raw =
           if existing
@@ -66,7 +66,7 @@ module Rbrun
 
       # Remove the record (by name+type). True if one was deleted, false if there was nothing to delete.
       def remove(name:, type: nil)
-        existing = find(name: name, type: type)
+        existing = find(name:, type:)
         return false unless existing
 
         request(:delete, "/zones/#{@zone_id}/dns_records/#{existing.id}")
@@ -75,41 +75,41 @@ module Rbrun
 
       private
 
-      def record_from(raw)
-        return nil unless raw
+        def record_from(raw)
+          return nil unless raw
 
-        Record.new(id: raw["id"], name: raw["name"], type: raw["type"],
-                   content: raw["content"], proxied: !!raw["proxied"])
-      end
-
-      def fetch_page(path, params)
-        Array(request(:get, path, nil, params)["result"])
-      end
-
-      def request(method, path, body = nil, params = {})
-        response = conn.public_send(method, "#{API}#{path}") do |req|
-          req.params.update(params) if params.any?
-          next if body.nil?
-
-          req.headers["Content-Type"] = "application/json"
-          req.body = JSON.generate(body)
+          Record.new(id: raw["id"], name: raw["name"], type: raw["type"],
+                     content: raw["content"], proxied: !!raw["proxied"])
         end
-        parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue {})
-        return parsed if response.success? && parsed["success"] != false
 
-        errors = Array(parsed["errors"]).map { |e| e["message"] }.join("; ")
-        raise Error, "cloudflare dns: #{method.to_s.upcase} #{path} → #{response.status} #{errors}"
-      end
-
-      def conn
-        @conn ||= Faraday.new do |f|
-          f.response :json, content_type: /\bjson/
-          f.headers["Authorization"] = "Bearer #{@token}"
-          f.options.open_timeout = 15
-          f.options.timeout = 30
-          f.adapter :async_http
+        def fetch_page(path, params)
+          Array(request(:get, path, nil, params)["result"])
         end
-      end
+
+        def request(method, path, body = nil, params = {})
+          response = conn.public_send(method, "#{API}#{path}") do |req|
+            req.params.update(params) if params.any?
+            next if body.nil?
+
+            req.headers["Content-Type"] = "application/json"
+            req.body = JSON.generate(body)
+          end
+          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue {})
+          return parsed if response.success? && parsed["success"] != false
+
+          errors = Array(parsed["errors"]).map { |e| e["message"] }.join("; ")
+          raise Error, "cloudflare dns: #{method.to_s.upcase} #{path} → #{response.status} #{errors}"
+        end
+
+        def conn
+          @conn ||= Faraday.new do |f|
+            f.response :json, content_type: /\bjson/
+            f.headers["Authorization"] = "Bearer #{@token}"
+            f.options.open_timeout = 15
+            f.options.timeout = 30
+            f.adapter :async_http
+          end
+        end
     end
   end
 end

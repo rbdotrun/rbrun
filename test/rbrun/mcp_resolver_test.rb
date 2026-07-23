@@ -5,7 +5,7 @@ class McpResolverTest < ActiveSupport::TestCase
   teardown { Rbrun.reset_config! }
 
   def spec(name)
-    Rbrun::McpServer::Spec.new(name: name, transport: :stdio, auth: nil, command: "x", args: [],
+    Rbrun::McpServer::Spec.new(name:, transport: :stdio, auth: nil, command: "x", args: [],
                                url: nil, env: {}, headers: {}, tools: nil, tool_permissions: {})
   end
 

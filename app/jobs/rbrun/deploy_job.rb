@@ -4,7 +4,7 @@ module Rbrun
   class DeployJob < ApplicationJob
     def perform(worktree_id)
       worktree = Rbrun::Worktree.find(worktree_id)
-      Rbrun::DeployRunner.new(worktree: worktree).run!
+      Rbrun::DeployRunner.new(worktree:).run!
     end
   end
 end

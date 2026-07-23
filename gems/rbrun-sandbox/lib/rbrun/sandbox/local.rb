@@ -33,7 +33,7 @@ module Rbrun
       end
 
       def exec!(command, timeout: 60)
-        result = exec(command, timeout: timeout)
+        result = exec(command, timeout:)
         return result if result.success?
 
         raise Error, "#{command.inspect} exited #{result.exit_code}: #{result.stderr.to_s.lines.last(5).join}"
@@ -77,7 +77,7 @@ module Rbrun
 
       def glob(dir)
         base = absolute(dir)
-        Dir.glob("**/*", base: base).select { |rel| File.file?(File.join(base, rel)) }.sort
+        Dir.glob("**/*", base:).select { |rel| File.file?(File.join(base, rel)) }.sort
       end
 
       def destroy!
@@ -160,17 +160,17 @@ module Rbrun
 
       private
 
-      def absolute(path)
-        path.start_with?(@root) ? path : File.join(workspace, path)
-      end
+        def absolute(path)
+          path.start_with?(@root) ? path : File.join(workspace, path)
+        end
 
-      def slugify(labels)
-        return "default" if labels.nil? || labels.empty?
+        def slugify(labels)
+          return "default" if labels.nil? || labels.empty?
 
-        labels.map { |k, v| "#{k}-#{v}" }.join("_").gsub(/[^a-zA-Z0-9_\-]/, "-")
-      end
+          labels.map { |k, v| "#{k}-#{v}" }.join("_").gsub(/[^a-zA-Z0-9_\-]/, "-")
+        end
 
-      def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

@@ -47,7 +47,7 @@ module Rbrun
       return @target.last_deploy_log.to_s unless @target.status == "deployed" && @target.server_ip.present?
 
       with_checkout do |dir, _sha|
-        server.app_logs(work_dir: dir, server_ip: @target.server_ip, ssh_private_key: @target.ssh_private_key, tail: tail)
+        server.app_logs(work_dir: dir, server_ip: @target.server_ip, ssh_private_key: @target.ssh_private_key, tail:)
       end
     end
 
@@ -93,26 +93,26 @@ module Rbrun
 
     private
 
-    def server = @server ||= Rbrun.server(tenant: @wt.tenant)
+      def server = @server ||= Rbrun.server(tenant: @wt.tenant)
 
-    # App secrets the deploy + running container need (RAILS_MASTER_KEY, POSTGRES_PASSWORD, …), from the
-    # repo's stored secrets — the same store the preview flow uses.
-    def secrets_env
-      Rbrun::RepoSecret.where(tenant: @wt.tenant, repo: @wt.repo).to_h { |s| [ s.key, s.value ] }
-    end
-
-    def with_checkout
-      Dir.mktmpdir("rbrun-deploy-") do |dir|
-        yield dir, clone_branch(dir)
+      # App secrets the deploy + running container need (RAILS_MASTER_KEY, POSTGRES_PASSWORD, …), from the
+      # repo's stored secrets — the same store the preview flow uses.
+      def secrets_env
+        Rbrun::RepoSecret.where(tenant: @wt.tenant, repo: @wt.repo).to_h { |s| [ s.key, s.value ] }
       end
-    end
 
-    def clone_branch(dir)
-      pat = Rbrun.config(@wt.tenant).github_pat
-      url = "https://x-access-token:#{pat}@github.com/#{@wt.repo}.git"
-      system("git", "clone", "--depth", "1", "--branch", @wt.branch, url, dir, exception: true)
-      out, = Open3.capture2("git", "-C", dir, "rev-parse", "HEAD")
-      out.strip
-    end
+      def with_checkout
+        Dir.mktmpdir("rbrun-deploy-") do |dir|
+          yield dir, clone_branch(dir)
+        end
+      end
+
+      def clone_branch(dir)
+        pat = Rbrun.config(@wt.tenant).github_pat
+        url = "https://x-access-token:#{pat}@github.com/#{@wt.repo}.git"
+        system("git", "clone", "--depth", "1", "--branch", @wt.branch, url, dir, exception: true)
+        out, = Open3.capture2("git", "-C", dir, "rev-parse", "HEAD")
+        out.strip
+      end
   end
 end

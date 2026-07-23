@@ -23,7 +23,7 @@ namespace :dogfood do
 
     tenant = "dogfood"
     dog.header "seed the skills + ingest their scenarios (idempotent)"
-    Rbrun::SkillSeeder.new(tenant: tenant, authored: Rbrun::SkillSeeder.builtin_authored).call
+    Rbrun::SkillSeeder.new(tenant:, authored: Rbrun::SkillSeeder.builtin_authored).call
     ingested = Rbrun::SkillScenarios.ingest_all(tenant, Rbrun.config)
     dog.ok "scenarios ingested", ingested.positive?
 
@@ -36,7 +36,7 @@ namespace :dogfood do
     passed = 0
     scenarios.each do |scenario|
       dog.header "#{scenario.skill.slug} · #{scenario.label}"
-      record = Rbrun::SkillScenarioRun.run(scenario, tenant: tenant)
+      record = Rbrun::SkillScenarioRun.run(scenario, tenant:)
       passed += 1 if record[:pass]
       record[:steps].each do |step|
         dog.ok "#{step[:label]}", step[:done]

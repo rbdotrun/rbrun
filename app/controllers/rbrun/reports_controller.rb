@@ -20,9 +20,9 @@ module Rbrun
 
     private
 
-    def set_turn
-      @session = Rbrun::Session.for_tenant(current_tenant).find(params[:id])
-      @lead = @session.messages.find(params[:message_id])
-    end
+      def set_turn
+        @session = Rbrun::Session.for_tenant(current_tenant).find(params[:id])
+        @lead = @session.messages.find(params[:message_id])
+      end
   end
 end

@@ -4,9 +4,9 @@ module Rbrun
   module Mcp
     class ToolBudgetTest < ActiveSupport::TestCase
       def spec(name:, tools:, tool_permissions: {})
-        Rbrun::McpServer::Spec.new(name: name, transport: :stdio, auth: nil, command: "x", args: [],
-                                   url: nil, env: {}, headers: {}, tools: tools,
-                                   tool_permissions: tool_permissions)
+        Rbrun::McpServer::Spec.new(name:, transport: :stdio, auth: nil, command: "x", args: [],
+                                   url: nil, env: {}, headers: {}, tools:,
+                                   tool_permissions:)
       end
 
       test "blocked tools are removed from the allowlist" do

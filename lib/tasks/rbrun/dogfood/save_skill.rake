@@ -22,8 +22,8 @@ namespace :dogfood do
 
     slug = "weather-tip"
     dog.header "reap prior dogfood skills (idempotency)"
-    Rbrun::Skill.for_tenant("dogfood").where(slug: slug).destroy_all
-    dog.ok "no prior '#{slug}' skill", Rbrun::Skill.for_tenant("dogfood").where(slug: slug).none?
+    Rbrun::Skill.for_tenant("dogfood").where(slug:).destroy_all
+    dog.ok "no prior '#{slug}' skill", Rbrun::Skill.for_tenant("dogfood").where(slug:).none?
 
     wt = Rbrun::Worktree.create!(tenant: "dogfood", repo: "rbdotrun/scratch")
     session = wt.sessions.create!(tenant: "dogfood")
@@ -41,19 +41,19 @@ namespace :dogfood do
       dog.ok "it froze save_skill", frozen&.payload&.dig("name") == "save_skill"
       dog.info "frozen args", frozen&.payload&.dig("input").inspect
       dog.ok "nothing promoted yet (gate not bypassed)",
-             Rbrun::Skill.for_tenant("dogfood").where(slug: slug).none?
+             Rbrun::Skill.for_tenant("dogfood").where(slug:).none?
 
       dog.header "approving runs the frozen call → the skill is promoted"
       frozen.decide_approval!("approve") if frozen
 
-      skill = Rbrun::Skill.for_tenant("dogfood").find_by(slug: slug)
+      skill = Rbrun::Skill.for_tenant("dogfood").find_by(slug:)
       dog.ok "the skill was created", skill.present?
       dog.ok "it has a current version", skill&.current_version.present?
       dog.ok "the version's source is 'ui' (authored in-app)", skill&.current_version&.source == "ui"
       staged = skill && Rbrun::SkillArchive.files(skill.current_version.archive)
       dog.ok "the archive carries a SKILL.md", staged&.key?("SKILL.md") == true
     ensure
-      Rbrun::Skill.for_tenant("dogfood").where(slug: slug).destroy_all
+      Rbrun::Skill.for_tenant("dogfood").where(slug:).destroy_all
       session.sandbox.destroy!
       wt.destroy!
     end

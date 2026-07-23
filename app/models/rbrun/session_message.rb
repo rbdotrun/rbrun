@@ -33,7 +33,7 @@ module Rbrun
     # or nil when the claim lost (already decided elsewhere). The claim is the UPDATE's own WHERE.
     def decide_approval!(decision)
       status = decision.to_s == "refuse" ? "rejected" : "approved"
-      claimed = self.class.where(id: id, approval_status: "pending")
+      claimed = self.class.where(id:, approval_status: "pending")
                     .update_all(approval_status: status, updated_at: Time.current)
       return nil if claimed.zero?
 
@@ -48,56 +48,56 @@ module Rbrun
 
     private
 
-    def assign_turn
-      self.user_message ||= session.open_turn_lead unless role == "user"
-    end
-
-    # Run the call the owner saw — THAT tool with THOSE args, off the row. Log the result like any
-    # other. Returns the nudge to hand the resumed agent.
-    def run_frozen_call!
-      name = payload["name"]
-      tool = Rbrun::ApplicationTool.find(name)
-      args = (payload["input"] || {}).symbolize_keys
-      result =
-        begin
-          tool ? tool.in_session(session).execute(**args) : { "error" => "unknown tool: #{name}" }
-        rescue StandardError => e
-          { "error" => e.message }
-        end
-      failed = result.is_a?(Hash) && result["error"]
-
-      session.messages.create!(role: "tool", event_type: "tool_result", content: result.to_json,
-        tool_use_id: tool_use_id,
-        payload: { "tool_use_id" => tool_use_id, "result" => result, "is_error" => !!failed })
-
-      "The user approved #{name}. Result: #{result.to_json}. Continue."
-    end
-
-    def mcp_tool? = payload["tool_kind"] == "mcp"
-
-    # The external server reconnects asynchronously on resume; if the first re-call reports the tool
-    # unavailable, that is the connection still settling, not a real absence — retry.
-    def mcp_approved_nudge
-      "The user approved #{payload['name']} — it is now enabled. Call it again with the same arguments. " \
-        "If the first call reports the tool unavailable, wait a moment and retry it once or twice; " \
-        "it is reconnecting."
-    end
-
-    def refusal_nudge = "The user refused #{payload['name']}. Do not retry it; propose an alternative."
-
-    def broadcastable? = role == "user" || event_type.in?(BROADCAST_EVENTS)
-    def finalized? = visible? && saved_change_to_content? && content.present?
-
-    def broadcast_open_or_event
-      if role == "user" && event_type == "text"
-        ::Turbo::StreamsChannel.broadcast_append_to("rbrun_session_#{session_id}",
-          target: "conversation_#{session_id}", partial: "rbrun/sessions/turn",
-          locals: { user_message: self, messages: [ self ] })
-      else
-        session.broadcast_event(self, created: true)
+      def assign_turn
+        self.user_message ||= session.open_turn_lead unless role == "user"
       end
-    end
 
-    def broadcast_finalized_event = session.broadcast_event(self, created: false)
+      # Run the call the owner saw — THAT tool with THOSE args, off the row. Log the result like any
+      # other. Returns the nudge to hand the resumed agent.
+      def run_frozen_call!
+        name = payload["name"]
+        tool = Rbrun::ApplicationTool.find(name)
+        args = (payload["input"] || {}).symbolize_keys
+        result =
+          begin
+            tool ? tool.in_session(session).execute(**args) : { "error" => "unknown tool: #{name}" }
+          rescue StandardError => e
+            { "error" => e.message }
+          end
+        failed = result.is_a?(Hash) && result["error"]
+
+        session.messages.create!(role: "tool", event_type: "tool_result", content: result.to_json,
+          tool_use_id:,
+          payload: { "tool_use_id" => tool_use_id, "result" => result, "is_error" => !!failed })
+
+        "The user approved #{name}. Result: #{result.to_json}. Continue."
+      end
+
+      def mcp_tool? = payload["tool_kind"] == "mcp"
+
+      # The external server reconnects asynchronously on resume; if the first re-call reports the tool
+      # unavailable, that is the connection still settling, not a real absence — retry.
+      def mcp_approved_nudge
+        "The user approved #{payload['name']} — it is now enabled. Call it again with the same arguments. " \
+          "If the first call reports the tool unavailable, wait a moment and retry it once or twice; " \
+          "it is reconnecting."
+      end
+
+      def refusal_nudge = "The user refused #{payload['name']}. Do not retry it; propose an alternative."
+
+      def broadcastable? = role == "user" || event_type.in?(BROADCAST_EVENTS)
+      def finalized? = visible? && saved_change_to_content? && content.present?
+
+      def broadcast_open_or_event
+        if role == "user" && event_type == "text"
+          ::Turbo::StreamsChannel.broadcast_append_to("rbrun_session_#{session_id}",
+            target: "conversation_#{session_id}", partial: "rbrun/sessions/turn",
+            locals: { user_message: self, messages: [ self ] })
+        else
+          session.broadcast_event(self, created: true)
+        end
+      end
+
+      def broadcast_finalized_event = session.broadcast_event(self, created: false)
   end
 end

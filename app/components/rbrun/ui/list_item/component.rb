@@ -32,28 +32,28 @@ module Rbrun
             link_to(@href, role: "menuitem", tabindex: "-1", data:,
                            aria: { current: (@active ? "true" : nil) }, class: klass, **@attrs) { body }
           else
-            tag.div(body, role: "menuitem", tabindex: "-1", data: data, class: klass, **@attrs)
+            tag.div(body, role: "menuitem", tabindex: "-1", data:, class: klass, **@attrs)
           end
         end
 
         private
 
-        def leading
-          tag.span(@avatar, class: AVATAR) if @avatar.present?
-        end
-
-        def text_stack
-          tag.span(class: "flex min-w-0 flex-1 flex-col") do
-            safe_join([
-              tag.span(@title, class: TITLE),
-              (tag.span(@subtitle, class: SUBTITLE) if @subtitle.present?)
-            ].compact)
+          def leading
+            tag.span(@avatar, class: AVATAR) if @avatar.present?
           end
-        end
 
-        def trailing
-          lucide_icon("check", class: CHECK) if @active
-        end
+          def text_stack
+            tag.span(class: "flex min-w-0 flex-1 flex-col") do
+              safe_join([
+                tag.span(@title, class: TITLE),
+                (tag.span(@subtitle, class: SUBTITLE) if @subtitle.present?)
+              ].compact)
+            end
+          end
+
+          def trailing
+            lucide_icon("check", class: CHECK) if @active
+          end
       end
     end
   end

@@ -11,7 +11,7 @@ module Rbrun
         workflow = Rbrun::Workflow.for_tenant(tenant).find_by(id: workflow_id)
         return error("no such workflow: #{workflow_id}") unless workflow
 
-        session.update!(workflow: workflow, workflow_status: "active")
+        session.update!(workflow:, workflow_status: "active")
         session.broadcast_workflow
         { "data" => { "label" => workflow.label, "total" => Rbrun::Workflow::Run.new(session).total } }
       end

@@ -22,27 +22,27 @@ module Rbrun
 
         private
 
-        def row
-          case variant.to_sym
-          when :list_item then list_item_row
-          else list_item_row
+          def row
+            case variant.to_sym
+            when :list_item then list_item_row
+            else list_item_row
+            end
           end
-        end
 
-        # Mirrors an Ui::ListItem row: avatar square + two stacked text bars.
-        def list_item_row
-          tag.div(class: "flex items-center gap-2.5 rounded-md px-2.5 py-1.5") do
-            safe_join([
-              tag.div(class: cn("size-9 shrink-0", BAR)),
-              tag.div(class: "flex min-w-0 flex-1 flex-col gap-1.5") do
-                safe_join([
-                  tag.div(class: cn("h-3.5 w-40 max-w-full", BAR)),
-                  tag.div(class: cn("h-2.5 w-24 max-w-full", BAR))
-                ])
-              end
-            ])
+          # Mirrors an Ui::ListItem row: avatar square + two stacked text bars.
+          def list_item_row
+            tag.div(class: "flex items-center gap-2.5 rounded-md px-2.5 py-1.5") do
+              safe_join([
+                tag.div(class: cn("size-9 shrink-0", BAR)),
+                tag.div(class: "flex min-w-0 flex-1 flex-col gap-1.5") do
+                  safe_join([
+                    tag.div(class: cn("h-3.5 w-40 max-w-full", BAR)),
+                    tag.div(class: cn("h-2.5 w-24 max-w-full", BAR))
+                  ])
+                end
+              ])
+            end
           end
-        end
       end
     end
   end

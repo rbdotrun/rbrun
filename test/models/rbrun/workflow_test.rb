@@ -3,10 +3,10 @@ require "test_helper"
 module Rbrun
   class WorkflowTest < ActiveSupport::TestCase
     def build_workflow(label:, goal: nil, steps: [], tenant: "rbrun")
-      wf = Rbrun::Workflow.new(label: label, goal: goal)
+      wf = Rbrun::Workflow.new(label:, goal:)
       wf[Rbrun.config.tenancy_key] = tenant
       wf.save!
-      steps.each_with_index { |title, i| wf.steps.create!(position: i, title: title) }
+      steps.each_with_index { |title, i| wf.steps.create!(position: i, title:) }
       wf
     end
 

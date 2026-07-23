@@ -3,11 +3,11 @@ require "test_helper"
 module Rbrun
   class McpSeederTest < ActiveSupport::TestCase
     def server(name: "stripe", **overrides)
-      { name: name, transport: :stdio, auth: :api_key, command: "npx", args: [ "-y", "x" ],
+      { name:, transport: :stdio, auth: :api_key, command: "npx", args: [ "-y", "x" ],
         env: { "K" => "v" }, headers: {}, tools: nil, tool_permissions: {} }.merge(overrides)
     end
 
-    def seed(authored, tenant: "rbrun") = Rbrun::McpSeeder.new(tenant: tenant, authored: authored).call
+    def seed(authored, tenant: "rbrun") = Rbrun::McpSeeder.new(tenant:, authored:).call
 
     test "a new server is created" do
       assert_equal [ :created ], seed([ server ]).map(&:status)

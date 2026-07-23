@@ -43,7 +43,7 @@ module Rbrun
     # and clear both divergence flags. Idempotent on digest.
     def promote!(digest:, archive:, source:)
       transaction do
-        version = versions.find_or_create_by!(digest: digest) { |v| v.archive = archive; v.source = source }
+        version = versions.find_or_create_by!(digest:) { |v| v.archive = archive; v.source = source }
         update!(current_version: version, divergence_digest: nil, dismissed_digest: nil)
         version
       end
@@ -57,17 +57,17 @@ module Rbrun
 
     private
 
-    def broadcast_row
-      stream = [ "rbrun", tenant, "skills" ]
-      locals = { skill: self, template: TABLE_TEMPLATE }
-      if current_version_id_before_last_save.nil? # first version → the row is new
-        ::Turbo::StreamsChannel.broadcast_append_to(stream, target: ROWS_ID,
-                                                    partial: "rbrun/skills/skill_row", locals: locals)
-      else
-        ::Turbo::StreamsChannel.broadcast_replace_to(stream,
-                                                    target: ActionView::RecordIdentifier.dom_id(self),
-                                                    partial: "rbrun/skills/skill_row", locals: locals)
+      def broadcast_row
+        stream = [ "rbrun", tenant, "skills" ]
+        locals = { skill: self, template: TABLE_TEMPLATE }
+        if current_version_id_before_last_save.nil? # first version → the row is new
+          ::Turbo::StreamsChannel.broadcast_append_to(stream, target: ROWS_ID,
+                                                      partial: "rbrun/skills/skill_row", locals:)
+        else
+          ::Turbo::StreamsChannel.broadcast_replace_to(stream,
+                                                      target: ActionView::RecordIdentifier.dom_id(self),
+                                                      partial: "rbrun/skills/skill_row", locals:)
+        end
       end
-    end
   end
 end

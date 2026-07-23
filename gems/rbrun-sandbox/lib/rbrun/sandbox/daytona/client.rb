@@ -280,62 +280,62 @@ module Rbrun
 
         private
 
-        def confirm(id)
-          r = conn.get("#{@api_url}/sandbox/#{id}")
-          return nil if r.status == 404
+          def confirm(id)
+            r = conn.get("#{@api_url}/sandbox/#{id}")
+            return nil if r.status == 404
 
-          ok!(r).body
-        end
+            ok!(r).body
+          end
 
-        def create_sandbox(labels)
-          post(
-            "#{@api_url}/sandbox",
-            body: {
-              "labels" => labels.transform_values(&:to_s),
-              "autoStopInterval" => AUTO_STOP_MINUTES,
-              # Start from the self-built snapshot (config[:dockerfile]), built server-side on first
-              # use. Resources are baked on the snapshot — the API refuses cpu/memory/disk here.
-              "snapshot" => ensure_snapshot
-            },
-            timeout: 120
-          )
-        end
+          def create_sandbox(labels)
+            post(
+              "#{@api_url}/sandbox",
+              body: {
+                "labels" => labels.transform_values(&:to_s),
+                "autoStopInterval" => AUTO_STOP_MINUTES,
+                # Start from the self-built snapshot (config[:dockerfile]), built server-side on first
+                # use. Resources are baked on the snapshot — the API refuses cpu/memory/disk here.
+                "snapshot" => ensure_snapshot
+              },
+              timeout: 120
+            )
+          end
 
-        def get(url, params = {}) = request(:get, url, params: params).body
+          def get(url, params = {}) = request(:get, url, params:).body
 
-        def post(url, body: nil, params: {}, timeout: 60) = request(:post, url, body: body, params: params, timeout: timeout).body
+          def post(url, body: nil, params: {}, timeout: 60) = request(:post, url, body:, params:, timeout:).body
 
-        def request(method, url, params: {}, body: nil, timeout: 60)
-          response = conn.public_send(method, url) do |req|
-            req.options.timeout = timeout
-            req.params.update(params)
-            next if body.nil?
+          def request(method, url, params: {}, body: nil, timeout: 60)
+            response = conn.public_send(method, url) do |req|
+              req.options.timeout = timeout
+              req.params.update(params)
+              next if body.nil?
 
-            if body.is_a?(Hash) && body.values.any? { |v| v.is_a?(Faraday::Multipart::FilePart) }
-              req.body = body
-            else
-              req.headers["Content-Type"] = "application/json"
-              req.body = body.to_json
+              if body.is_a?(Hash) && body.values.any? { |v| v.is_a?(Faraday::Multipart::FilePart) }
+                req.body = body
+              else
+                req.headers["Content-Type"] = "application/json"
+                req.body = body.to_json
+              end
+            end
+            ok!(response)
+          end
+
+          def ok!(response)
+            return response if response.success?
+
+            raise Error, "#{response.env.method.to_s.upcase} #{response.env.url.path} → #{response.status}: #{response.body.to_s[0, 200]}"
+          end
+
+          def conn
+            @conn ||= Faraday.new do |f|
+              f.request :multipart
+              f.response :json, content_type: /\bjson/
+              f.headers["Authorization"] = "Bearer #{@api_key}"
+              f.options.open_timeout = 15
+              f.adapter :async_http
             end
           end
-          ok!(response)
-        end
-
-        def ok!(response)
-          return response if response.success?
-
-          raise Error, "#{response.env.method.to_s.upcase} #{response.env.url.path} → #{response.status}: #{response.body.to_s[0, 200]}"
-        end
-
-        def conn
-          @conn ||= Faraday.new do |f|
-            f.request :multipart
-            f.response :json, content_type: /\bjson/
-            f.headers["Authorization"] = "Bearer #{@api_key}"
-            f.options.open_timeout = 15
-            f.adapter :async_http
-          end
-        end
       end
     end
   end

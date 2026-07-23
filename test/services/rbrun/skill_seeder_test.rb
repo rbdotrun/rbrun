@@ -7,11 +7,11 @@ module Rbrun
     FILES2 = { "SKILL.md" => "# v2\n" }.freeze
 
     def dig(files) = Rbrun::SkillArchive.digest_files(files)
-    def inline(slug, files) = { slug: slug, name: slug, files: files, source: :inline }
-    def seed(authored, tenant: "rbrun") = Rbrun::SkillSeeder.new(tenant: tenant, authored: authored).call
+    def inline(slug, files) = { slug:, name: slug, files:, source: :inline }
+    def seed(authored, tenant: "rbrun") = Rbrun::SkillSeeder.new(tenant:, authored:).call
 
     def existing(slug: "pdf", files: FILES)
-      skill = Rbrun::Skill.create!(tenant: "rbrun", slug: slug, name: slug)
+      skill = Rbrun::Skill.create!(tenant: "rbrun", slug:, name: slug)
       skill.promote!(digest: dig(files), archive: Rbrun::SkillArchive.pack_files(files), source: :inline)
       skill
     end

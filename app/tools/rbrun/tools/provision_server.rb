@@ -19,16 +19,16 @@ module Rbrun
 
       private
 
-      def server_name(wt) = "rbrun-w#{wt.id}"
+        def server_name(wt) = "rbrun-w#{wt.id}"
 
-      def default_attrs(wt)
-        cfg = Rbrun.config(session.tenant).server_provider
-        prov = (cfg[:default] || :kamal_hetzner)
-        pc = cfg[prov] || {}
-        domain = Rbrun.config.preview_domain.presence || "preview.local"
-        { provider: prov.to_s, server_type: pc[:server_type] || "cx23", region: pc[:region] || "fsn1",
-          image: pc[:image] || "ubuntu-24.04", host: "#{server_name(wt)}.#{domain}", status: "pending" }
-      end
+        def default_attrs(wt)
+          cfg = Rbrun.config(session.tenant).server_provider
+          prov = (cfg[:default] || :kamal_hetzner)
+          pc = cfg[prov] || {}
+          domain = Rbrun.config.preview_domain.presence || "preview.local"
+          { provider: prov.to_s, server_type: pc[:server_type] || "cx23", region: pc[:region] || "fsn1",
+            image: pc[:image] || "ubuntu-24.04", host: "#{server_name(wt)}.#{domain}", status: "pending" }
+        end
     end
   end
 end

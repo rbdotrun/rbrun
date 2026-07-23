@@ -10,7 +10,7 @@ class RuntimeDispatchTest < Minitest::Test
 
   def test_dispatches_to_claude_sdk_adapter
     sandbox = Rbrun::Sandbox.new(provider: :local, config: {}, labels: { session: "rt-dispatch" })
-    runtime = Rbrun::Runtime.new(provider: :claude_sdk, sandbox: sandbox,
+    runtime = Rbrun::Runtime.new(provider: :claude_sdk, sandbox:,
                                  config: { anthropic_api_key: "sk-test" })
     assert_instance_of Rbrun::Runtime::ClaudeSdk, runtime
   ensure

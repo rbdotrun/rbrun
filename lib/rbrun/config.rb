@@ -37,7 +37,7 @@ module Rbrun
 
     # Repeatable: append one login identity. Omitted tenant ⇒ DEFAULT_TENANT.
     def user(email:, password:, tenant: DEFAULT_TENANT)
-      @users << { email: email, password: password, tenant: tenant }
+      @users << { email:, password:, tenant: }
     end
 
     # Repeatable: append an inline skill (a seed source — the DB is the runtime store). Two forms:
@@ -51,7 +51,7 @@ module Rbrun
         files ||= { "SKILL.md" => body.to_s }
       end
       slug or raise ArgumentError, "c.skill needs a slug (positional shorthand or slug:)"
-      @skills << { slug: slug, name: name || slug, files: files || {} }
+      @skills << { slug:, name: name || slug, files: files || {} }
       nil
     end
 
@@ -66,8 +66,8 @@ module Rbrun
       MCP_TRANSPORTS.include?(transport) or raise ArgumentError, "c.mcp_server transport must be one of #{MCP_TRANSPORTS.join('/')}"
       auth = auth&.to_sym
       auth.nil? || MCP_AUTHS.include?(auth) or raise ArgumentError, "c.mcp_server auth must be one of #{MCP_AUTHS.join('/')}"
-      @mcp_servers << { name: name, transport: transport, auth: auth, command: command, args: args,
-                        url: url, env: env, headers: headers, tools: tools, tool_permissions: tool_permissions }
+      @mcp_servers << { name:, transport:, auth:, command:, args:,
+                        url:, env:, headers:, tools:, tool_permissions: }
       nil
     end
 

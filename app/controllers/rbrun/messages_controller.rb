@@ -18,6 +18,6 @@ module Rbrun
 
     private
 
-    def set_session = @session = Rbrun::Session.for_tenant(current_tenant).find(params[:id])
+      def set_session = @session = Rbrun::Session.for_tenant(current_tenant).find(params[:id])
   end
 end

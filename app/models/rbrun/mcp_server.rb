@@ -22,9 +22,9 @@ module Rbrun
     before_save :assign_digest
 
     def to_spec
-      Spec.new(name: name, transport: transport&.to_sym, auth: auth&.to_sym, command: command,
-               args: args || [], url: url, env: env || {}, headers: headers || {},
-               tools: tools, tool_permissions: tool_permissions || {})
+      Spec.new(name:, transport: transport&.to_sym, auth: auth&.to_sym, command:,
+               args: args || [], url:, env: env || {}, headers: headers || {},
+               tools:, tool_permissions: tool_permissions || {})
     end
 
     # A hash over the config that DEFINES the server — env/header KEYS only (secret values don't define
@@ -32,7 +32,7 @@ module Rbrun
     # header keys); `args` stays ordered (it's a command line).
     def compute_digest
       Digest::SHA256.hexdigest(JSON.generate(
-        transport: transport, auth: auth, command: command, args: args || [], url: url,
+        transport:, auth:, command:, args: args || [], url:,
         env_keys: (env || {}).keys.map(&:to_s).sort, header_keys: (headers || {}).keys.map(&:to_s).sort,
         tools: (tools || []).map(&:to_s).sort, tool_permissions: tool_permissions || {}
       ))
@@ -40,6 +40,6 @@ module Rbrun
 
     private
 
-    def assign_digest = self.config_digest = compute_digest
+      def assign_digest = self.config_digest = compute_digest
   end
 end
