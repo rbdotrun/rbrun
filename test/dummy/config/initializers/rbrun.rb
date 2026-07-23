@@ -1,6 +1,6 @@
 Rbrun.configure do |c|
   c.database_connection = :primary      # dummy uses one sqlite DB; no separate connection
-  c.tenancy_key         = "tenant"
+
 
   # Sandbox: Daytona wherever creds are supplied (the deploy), else the local dir backend for tests and
   # laptop dev. Previews REQUIRE a sandbox that resolves preview URLs — only Daytona does.
