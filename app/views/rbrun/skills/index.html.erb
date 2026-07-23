@@ -1,5 +1,5 @@
-<%= preset("page", title: "Skills", variant: :centered) do |p| %>
-  <% p.with_body do %>
+<%= component("surface", title: "Skills", inset: :centered) do |s| %>
+  <% s.with_body do %>
     <p class="mb-4 text-sm text-slate-500">Capabilities the agent stages from the store. Authored from config; the store is the source of truth.</p>
 
     <% if @rows.empty? %>
