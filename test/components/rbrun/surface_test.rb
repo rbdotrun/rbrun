@@ -50,11 +50,26 @@ module Rbrun
       assert_match "FOOT", html
     end
 
-    test "insets: centered wraps a max-w column; padded pads the body" do
+    test "insets: centered wraps a max-w column; padded pads the body with the shared x + a vertical" do
       centered = render_surface(inset: :centered) { |s| s.with_body { "B" } }.to_html
       assert_match "max-w-3xl", centered
       padded = render_surface(inset: :padded) { |s| s.with_body { "B" } }.to_html
-      assert_match "p-6", padded
+      assert_match "px-6", padded   # the shared x (size :lg) — not a bespoke p-6
+      assert_match "py-4", padded
+    end
+
+    test "one normalized x-inset is shared by header, fixed strip, body and footer; it scales with size" do
+      md = render_surface(title: "T", size: :md, inset: :padded) do |s|
+        s.with_fixed_area { "TABS" }
+        s.with_body { "B" }
+        s.with_footer { "F" }
+      end.to_html
+      assert_equal 4, md.scan("px-4").length     # header + fixed_area + body + footer, all px-4
+      refute_match "px-6", md
+      refute_match "px-3", md
+
+      lg = render_surface(title: "T", size: :lg, inset: :padded) { |s| s.with_body { "B" } }.to_html
+      assert_match "px-6", lg                     # same knob, larger at :lg
     end
 
     test "elevation adds a shadow" do
