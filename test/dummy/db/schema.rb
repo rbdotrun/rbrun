@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_160001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -224,6 +224,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_150000) do
 
   create_table "rbrun_workflow_steps", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.text "description"
     t.integer "position", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
@@ -266,7 +267,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_150000) do
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
   add_foreign_key "rbrun_skill_scenarios", "rbrun_skills", column: "skill_id"
   add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"
-  add_foreign_key "rbrun_workflow_step_completions", "rbrun_session_messages", column: "user_message_id"
+  add_foreign_key "rbrun_workflow_step_completions", "rbrun_session_messages", column: "user_message_id", on_delete: :nullify
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_workflow_steps", column: "workflow_step_id"
   add_foreign_key "rbrun_workflow_steps", "rbrun_workflows", column: "workflow_id"
