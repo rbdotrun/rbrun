@@ -38,9 +38,22 @@ module Rbrun
     # (every skill still stages — this only TELLS the agent which to reach for). Empty prefs ⇒ untouched.
     def system_prompt
       parts = [ Rbrun.config(@session.tenant).system_prompt.to_s ]
+      parts << workspace_note
       parts << preferred_skills_note
       parts << self_validation_note # autonomous scenario runs only
       parts.compact.reject(&:blank?).join("\n\n")
+    end
+
+    # Passing cwd to the SDK query() sets the tool base, but the SDK does NOT surface the absolute path
+    # to the agent — so it still guesses (observed: it invented `/tmp/dummy-rails-check`). File tools
+    # want ABSOLUTE paths, so the agent must be TOLD the exact checkout. Belt-and-suspenders with the
+    # cwd option: the option makes relative paths + Bash correct, this stops the absolute-path guessing.
+    def workspace_note
+      dir = @session.worktree.checkout
+      return nil if dir.blank?
+
+      "Your working directory (Bash cwd, and where the repo is checked out) is `#{dir}`. Any absolute " \
+        "path you pass to a file tool MUST be under `#{dir}` — do not guess; prefer paths relative to it."
     end
 
     def preferred_skills_note

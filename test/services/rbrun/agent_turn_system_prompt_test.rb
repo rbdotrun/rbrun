@@ -17,10 +17,12 @@ module Rbrun
       @session = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b").sessions.create!
     end
 
-    test "the turn's system prompt is the host prompt (cwd is passed via the SDK option, not the prompt)" do
+    test "the system prompt names the exact checkout (the SDK cwd option doesn't surface it to the agent)" do
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
-      assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
+      assert runtime.system.start_with?(Rbrun.config(@session.tenant).system_prompt.to_s)
+      assert_includes runtime.system, "Your working directory"
+      assert_includes runtime.system, @session.worktree.checkout
     end
 
     test "preferred_skills append a steer to the system prompt" do
