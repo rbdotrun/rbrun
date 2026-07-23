@@ -36,23 +36,21 @@ case) and its **produced artifact** (`ArtifactVersion`). Those are their own tru
 - `SkillScenarioRun` (auto, self-validating) — seeds a `Rbrun::Workflow` from `scenario.steps`, runs the
   skill, self-validates each step (auto mode auto-approves `validate_step`).
 - `ArtifactVersion` (Plan C) — a scenario run's produced artifact = the showcase.
-- The app-wide `#modal` dialog + `table`/`surface`/`empty` primitives + live broadcast + `solid_cable`.
+- The `table`/`surface`/`empty`/`field`/`input`/`textarea`/`select`/`multi_select` primitives + live broadcast + `solid_cable`.
 
 ## The form
 
-### Route
+### Routes — vanilla resourceful
 
-- `GET  skills/:slug/edit` — the form (full view).
-- `PATCH skills/:slug` — Save: assemble `SKILL.md` → `promote!` a new version.
-- Existing skill: the index row links here. New skill: the dialog below lands here.
-- `?version=<id>` loads a specific version's archive into the form (else current).
+`resources :skills, param: :slug, only: %i[index new create edit update]` (+ the existing `reconcile`):
 
-### New = name it, then edit
+- `GET  skills/new`        — a blank form.
+- `POST skills`            — create: assemble `SKILL.md` → create `Skill` + `promote!` v1.
+- `GET  skills/:slug/edit` — the form loaded from the current version (or `?version=<id>`).
+- `PATCH skills/:slug`     — update: assemble `SKILL.md` → `promote!` a new version.
 
-- Skills index **New** → app-wide `#modal` dialog, **one field: a label**.
-- Submit → create the `Skill` (`slug` from the label) **with a stub v1**: `promote!` a minimal archive
-  whose `SKILL.md` is `---\nname: <label>\ndescription: …\n---\n<placeholder body>`, `source: :ui`.
-- Redirect to `skills/:slug/edit`.
+No dialog, no stub — **New is just the empty form**; you fill it (the label/name is a field) and submit
+→ the skill is created with v1 assembled from what you typed. Standard Rails `new`/`create`/`edit`/`update`.
 
 ### Fields (all authored, all end up in `SKILL.md`)
 
@@ -96,8 +94,8 @@ No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
 ## Plans (one spec, two plans, build in order)
 
 - **Plan 1 — the skill form + versions.** `Rbrun::SkillForm` (fields ⇄ `SKILL.md`: name/label/tagline/
-  icon/kind/example/description/body + `preferred_skills`/`preferred_tools`); the New dialog + stub
-  creation; `skills/:slug/edit` form + `PATCH` save → `promote!`; the version dropdown (load a version's
+  icon/kind/example/description/body + `preferred_skills`/`preferred_tools`); vanilla `new`/`create`/
+  `edit`/`update` (create → v1, update → `promote!` a new version); the version dropdown (load a version's
   archive into the form). `rbrun_sessions.kind` enum + index filter. Delivers full skill editing.
 - **Plan 2 — scenarios + run.** The scenarios sub-form (label/prompt/steps jsonb); `save_skill`-style
   ingestion isn't needed (the form writes `SkillScenario` rows directly); add
