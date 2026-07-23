@@ -32,6 +32,11 @@ module Rbrun
       assert_select "turbo-frame#repo_results"
       assert_select "a", text: /rbdotrun\/rbrun/
       assert_select "a", text: /acme\/api/
+      assert_select "div[role=menu]"
+      assert_select "a[role=menuitem]", minimum: 2
+      # The subtitle line carries the org (owner) segment.
+      assert_select "a[role=menuitem] span", text: "rbdotrun"
+      assert_select "a[role=menuitem] span", text: "acme"
     end
 
     test "a request from the #modal frame renders the dialog shell without hitting GitHub" do
