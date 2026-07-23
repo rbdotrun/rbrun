@@ -6,7 +6,7 @@
 
   <%# Right-side affordance — the command controller shows exactly one: the spinner while a search
       request is in flight, the clear (X) when the field has a value at rest. Both start hidden. %>
-  <span data-command-target="spinner" class="absolute right-3 top-1/2 hidden -translate-y-1/2">
+  <span data-command-target="spinner" class="absolute right-3 top-1/2 hidden -translate-y-1/2 flex items-center">
     <%= component("spinner", size: :sm) %>
   </span>
   <button type="button" aria-label="Clear search"
