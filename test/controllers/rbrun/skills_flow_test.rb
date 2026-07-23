@@ -60,5 +60,29 @@ module Rbrun
       get "/rbrun/skills"
       assert_select ".border-amber-300", count: 0
     end
+
+    test "the index shows a New skill button that targets the drawer" do
+      get "/rbrun/skills"
+      assert_response :success
+      assert_select "form[action=?][data-turbo-frame=drawer]", "/rbrun/skills/new"
+    end
+
+    test "New skill opens a create-skill conversation in the drawer" do
+      assert_difference("Rbrun::Session.count", 1) do
+        post "/rbrun/skills/new"
+      end
+      session = Rbrun::Session.order(:id).last
+      assert_equal %w[create-skill], session.preferred_skills
+      assert_equal Rbrun::SkillsController::SKILLS_REPO, session.worktree.repo
+      assert_response :success
+      assert_select "turbo-frame#drawer"
+    end
+
+    test "New skill reuses one skills worktree per tenant" do
+      assert_difference("Rbrun::Worktree.count", 1) do
+        post "/rbrun/skills/new"
+        post "/rbrun/skills/new"
+      end
+    end
   end
 end

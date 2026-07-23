@@ -1,52 +1,53 @@
 <%= component("surface", title: "Skills", heading: :h1, inset: :centered) do |s| %>
-  <% s.with_body do %>
-    <p class="mb-4 text-sm text-slate-500">Capabilities the agent stages from the store. Authored from config; the store is the source of truth.</p>
-
-    <% if @rows.empty? %>
-      <p class="text-sm text-slate-400">No skills yet. Add a <code>c.skill</code> or a <code>c.skills_path</code> folder, then reseed.</p>
+  <% s.with_actions do %>
+    <%= form_with url: rbrun.build_skill_path, method: :post, data: { turbo_frame: "drawer" } do %>
+      <%= component("button", variant: :primary, size: :sm, type: "submit") do %>
+        <%= lucide_icon("plus", class: "size-4") %> New skill
+      <% end %>
     <% end %>
+  <% end %>
 
-    <div class="flex flex-col gap-3">
-      <% @rows.each do |r| %>
-        <% skill = r[:skill] %>
-        <div class="rounded-lg border <%= r[:state] == :clean ? "border-slate-200" : "border-amber-300 bg-amber-50" %> p-4">
-          <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <p class="font-medium text-slate-800"><%= skill.name %></p>
-              <p class="text-xs text-slate-400">
-                <%= skill.slug %> ·
-                <%= skill.current_version ? "v#{skill.current_version.digest[0, 7]}" : "no version" %> ·
-                <%= skill.current_version&.source %>
-              </p>
-            </div>
-            <% if r[:state] != :clean %>
-              <%= render(Rbrun::Ui::Badge::Component.new(label: r[:state].to_s, color: :amber)) %>
+  <% s.with_body do %>
+    <%= turbo_stream_from ["rbrun", current_tenant, "skills"] %>
+
+    <p class="mb-4 text-sm text-slate-500">Capabilities the agent stages from the store. Build one with the assistant, or author from config — the store is the source of truth.</p>
+
+    <div id="skills_table">
+      <%= render "rbrun/skills/table", rows: @rows %>
+    </div>
+
+    <% attention = @rows.reject { |r| r[:state] == :clean } %>
+    <% if attention.any? %>
+      <h2 class="mt-8 mb-3 text-sm font-semibold text-amber-700">Needs attention</h2>
+      <div class="flex flex-col gap-3">
+        <% attention.each do |r| %>
+          <% skill = r[:skill] %>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <p class="font-medium text-slate-800"><%= skill.name %> <span class="text-xs font-normal text-slate-400"><%= skill.slug %></span></p>
+            <% if r[:state] == :diverged %>
+              <p class="mt-2 mb-1 text-xs font-medium text-amber-700">The authored source differs from the stored version.</p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p class="mb-1 text-slate-500">Stored (current)</p>
+                  <pre class="overflow-x-auto rounded border border-slate-200 bg-white p-2 text-[11px] leading-relaxed text-slate-600"><%= r[:current_md] %></pre>
+                </div>
+                <div>
+                  <p class="mb-1 text-slate-500">Authored (source)</p>
+                  <pre class="overflow-x-auto rounded border border-slate-200 bg-white p-2 text-[11px] leading-relaxed text-slate-600"><%= r[:authored_md] %></pre>
+                </div>
+              </div>
+              <div class="mt-3 flex items-center gap-2">
+                <%= button_to "Reload", rbrun.reconcile_skill_path(skill.slug, decision: "reload"), method: :post,
+                      class: "rounded-md bg-default-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-default-500 cursor-pointer" %>
+                <%= button_to "Keep stored", rbrun.reconcile_skill_path(skill.slug, decision: "keep"), method: :post,
+                      class: "rounded-md px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer" %>
+              </div>
+            <% elsif r[:state] == :issue %>
+              <p class="mt-2 text-xs font-medium text-amber-700">The authored source can't be read (missing or broken <code>SKILL.md</code>). Fix the source, then reseed.</p>
             <% end %>
           </div>
-
-          <% if r[:state] == :diverged %>
-            <p class="mt-3 mb-1 text-xs font-medium text-amber-700">The authored source differs from the stored version.</p>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <p class="mb-1 text-slate-500">Stored (current)</p>
-                <pre class="overflow-x-auto rounded border border-slate-200 bg-white p-2 text-[11px] leading-relaxed text-slate-600"><%= r[:current_md] %></pre>
-              </div>
-              <div>
-                <p class="mb-1 text-slate-500">Authored (source)</p>
-                <pre class="overflow-x-auto rounded border border-slate-200 bg-white p-2 text-[11px] leading-relaxed text-slate-600"><%= r[:authored_md] %></pre>
-              </div>
-            </div>
-            <div class="mt-3 flex items-center gap-2">
-              <%= button_to "Reload", rbrun.reconcile_skill_path(skill.slug, decision: "reload"), method: :post,
-                    class: "rounded-md bg-default-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-default-500 cursor-pointer" %>
-              <%= button_to "Keep stored", rbrun.reconcile_skill_path(skill.slug, decision: "keep"), method: :post,
-                    class: "rounded-md px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer" %>
-            </div>
-          <% elsif r[:state] == :issue %>
-            <p class="mt-3 text-xs font-medium text-amber-700">The authored source can't be read (missing or broken <code>SKILL.md</code>). Fix the source, then reseed.</p>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
+        <% end %>
+      </div>
+    <% end %>
   <% end %>
 <% end %>

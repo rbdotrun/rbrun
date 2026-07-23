@@ -24,6 +24,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > Hand-rolled markup drifts, breaks theming, and skips the Stimulus wiring. One system, one surface —
 > enforced here, not case by case.
 
+> # 🛑 ALWAYS REACH A COMPONENT THROUGH THE `component(...)` HELPER. 🛑
+>
+> **NEVER instantiate a component class directly in a view.** `render(Rbrun::Ui::Badge::Component.new(label:, color:))`
+> is a BUG; it is `component("badge", label:, color:)`. Same for every primitive: `component("table", …)`,
+> `component("button", …)`, `component("surface", …)`, `component("drawer_panel", …)`, `component("badge", …)`.
+> A bare `render(Rbrun::Ui::<Name>::Component.new(...))` — or `render(Rbrun::<Name>::Component.new(...))` — in
+> ANY `.erb` is wrong, even when it "works".
+>
+> **Why:** `component(...)` (and its siblings `preset(...)` / `custom(...)`) is the ONE resolution seam — it
+> maps a stable string name to the class, applies presets/variants, and keeps views decoupled from class
+> paths and constructor signatures. Newing the class up in a view hard-codes the namespace, skips that
+> seam, and drifts the moment a primitive is renamed, presetized, or moved. One helper, one door.
+>
+> **The only place a component class name appears literally is INSIDE another component** (a component
+> composing a child via `render(Child::Component.new)` in its own `.rb`/template). In a **view** (`app/views/**`),
+> it is ALWAYS `component("<name>", …)`.
+
 ## What this is
 
 `rbrun` is a **mountable Rails engine** that is, conceptually, a standalone agentic-runner application — it owns its own database, assets, and (optional) auth, and mounts into a host app only for deployment convenience. It packages an agentic Claude SDK runner — agentic runner + skill pattern + sandbox backend — as provider sub-gems under a batteries-included engine.

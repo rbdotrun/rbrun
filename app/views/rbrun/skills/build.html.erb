@@ -1,0 +1,5 @@
+<%# Loaded into the app-wide drawer: a full create-skill conversation (composer + streaming timeline).
+    Flush body so the conversation owns its height and self-scrolls. %>
+<%= component("drawer_panel", title: "New skill", padded: false) do %>
+  <%= render(Rbrun::Sessions::Default::Component.new(session: @session)) %>
+<% end %>
