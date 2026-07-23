@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "cgi"
 require_relative "support"
 
 # Repo Workspace Switcher dogfood — the sidebar switcher, for real, in a headless browser. Boots the
@@ -50,27 +51,31 @@ namespace :dogfood do
       dog.ok "the Conversations nav is present", page.has_text?("Conversations", wait: 5)
       shot.("rail")
 
-      dog.header "open the switcher → GitHub repos lazy-load"
-      page.find("#repo_switcher [data-dropdown-target='trigger']").click
-      dog.ok "the search input appeared", page.has_css?("#repo_switcher input[data-command-target='input']", wait: 10)
+      # full_name of a result row, read from its switch_repo href (repo=owner%2Fname) — exact + stable.
+      full_name = ->(node) { CGI.unescape(node[:href].to_s[/repo=([^&]+)/, 1].to_s) }
+
+      dog.header "open the switcher → the dialog opens, GitHub repos lazy-load"
+      page.find("#repo_switcher a").click
+      dog.ok "the dialog opened", page.has_css?("dialog[open]", wait: 10)
+      dog.ok "the search input appeared", page.has_css?("dialog[open] input[data-command-target='input']", wait: 10)
       dog.ok "real GitHub repos populated the results frame",
              page.has_css?("#repo_results a[role='menuitem']", wait: 30)
-      first = page.all("#repo_results a[role='menuitem']").first&.text.to_s.gsub(/\s+/, "")
+      first = full_name.call(page.all("#repo_results a[role='menuitem']").first)
       dog.info "first repo", first
       shot.("open")
 
       dog.header "type a query → server-side GitHub search"
-      page.fill_in "Search repositories…", with: first[0, 2].presence || "a"
-      sleep_until = -> { page.has_css?("#repo_results a[role='menuitem'], #repo_results p", wait: 30) }
-      dog.ok "the search endpoint responded (results reloaded)", sleep_until.call
+      page.fill_in "Search repositories…", with: (first.split("/").last.to_s[0, 3].presence || "a")
+      dog.ok "the search endpoint responded (results reloaded)",
+             page.has_css?("#repo_results a[role='menuitem'], #repo_results p", wait: 30)
       shot.("search")
 
-      dog.header "pick a repo → the workspace switches"
+      dog.header "pick a repo → the dialog closes, the workspace switches"
       target = page.all("#repo_results a[role='menuitem']").first
-      picked = target.text.to_s.gsub(/\s+/, "")
+      picked = full_name.call(target)
       target.click
-      dog.ok "the switcher face shows the picked repo",
-             page.has_css?("#repo_label", text: picked.sub(/\A.{2}/, ""), wait: 20) || page.has_css?("#repo_label", wait: 5)
+      dog.ok "the dialog closed", page.has_no_css?("dialog[open]", wait: 15)
+      dog.ok "the switcher face shows the picked repo", page.has_css?("#repo_label", text: picked, wait: 20)
       dog.info "picked", picked
       shot.("picked")
 
