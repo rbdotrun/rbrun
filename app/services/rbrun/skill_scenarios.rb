@@ -49,5 +49,44 @@ module Rbrun
       dirs.concat(Dir.glob(File.join(path, "*"))) if path.present? && Dir.exist?(path)
       dirs.select { |d| File.directory?(d) && Dir.exist?(File.join(d, "scenarios")) }.sort
     end
+
+    # Reconcile a SEED/SCRATCH tenant to its authored sources: destroy skills no longer authored on disk
+    # (cascading their versions + scenario workflows) and, for surviving skills, destroy scenario
+    # workflows whose label is no longer in the folder's scenarios/*.yml. Returns the count reaped.
+    #
+    # DESTRUCTIVE and one-directional — the authored files are the truth. Use ONLY for a tenant whose
+    # skills/scenarios come solely from folders (the dogfood tenant). NEVER call it for a tenant whose
+    # users author skills or scenarios in the UI — it would delete their work. This is why reaping is
+    # opt-in here and never folded into `ingest`/`ingest_all` (which stay purely additive).
+    def reap_unauthored!(tenant, config)
+      authored_slugs = Rbrun::SkillSeeder.authored_from_config(config).map { |a| a[:slug] }.to_set
+      labels_by_slug = scenario_labels_by_slug(config)
+      reaped = 0
+
+      Rbrun::Skill.for_tenant(tenant).find_each do |skill|
+        unless authored_slugs.include?(skill.slug)
+          reaped += 1 + skill.workflows.count
+          skill.destroy! # a removed skill — cascade its versions + scenario workflows
+          next
+        end
+
+        keep = labels_by_slug[skill.slug] || Set.new
+        skill.workflows.reject { |wf| keep.include?(wf.label) }.each do |stale|
+          stale.destroy!
+          reaped += 1
+        end
+      end
+      reaped
+    end
+
+    # { skill_slug => Set[scenario label] } read from each authored folder's scenarios/*.yml.
+    def scenario_labels_by_slug(config)
+      folders_with_scenarios(config).each_with_object({}) do |folder, map|
+        labels = Dir.glob(File.join(folder, "scenarios", "*.yml")).filter_map do |path|
+          (YAML.safe_load(File.read(path)) || {})["label"].to_s.strip.presence
+        end
+        map[File.basename(folder)] = labels.to_set
+      end
+    end
   end
 end

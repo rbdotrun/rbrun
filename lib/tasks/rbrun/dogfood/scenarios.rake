@@ -25,7 +25,11 @@ namespace :dogfood do
     dog.header "seed the skills + ingest their scenarios (idempotent)"
     Rbrun::SkillSeeder.new(tenant:, authored: Rbrun::SkillSeeder.builtin_authored).call
     ingested = Rbrun::SkillScenarios.ingest_all(tenant, Rbrun.config)
+    # Reap prior-run ghosts: skills/scenarios no longer authored on disk (invariant 11 — a dogfood
+    # converges). Safe here because the dogfood tenant's scenarios come ONLY from folders, never the UI.
+    reaped = Rbrun::SkillScenarios.reap_unauthored!(tenant, Rbrun.config)
     dog.ok "scenarios ingested", ingested.positive?
+    dog.info "stale reaped", reaped
 
     scenarios = Rbrun::Workflow.for_tenant(tenant).scenarios.includes(:skill).order(:skill_id, :label)
     if scenarios.empty?

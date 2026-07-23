@@ -46,6 +46,23 @@ module Rbrun
       end
     end
 
+    test "reap_unauthored! drops scenarios + skills no longer authored, keeps authored ones" do
+      # @skill is release-notes (an authored builtin): one authored scenario + one that's no longer on disk.
+      kept  = @skill.workflows.create!(tenant: "acme", label: "Writes and saves release notes", prompt: "x")
+      stale = @skill.workflows.create!(tenant: "acme", label: "Ghost scenario", prompt: "y")
+      # a whole skill with no authored source
+      ghost = Rbrun::Skill.create!(tenant: "acme", slug: "no-such-skill", name: "Ghost")
+      ghost.workflows.create!(tenant: "acme", label: "whatever", prompt: "z")
+
+      reaped = Rbrun::SkillScenarios.reap_unauthored!("acme", Rbrun.config)
+
+      assert Rbrun::Workflow.exists?(kept.id),  "authored scenario kept"
+      refute Rbrun::Workflow.exists?(stale.id), "stale scenario reaped"
+      assert Rbrun::Skill.exists?(@skill.id),   "authored skill kept"
+      refute Rbrun::Skill.exists?(ghost.id),    "unauthored skill reaped"
+      assert_equal 3, reaped # stale scenario + ghost skill + ghost's workflow
+    end
+
     test "scenarios/ is excluded from the staged archive (read_dir)" do
       require "tmpdir"
       dir = Dir.mktmpdir("skill-")
