@@ -50,13 +50,13 @@ namespace :dogfood do
     Rbrun::ApplicationJob.queue_adapter = :test # capture the enqueue; we run the deploy job once, below
 
     # Store the app's secrets so the agent doesn't have to ask in this headless run.
-    Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "RAILS_MASTER_KEY") { |s| s.value = ENV["DOGFOOD_APP_MASTER_KEY"] }
-    Rbrun::RepoSecret.find_or_create_by!(tenant: tenant, repo: repo, key: "POSTGRES_PASSWORD") { |s| s.value = SecureRandom.hex(16) }
+    Rbrun::RepoSecret.find_or_create_by!(tenant:, repo:, key: "RAILS_MASTER_KEY") { |s| s.value = ENV["DOGFOOD_APP_MASTER_KEY"] }
+    Rbrun::RepoSecret.find_or_create_by!(tenant:, repo:, key: "POSTGRES_PASSWORD") { |s| s.value = SecureRandom.hex(16) }
 
     # Reap prior dogfood worktrees via the ONE teardown entry point (idempotency, invariant #11).
-    Rbrun::Worktree.for_tenant(tenant).where(repo: repo, archived_at: nil).find_each(&:archive!)
+    Rbrun::Worktree.for_tenant(tenant).where(repo:, archived_at: nil).find_each(&:archive!)
 
-    worktree = Rbrun::Worktree.create!(tenant: tenant, repo: repo, base: "main")
+    worktree = Rbrun::Worktree.create!(tenant:, repo:, base: "main")
     dog.header "provisioning the dev sandbox (clone #{repo} + push the branch)"
     worktree.provision!
     session = worktree.sessions.create!
@@ -122,7 +122,7 @@ namespace :dogfood do
 
       target = worktree.reload.deploy_target
       dog.ok "agent (resumed on a fresh box) marked it torn_down", target&.status == "torn_down"
-      dog.ok "server gone from Hetzner",                          Rbrun.server.find_server(name: name).nil?
+      dog.ok "server gone from Hetzner",                          Rbrun.server.find_server(name:).nil?
       dog.ok "#{url} no longer answers",                         url_dead?(url)
     ensure
       # Final cleanup — the ONE teardown entry point: reaps the box + soft-deletes (idempotent).

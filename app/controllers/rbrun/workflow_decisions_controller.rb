@@ -22,39 +22,39 @@ module Rbrun
 
     private
 
-    def perform(decision, session, plan)
-      return { "created" => false } if decision == "cancel"
+      def perform(decision, session, plan)
+        return { "created" => false } if decision == "cancel"
 
-      workflow = create_workflow(session.tenant, plan)
-      if decision == "apply"
-        session.update!(workflow: workflow, workflow_status: "active")
-        session.broadcast_workflow
+        workflow = create_workflow(session.tenant, plan)
+        if decision == "apply"
+          session.update!(workflow:, workflow_status: "active")
+          session.broadcast_workflow
+        end
+        { "created" => true, "workflow_id" => workflow.id, "label" => workflow.label, "bound" => decision == "apply" }
       end
-      { "created" => true, "workflow_id" => workflow.id, "label" => workflow.label, "bound" => decision == "apply" }
-    end
 
-    def create_workflow(tenant, plan)
-      workflow = Rbrun::Workflow.new(label: plan["label"].to_s.strip.presence || "Untitled workflow",
-                                     goal: plan["goal"], description: plan["description"])
-      workflow[Rbrun.config.tenancy_key] = tenant
-      workflow.save!
-      Array(plan["steps"]).map(&:to_s).map(&:strip).reject(&:empty?).each_with_index do |title, i|
-        workflow.steps.create!(position: i, title: title)
+      def create_workflow(tenant, plan)
+        workflow = Rbrun::Workflow.new(label: plan["label"].to_s.strip.presence || "Untitled workflow",
+                                       goal: plan["goal"], description: plan["description"])
+        workflow[Rbrun.config.tenancy_key] = tenant
+        workflow.save!
+        Array(plan["steps"]).map(&:to_s).map(&:strip).reject(&:empty?).each_with_index do |title, i|
+          workflow.steps.create!(position: i, title:)
+        end
+        workflow
       end
-      workflow
-    end
 
-    def nudge_for(decision, outcome)
-      case decision
-      when "apply"
-        "The user applied the workflow \"#{outcome['label']}\" — it is now running in this conversation. " \
-          "Work the steps in order; call validate_step when you finish each one."
-      when "save"
-        "The user saved the workflow \"#{outcome['label']}\" to the library but did NOT start it here. " \
-          "Continue with the current task."
-      else
-        "The user declined to create the workflow. Proceed without one, or propose a revised plan."
+      def nudge_for(decision, outcome)
+        case decision
+        when "apply"
+          "The user applied the workflow \"#{outcome['label']}\" — it is now running in this conversation. " \
+            "Work the steps in order; call validate_step when you finish each one."
+        when "save"
+          "The user saved the workflow \"#{outcome['label']}\" to the library but did NOT start it here. " \
+            "Continue with the current task."
+        else
+          "The user declined to create the workflow. Proceed without one, or propose a revised plan."
+        end
       end
-    end
   end
 end

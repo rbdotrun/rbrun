@@ -47,24 +47,24 @@ module Rbrun
 
           private
 
-          def disabled_item
-            tag.span(role: "menuitem", tabindex: "-1", "aria-disabled": "true",
-                     data: { menu_target: "item" }, class: class_names(BASE, DISABLED)) do
-              safe_join([ leading, tag.span(@label, class: "flex-1 truncate") ].compact)
+            def disabled_item
+              tag.span(role: "menuitem", tabindex: "-1", "aria-disabled": "true",
+                       data: { menu_target: "item" }, class: class_names(BASE, DISABLED)) do
+                safe_join([ leading, tag.span(@label, class: "flex-1 truncate") ].compact)
+              end
             end
-          end
 
-          def leading
-            if @avatar.present?
-              tag.span(@avatar, class: AVATAR)
-            elsif @icon.present?
-              lucide_icon(@icon, class: ICON)
+            def leading
+              if @avatar.present?
+                tag.span(@avatar, class: AVATAR)
+              elsif @icon.present?
+                lucide_icon(@icon, class: ICON)
+              end
             end
-          end
 
-          def trailing
-            lucide_icon("check", class: CHECK) if @active
-          end
+            def trailing
+              lucide_icon("check", class: CHECK) if @active
+            end
         end
 
         # ── Item: current (avatar + bold name, non-interactive) ───────────────

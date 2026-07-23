@@ -60,9 +60,9 @@ module Rbrun
 
     private
 
-    def claude_dir(sandbox) = File.join(sandbox.workspace, ".claude")
-    def tar_path(sandbox)   = File.join(sandbox.workspace, TAR_NAME)
+      def claude_dir(sandbox) = File.join(sandbox.workspace, ".claude")
+      def tar_path(sandbox)   = File.join(sandbox.workspace, TAR_NAME)
 
-    def esc(str) = Shellwords.escape(str)
+      def esc(str) = Shellwords.escape(str)
   end
 end

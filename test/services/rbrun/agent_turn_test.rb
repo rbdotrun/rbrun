@@ -4,7 +4,7 @@ module Rbrun
   class AgentTurnTest < ActiveSupport::TestCase
     # A scripted stand-in for a runtime adapter: plays events into on_event and round-trips the tool.
     class ToolCallingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         on_event.call({ type: "session", session_id: "sess-1" })
         on_event.call({ type: "assistant", text: "on it" })
         resp = tool_handler.call({ type: "tool_request", id: "t1", name: "identity", args: {} })
@@ -15,7 +15,7 @@ module Rbrun
     end
 
     class GatingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         on_event.call({ type: "session", session_id: "sess-2" })
         on_event.call({ type: "needs_approval", tool: "dangerous", arguments: { "x" => 1 }, tool_use_id: "g1" })
         { type: "result", stop_reason: "awaiting_approval" }
@@ -43,7 +43,7 @@ module Rbrun
     class SkillsCapturingRuntime
       attr_reader :staged
 
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         @staged = skills && Rbrun::SkillArchive.read_dir(skills)
         on_event.call({ type: "result", stop_reason: "end_turn" })
         { type: "result", stop_reason: "end_turn" }
@@ -57,7 +57,7 @@ module Rbrun
                      archive: Rbrun::SkillArchive.pack_files(files), source: :inline)
 
       runtime = SkillsCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
 
       assert_equal({ "pdf/SKILL.md" => "# staged\n" }, runtime.staged,
                    "the current version's folder is staged under <slug>/")
@@ -66,7 +66,7 @@ module Rbrun
     class McpCapturingRuntime
       attr_reader :mcp, :seen
 
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         @mcp = mcp
         on_event.call({ type: "result", stop_reason: "end_turn" })
         { type: "result", stop_reason: "end_turn" }
@@ -77,7 +77,7 @@ module Rbrun
       Rbrun::McpServer.create!(tenant: "acme", name: "stripe", transport: "stdio", command: "npx",
                                args: [ "-y", "x" ], env: { "K" => "v" })
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
 
       assert_equal({ "command" => "npx", "args" => [ "-y", "x" ], "env" => { "K" => "v" } },
                    runtime.mcp.dig("servers", "stripe"))
@@ -96,12 +96,12 @@ module Rbrun
 
     test "no MCP servers ⇒ mcp is nil" do
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("go")
+      AgentTurn.new(session: @session, runtime:).run("go")
       assert_nil runtime.mcp
     end
 
     class McpGatingRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         on_event.call({ type: "session", session_id: "sess-mcp" })
         on_event.call({ type: "needs_approval", tool: "mcp__stripe__pay", arguments: { "amt" => 5 },
                         tool_use_id: "g9", tool_kind: "mcp" })
@@ -110,7 +110,7 @@ module Rbrun
     end
 
     class McpStatusRuntime
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         on_event.call({ type: "mcp_status", servers: [ { name: "stripe", status: "failed" }, { name: "rbrun", status: "connected" } ] })
         on_event.call({ type: "result", stop_reason: "end_turn" })
         { type: "result", stop_reason: "end_turn" }
@@ -150,7 +150,7 @@ module Rbrun
         approval_status: "approved", payload: { "name" => "mcp__stripe__pay", "tool_kind" => "mcp" })
 
       runtime = McpCapturingRuntime.new
-      AgentTurn.new(session: @session, runtime: runtime).run("continue")
+      AgentTurn.new(session: @session, runtime:).run("continue")
       assert_includes runtime.mcp["approved"], "mcp__stripe__pay"
     end
 

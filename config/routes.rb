@@ -6,6 +6,9 @@ Rbrun::Engine.routes.draw do
   resources :sessions, path: "c", only: %i[index create show]
   post "c/:id",       to: "messages#create", as: :session_message
   post "c/:id/retry", to: "sessions#retry",  as: :session_retry
+  # Per-turn "report an error": the footer link opens the dialog (new), the form files it (create).
+  get  "c/:id/report/:message_id", to: "reports#new",    as: :new_report
+  post "c/:id/report/:message_id", to: "reports#create", as: :report
   resources :approvals, only: :update, param: :tool_use_id
   # Custom gate: ask_user submits its picks here (a custom_approval! tool → its own submit route).
   post "ask_user/:tool_use_id", to: "ask_user_responses#create", as: :ask_user_response

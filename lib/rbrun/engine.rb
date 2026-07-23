@@ -1,6 +1,9 @@
 require "turbo-rails"
 require "stimulus-rails"
 require "lucide-rails"
+# Load ViewComponent's engine eagerly (it's otherwise pulled in lazily via view_component_contrib) so
+# its config.view_component exists by the time our initializer below turns previews off.
+require "view_component"
 
 module Rbrun
   class Engine < ::Rails::Engine
@@ -18,6 +21,18 @@ module Rbrun
         app.config.assets.paths << root.join("app/assets/builds").to_s
         app.config.assets.precompile += %w[ rbrun/rbrun.css rbrun/rbrun.js ]
       end
+    end
+
+    # rbrun pulls in ViewComponent (via view_component_contrib). Its dev preview UI registers a
+    # `preview_view_components` route that RE-ADDS itself on every routes reload → "Invalid route name,
+    # already in use" and a forced restart after each code change. rbrun's components are covered by the
+    # primitives smoke test, not previews, so turn previews off. Set here (an engine initializer runs
+    # after ViewComponent's railtie defines config.view_component, and before routes are drawn — the env
+    # file and config/initializers are too early: config.view_component doesn't exist there yet).
+    initializer "rbrun.disable_view_component_previews", after: "view_component.set_configs" do |app|
+      # (No respond_to? guard — config.view_component is method_missing-backed, so respond_to? is false
+      # even though it's set. set_configs ran just before, so the object is present.)
+      app.config.view_component.show_previews = false
     end
 
     # Auth is mandatory — fail fast at boot if nothing provides it. Then seed skills from config

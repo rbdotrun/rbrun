@@ -54,7 +54,7 @@ module Rbrun
       def rank(specs)
         specs.each_with_index.flat_map do |spec, si|
           (spec.tools || []).each_with_index.map do |tool, ti|
-            { si: si, ti: ti, name: tool, prio: PRIORITY.fetch(perm(spec, tool), 2) }
+            { si:, ti:, name: tool, prio: PRIORITY.fetch(perm(spec, tool), 2) }
           end
         end.sort_by { |e| [ e[:prio], -e[:si], -e[:ti] ] }
       end

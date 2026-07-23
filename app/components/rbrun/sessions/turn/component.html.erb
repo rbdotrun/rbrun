@@ -11,5 +11,10 @@
     <div id="<%= "timeline_#{user_message.id}" %>" class="flex flex-col gap-3 text-sm">
       <%= render(Rbrun::Sessions::Timeline::Component.new(messages: messages, working: working)) %>
     </div>
+
+    <%# The turn footer — only once the turn is done and actually produced a response. %>
+    <% if !working && messages.any? { |m| m.role == "assistant" } %>
+      <%= custom("sessions/turn_footer", user_message: user_message) %>
+    <% end %>
   </div>
 </div>

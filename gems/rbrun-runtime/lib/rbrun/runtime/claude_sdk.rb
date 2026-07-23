@@ -40,15 +40,15 @@ module Rbrun
       # events: tool_request → tool_handler (run in Ruby, answered on stdin); everything else →
       # on_event; result/error → terminal. Returns the terminal result event. The config.json (with
       # the api_key) is removed in ensure — the key never outlives the turn.
-      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, auto: false, tool_handler: nil, on_event: nil)
+      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, auto: false, cwd: nil, tool_handler: nil, on_event: nil)
         config_path = nil
         begin
           stage_client
           stage_skills(skills)
           prewarm_mcp(mcp)
           stage_settings
-          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp, auto: auto)
-          run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
+          config_path = write_config_file(prompt:, system:, tools:, resume:, mcp:, auto:, cwd:)
+          run_over_session(run_command(config_path, cwd:), tool_handler:, on_event:)
         ensure
           @sandbox.exec("rm -f #{config_path}") if config_path
         end
@@ -56,177 +56,182 @@ module Rbrun
 
       private
 
-      # Sibling of the workspace (parallels Daytona's /home/daytona/agent) — outside the agent's cwd so
-      # nothing it stages shows up in the working tree. Works for any adapter: dirname(workspace)/agent.
-      def agent_dir = File.join(File.dirname(@sandbox.workspace), "agent")
+        # Sibling of the workspace (parallels Daytona's /home/daytona/agent) — outside the agent's cwd so
+        # nothing it stages shows up in the working tree. Works for any adapter: dirname(workspace)/agent.
+        def agent_dir = File.join(File.dirname(@sandbox.workspace), "agent")
 
-      # Upload the driver + install its deps. Every turn, unconditionally — no "is it installed?"
-      # check (the check would be the second truth, and the seconds do not matter).
-      def stage_client
-        @sandbox.write(File.join(agent_dir, "package.json"), JSON.pretty_generate(AGENT_PACKAGE))
-        @sandbox.write(File.join(agent_dir, "client.ts"), File.read(CLIENT_TS))
-        @sandbox.exec!("cd #{agent_dir} && bun install", timeout: 180)
-      end
-
-      # Pre-fetch declared stdio MCP server packages into the box's package cache, so the SDK's spawn
-      # is warm (fast connect) instead of a cold download on the first turn. Best-effort — a failure
-      # here must not fail the turn. Kills the cold-start half of the connect race at the source.
-      def prewarm_mcp(mcp)
-        servers = mcp && (mcp["servers"] || mcp[:servers])
-        return if servers.blank?
-
-        servers.each_value do |entry|
-          command = entry["command"] || entry[:command]
-          next unless %w[bunx npx].include?(command.to_s)
-
-          args = entry["args"] || entry[:args] || []
-          pkg = args.find { |a| !a.to_s.start_with?("-") }
-          next if pkg.to_s.empty?
-
-          @sandbox.exec("cd #{agent_dir} && bun add #{pkg}", timeout: 120)
+        # Upload the driver + install its deps. Every turn, unconditionally — no "is it installed?"
+        # check (the check would be the second truth, and the seconds do not matter).
+        def stage_client
+          @sandbox.write(File.join(agent_dir, "package.json"), JSON.pretty_generate(AGENT_PACKAGE))
+          @sandbox.write(File.join(agent_dir, "client.ts"), File.read(CLIENT_TS))
+          @sandbox.exec!("cd #{agent_dir} && bun install", timeout: 180)
         end
-      rescue StandardError => e
-        warn "[rbrun] mcp prewarm skipped: #{e.message}"
-      end
 
-      # A skill is a folder; stage the tree under <workspace>/.claude/skills/ where the SDK's project
-      # setting source finds it. This method never learns a skill's name.
-      def stage_skills(dir)
-        return unless dir && Dir.exist?(dir)
+        # Pre-fetch declared stdio MCP server packages into the box's package cache, so the SDK's spawn
+        # is warm (fast connect) instead of a cold download on the first turn. Best-effort — a failure
+        # here must not fail the turn. Kills the cold-start half of the connect race at the source.
+        def prewarm_mcp(mcp)
+          servers = mcp && (mcp["servers"] || mcp[:servers])
+          return if servers.blank?
 
-        dest = File.join(@sandbox.workspace, ".claude", "skills")
-        uploads = Dir.glob(File.join(dir, "**/*")).select { |f| File.file?(f) }.map do |file|
-          Rbrun::Sandbox::FileUpload.new(source: file, destination: File.join(dest, file.delete_prefix("#{dir}/")))
+          servers.each_value do |entry|
+            command = entry["command"] || entry[:command]
+            next unless %w[bunx npx].include?(command.to_s)
+
+            args = entry["args"] || entry[:args] || []
+            pkg = args.find { |a| !a.to_s.start_with?("-") }
+            next if pkg.to_s.empty?
+
+            @sandbox.exec("cd #{agent_dir} && bun add #{pkg}", timeout: 120)
+          end
+        rescue StandardError => e
+          warn "[rbrun] mcp prewarm skipped: #{e.message}"
         end
-        @sandbox.upload(uploads)
-      end
 
-      # The container is the confinement; the one product choice left is that the agent does not browse.
-      def stage_settings
-        @sandbox.write(
-          File.join(@sandbox.workspace, ".claude", "settings.json"),
-          JSON.pretty_generate("permissions" => { "deny" => [ "WebFetch", "WebSearch" ] })
-        )
-      end
+        # A skill is a folder; stage the tree under <workspace>/.claude/skills/ where the SDK's project
+        # setting source finds it. This method never learns a skill's name.
+        def stage_skills(dir)
+          return unless dir && Dir.exist?(dir)
 
-      # The run config (api_key + prompt + client config), uploaded and deleted when the run ends — the
-      # key never outlives the turn. Returns its remote path.
-      def write_config_file(prompt:, system:, tools:, resume:, mcp: nil, auto: false)
-        path = File.join(agent_dir, "config.json")
-        @sandbox.write(path, {
-          api_key: @api_key,
-          prompt: prompt,
-          system_prompt: system,
-          model: @model,
-          manifest: tools,
-          mcp: mcp, # external MCP servers ({servers,tools,permissions}) — secrets live+die with this file
-          resume: resume,
-          auto: auto, # autonomous: canUseTool auto-approves every gate (no human), box-scoped
-          max_turns: @max_turns
-        }.to_json)
-        path
-      end
-
-      # The detached run command. CLAUDE_CONFIG_DIR points the SDK at the workspace's project settings
-      # (not the dev's ~/.claude). The GitHub PAT is injected as PROCESS-SCOPED env — a git credential
-      # helper via GIT_CONFIG_* env, so nothing is written to the host's global git config or HOME.
-      def run_command(config_path)
-        workspace = @sandbox.workspace
-        cmd = +"cd #{workspace} && CLAUDE_CONFIG_DIR=#{File.join(workspace, ".claude")} "
-        if @github_pat && !@github_pat.to_s.empty?
-          cmd << "GH_TOKEN=#{@github_pat} GITHUB_TOKEN=#{@github_pat} "
-          cmd << "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper "
-          cmd << %(GIT_CONFIG_VALUE_0='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' )
+          dest = File.join(@sandbox.workspace, ".claude", "skills")
+          uploads = Dir.glob(File.join(dir, "**/*")).select { |f| File.file?(f) }.map do |file|
+            Rbrun::Sandbox::FileUpload.new(source: file, destination: File.join(dest, file.delete_prefix("#{dir}/")))
+          end
+          @sandbox.upload(uploads)
         end
-        cmd << "bun #{File.join(agent_dir, "client.ts")} #{config_path}"
-        cmd
-      end
 
-      def to_canonical(line)
-        JSON.parse(line.strip, symbolize_names: true)
-      rescue JSON::ParserError
-        nil
-      end
-
-      # structured_output is DATA (the model's JSON) — hand it back STRING-keyed so it stores as-is;
-      # the envelope keeps its symbol keys.
-      def stringify_output(event)
-        out = event[:structured_output]
-        out.is_a?(Hash) || out.is_a?(Array) ? event.merge(structured_output: deep_stringify(out)) : event
-      end
-
-      def deep_stringify(obj)
-        case obj
-        when Hash  then obj.each_with_object({}) { |(k, v), h| h[k.to_s] = deep_stringify(v) }
-        when Array then obj.map { |e| deep_stringify(e) }
-        else obj
+        # The container is the confinement; the one product choice left is that the agent does not browse.
+        def stage_settings
+          @sandbox.write(
+            File.join(@sandbox.workspace, ".claude", "settings.json"),
+            JSON.pretty_generate("permissions" => { "deny" => [ "WebFetch", "WebSearch" ] })
+          )
         end
-      end
 
-      # Drive the client as a DETACHED session command over the sandbox contract. If the log stream
-      # drops, the process keeps running and we RECONNECT from `offset`. Terminal state comes only from
-      # the client's own result/error — never the transport.
-      def run_over_session(command, tool_handler:, on_event:)
-        session_id = "turn-#{SecureRandom.hex(6)}"
-        @sandbox.session_create(session_id)
-        cmd_id = @sandbox.session_exec(session_id, command)
+        # The run config (api_key + prompt + client config), uploaded and deleted when the run ends — the
+        # key never outlives the turn. Returns its remote path.
+        def write_config_file(prompt:, system:, tools:, resume:, mcp: nil, auto: false, cwd: nil)
+          path = File.join(agent_dir, "config.json")
+          @sandbox.write(path, {
+            api_key: @api_key,
+            prompt:,
+            system_prompt: system,
+            model: @model,
+            manifest: tools,
+            mcp:, # external MCP servers ({servers,tools,permissions}) — secrets live+die with this file
+            resume:,
+            auto:, # autonomous: canUseTool auto-approves every gate (no human), box-scoped
+            cwd:,   # the agent's working dir (the checkout) → query({ cwd }) so the SDK tells the agent
+            max_turns: @max_turns
+          }.to_json)
+          path
+        end
 
-        result = nil
-        error_message = nil
-        terminal = false
-        buf = +""
-        offset = 0
-        deadline = monotonic + @timeout
+        # The detached run command. CLAUDE_CONFIG_DIR points the SDK at the workspace's project settings
+        # (not the dev's ~/.claude). The GitHub PAT is injected as PROCESS-SCOPED env — a git credential
+        # helper via GIT_CONFIG_* env, so nothing is written to the host's global git config or HOME.
+        # cwd is the agent's working directory (the repo checkout for a normal worktree, the workspace for
+        # a bare one); CLAUDE_CONFIG_DIR always points at the workspace's own .claude — the SIBLING of the
+        # checkout — so skills/settings/session resolve there regardless of where the agent stands.
+        def run_command(config_path, cwd: nil)
+          workspace = @sandbox.workspace
+          dir = cwd.presence || workspace
+          cmd = +"cd #{dir} && CLAUDE_CONFIG_DIR=#{File.join(workspace, ".claude")} "
+          if @github_pat && !@github_pat.to_s.empty?
+            cmd << "GH_TOKEN=#{@github_pat} GITHUB_TOKEN=#{@github_pat} "
+            cmd << "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper "
+            cmd << %(GIT_CONFIG_VALUE_0='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' )
+          end
+          cmd << "bun #{File.join(agent_dir, "client.ts")} #{config_path}"
+          cmd
+        end
 
-        dispatch = lambda do |chunk|
-          buf << chunk
-          while (nl = buf.index("\n"))
-            line = buf.slice!(0..nl)
-            event = to_canonical(line)
-            next unless event
+        def to_canonical(line)
+          JSON.parse(line.strip, symbolize_names: true)
+        rescue JSON::ParserError
+          nil
+        end
 
-            case event[:type]
-            when "tool_response" then next # our own stdin echoed by the session — never a client event
-            when "result"        then result = stringify_output(event); error_message = nil; terminal = true
-            when "error"         then error_message = event[:message]; terminal = true
-            when "tool_request"  then answer_tool_request(session_id, cmd_id, event, tool_handler)
-            else on_event&.call(event)
+        # structured_output is DATA (the model's JSON) — hand it back STRING-keyed so it stores as-is;
+        # the envelope keeps its symbol keys.
+        def stringify_output(event)
+          out = event[:structured_output]
+          out.is_a?(Hash) || out.is_a?(Array) ? event.merge(structured_output: deep_stringify(out)) : event
+        end
+
+        def deep_stringify(obj)
+          case obj
+          when Hash  then obj.each_with_object({}) { |(k, v), h| h[k.to_s] = deep_stringify(v) }
+          when Array then obj.map { |e| deep_stringify(e) }
+          else obj
+          end
+        end
+
+        # Drive the client as a DETACHED session command over the sandbox contract. If the log stream
+        # drops, the process keeps running and we RECONNECT from `offset`. Terminal state comes only from
+        # the client's own result/error — never the transport.
+        def run_over_session(command, tool_handler:, on_event:)
+          session_id = "turn-#{SecureRandom.hex(6)}"
+          @sandbox.session_create(session_id)
+          cmd_id = @sandbox.session_exec(session_id, command)
+
+          result = nil
+          error_message = nil
+          terminal = false
+          buf = +""
+          offset = 0
+          deadline = monotonic + @timeout
+
+          dispatch = lambda do |chunk|
+            buf << chunk
+            while (nl = buf.index("\n"))
+              line = buf.slice!(0..nl)
+              event = to_canonical(line)
+              next unless event
+
+              case event[:type]
+              when "tool_response" then next # our own stdin echoed by the session — never a client event
+              when "result"        then result = stringify_output(event); error_message = nil; terminal = true
+              when "error"         then error_message = event[:message]; terminal = true
+              when "tool_request"  then answer_tool_request(session_id, cmd_id, event, tool_handler)
+              else on_event&.call(event)
+              end
             end
+            terminal
           end
-          terminal
+
+          until terminal
+            remaining = deadline - monotonic
+            raise Error, "client run timed out after #{@timeout}s" if remaining <= 0
+
+            begin
+              offset = @sandbox.session_logs_follow(session_id, cmd_id, skip: offset, timeout: remaining, &dispatch)
+            rescue Rbrun::Sandbox::TimeoutError
+              raise Error, "client run timed out after #{@timeout}s"
+            rescue StandardError => e
+              @logger&.debug { "[rbrun-runtime] log stream interrupted (#{e.class}: #{e.message}) — re-checking the command" }
+            end
+            break if terminal
+
+            exit_code = @sandbox.session_command(session_id, cmd_id)["exitCode"]
+            next if exit_code.nil? # still running, stream merely dropped → reconnect
+
+            raise Error, "client exited #{exit_code} without a result"
+          end
+
+          raise Error, error_message if error_message
+
+          result
         end
 
-        until terminal
-          remaining = deadline - monotonic
-          raise Error, "client run timed out after #{@timeout}s" if remaining <= 0
-
-          begin
-            offset = @sandbox.session_logs_follow(session_id, cmd_id, skip: offset, timeout: remaining, &dispatch)
-          rescue Rbrun::Sandbox::TimeoutError
-            raise Error, "client run timed out after #{@timeout}s"
-          rescue StandardError => e
-            @logger&.debug { "[rbrun-runtime] log stream interrupted (#{e.class}: #{e.message}) — re-checking the command" }
-          end
-          break if terminal
-
-          exit_code = @sandbox.session_command(session_id, cmd_id)["exitCode"]
-          next if exit_code.nil? # still running, stream merely dropped → reconnect
-
-          raise Error, "client exited #{exit_code} without a result"
+        # The tool bridge: run the requested tool in Ruby, write its result to the client's stdin.
+        def answer_tool_request(session_id, cmd_id, event, tool_handler)
+          response = tool_handler&.call(event) || { result: { error: "no tool handler" }, is_error: true }
+          @sandbox.session_input(session_id, cmd_id, { type: "tool_response", id: event[:id], **response }.to_json + "\n")
         end
 
-        raise Error, error_message if error_message
-
-        result
-      end
-
-      # The tool bridge: run the requested tool in Ruby, write its result to the client's stdin.
-      def answer_tool_request(session_id, cmd_id, event, tool_handler)
-        response = tool_handler&.call(event) || { result: { error: "no tool handler" }, is_error: true }
-        @sandbox.session_input(session_id, cmd_id, { type: "tool_response", id: event[:id], **response }.to_json + "\n")
-      end
-
-      def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

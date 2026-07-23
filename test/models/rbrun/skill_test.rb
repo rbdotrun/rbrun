@@ -9,7 +9,7 @@ module Rbrun
     def dig(files)  = Rbrun::SkillArchive.digest_files(files)
 
     def make(slug: "pdf", tenant: "rbrun")
-      skill = Rbrun::Skill.create!(tenant: tenant, slug: slug, name: slug)
+      skill = Rbrun::Skill.create!(tenant:, slug:, name: slug)
       skill.promote!(digest: dig(FILES), archive: blob(FILES), source: :file)
       skill
     end

@@ -15,13 +15,13 @@ module Rbrun
     def fake_server(ok:, output:)
       srv = Object.new
       srv.define_singleton_method(:deploy) do |work_dir:, host:, server_ip:, ssh_private_key:, env:|
-        Rbrun::Server::DeployResult.new(ok: ok, output: output)
+        Rbrun::Server::DeployResult.new(ok:, output:)
       end
       srv
     end
 
     def runner_with(server)
-      r = DeployRunner.new(worktree: @wt, server: server)
+      r = DeployRunner.new(worktree: @wt, server:)
       r.define_singleton_method(:with_checkout) { |&blk| blk.call("/tmp/checkout", "abc123def4567") }
       r.define_singleton_method(:wait_for_box!) { |**| true } # don't really SSH the fake IP in unit tests
       r

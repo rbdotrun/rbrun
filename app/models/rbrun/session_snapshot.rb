@@ -13,6 +13,6 @@ module Rbrun
 
     private
 
-    def inherit_tenant = self[Rbrun.config.tenancy_key] ||= session&.tenant
+      def inherit_tenant = self[Rbrun.config.tenancy_key] ||= session&.tenant
   end
 end

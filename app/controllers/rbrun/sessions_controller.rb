@@ -33,12 +33,12 @@ module Rbrun
 
     private
 
-    # The Worktree for the acting repo, created on first use. Base is the repo's default branch,
-    # captured when the repo was picked (from the GitHub result); falls back to "main".
-    def worktree_for(repo)
-      Rbrun::Worktree.for_tenant(current_tenant)
-                     .create_with(base: current_repo_base || "main")
-                     .find_or_create_by!(repo:)
-    end
+      # The Worktree for the acting repo, created on first use. Base is the repo's default branch,
+      # captured when the repo was picked (from the GitHub result); falls back to "main".
+      def worktree_for(repo)
+        Rbrun::Worktree.for_tenant(current_tenant)
+                       .create_with(base: current_repo_base || "main")
+                       .find_or_create_by!(repo:)
+      end
   end
 end

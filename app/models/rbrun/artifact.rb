@@ -24,8 +24,8 @@ module Rbrun
             create!(Rbrun.config.tenancy_key => tenant, :name => name.presence || filename)
           end
         number  = artifact.versions.maximum(:number).to_i + 1
-        version = artifact.versions.create!(number: number, message: message)
-        version.file.attach(io: io, filename: filename)
+        version = artifact.versions.create!(number:, message:)
+        version.file.attach(io:, filename:)
         artifact.update!(current_version: version)
         version
       end

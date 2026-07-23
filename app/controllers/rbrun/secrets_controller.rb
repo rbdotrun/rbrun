@@ -27,27 +27,27 @@ module Rbrun
 
     private
 
-    # Encrypt + upsert each declared, non-blank value as a repo-scoped RepoSecret. Returns the key names.
-    def store_secrets!(session, spec, submitted)
-      repo = session.worktree.repo
-      submitted.slice(*spec.keys).filter_map do |key, value|
-        next if value.to_s.empty?
+      # Encrypt + upsert each declared, non-blank value as a repo-scoped RepoSecret. Returns the key names.
+      def store_secrets!(session, spec, submitted)
+        repo = session.worktree.repo
+        submitted.slice(*spec.keys).filter_map do |key, value|
+          next if value.to_s.empty?
 
-        rec = Rbrun::RepoSecret.for_tenant(session.tenant).find_or_initialize_by(repo: repo, key: key)
-        rec[Rbrun.config.tenancy_key] = session.tenant
-        rec.update!(value: value)
-        key
+          rec = Rbrun::RepoSecret.for_tenant(session.tenant).find_or_initialize_by(repo:, key:)
+          rec[Rbrun.config.tenancy_key] = session.tenant
+          rec.update!(value:)
+          key
+        end
       end
-    end
 
-    # Raw submission → string-keyed { key => value } (single value per key). Sliced to declared keys
-    # only once validated. The frozen spec is the boundary, not a permit-list.
-    def submitted_secrets
-      raw = params[:secrets]
-      return {} if raw.blank?
+      # Raw submission → string-keyed { key => value } (single value per key). Sliced to declared keys
+      # only once validated. The frozen spec is the boundary, not a permit-list.
+      def submitted_secrets
+        raw = params[:secrets]
+        return {} if raw.blank?
 
-      hash = raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw
-      hash.to_h { |key, value| [ key.to_s, value.to_s ] }
-    end
+        hash = raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw
+        hash.to_h { |key, value| [ key.to_s, value.to_s ] }
+      end
   end
 end

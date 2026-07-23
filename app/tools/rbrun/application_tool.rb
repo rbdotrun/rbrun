@@ -30,7 +30,7 @@ module Rbrun
     end
 
     # Build a tool for a turn: the Session is Tenanted, so it is BOTH the tenant slug and the session.
-    def self.in_session(session) = new(tenant: session.tenant, session: session)
+    def self.in_session(session) = new(tenant: session.tenant, session:)
 
     IDENTITY_TOOL = "identity"
 
@@ -101,12 +101,12 @@ module Rbrun
 
     private
 
-    attr_reader :session
+      attr_reader :session
 
-    # Acting identity — the session's tenant slug. One source; nil for a bare metadata instance.
-    def tenant = @tenant
+      # Acting identity — the session's tenant slug. One source; nil for a bare metadata instance.
+      def tenant = @tenant
 
-    # The ruby_llm recoverable-error convention: return, don't raise. Always string-keyed.
-    def error(message) = { "error" => message }
+      # The ruby_llm recoverable-error convention: return, don't raise. Always string-keyed.
+      def error(message) = { "error" => message }
   end
 end

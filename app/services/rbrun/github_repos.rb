@@ -39,31 +39,31 @@ module Rbrun
 
     private
 
-    def to_repo(hash)
-      Repo.new(full_name: hash["full_name"], default_branch: hash["default_branch"] || "main",
-               private: hash["private"] || false)
-    end
+      def to_repo(hash)
+        Repo.new(full_name: hash["full_name"], default_branch: hash["default_branch"] || "main",
+                 private: hash["private"] || false)
+      end
 
-    def get(path, **params)
-      resp = conn.get(path, params)
-      raise Error, "GET #{path} → #{resp.status}: #{resp.body.to_s[0, 200]}" unless resp.success?
+      def get(path, **params)
+        resp = conn.get(path, params)
+        raise Error, "GET #{path} → #{resp.status}: #{resp.body.to_s[0, 200]}" unless resp.success?
 
-      resp.body
-    end
+        resp.body
+      end
 
-    def conn
-      @conn ||= begin
-        require "async/http/faraday"
-        Faraday.new(url: API) do |f|
-          f.response :json, content_type: /\bjson/
-          f.headers["Authorization"] = "Bearer #{@pat}"
-          f.headers["Accept"] = "application/vnd.github+json"
-          f.options.open_timeout = 15
-          f.adapter :async_http
+      def conn
+        @conn ||= begin
+          require "async/http/faraday"
+          Faraday.new(url: API) do |f|
+            f.response :json, content_type: /\bjson/
+            f.headers["Authorization"] = "Bearer #{@pat}"
+            f.headers["Accept"] = "application/vnd.github+json"
+            f.options.open_timeout = 15
+            f.adapter :async_http
+          end
         end
       end
-    end
 
-    class Error < StandardError; end
+      class Error < StandardError; end
   end
 end

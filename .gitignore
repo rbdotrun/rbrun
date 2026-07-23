@@ -19,3 +19,4 @@
 # Deploy: the generated SSH keypair and Kamal's resolved secrets never get committed.
 /.deploy/
 /.kamal/secrets
+/test/dummy/log/*.log.*

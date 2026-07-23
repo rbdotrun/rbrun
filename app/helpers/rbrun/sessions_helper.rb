@@ -26,7 +26,7 @@ module Rbrun
 
     # The shared gate form (one PATCH, two submits keyed by decision).
     def approval_actions(tool_use_id)
-      render "rbrun/sessions/approval_actions", tool_use_id: tool_use_id
+      render "rbrun/sessions/approval_actions", tool_use_id:
     end
 
     # The validation card component for a tool — resolved by folder-per-unit convention from the tool

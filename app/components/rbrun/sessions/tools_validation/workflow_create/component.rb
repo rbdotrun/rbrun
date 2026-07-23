@@ -7,28 +7,28 @@ module Rbrun
         class Component < Rbrun::Sessions::ToolsValidation::Base
           private
 
-          def label = input["label"]
-          def goal = input["goal"]
-          def steps = Array(input["steps"])
+            def label = input["label"]
+            def goal = input["goal"]
+            def steps = Array(input["steps"])
 
-          def decided? = !@call.approval_pending?
+            def decided? = !@call.approval_pending?
 
-          def outcome
-            @outcome ||= begin
-              row = @call.session.messages.find_by(event_type: "tool_result", tool_use_id: tool_use_id)
-              row&.payload&.dig("result") || {}
+            def outcome
+              @outcome ||= begin
+                row = @call.session.messages.find_by(event_type: "tool_result", tool_use_id:)
+                row&.payload&.dig("result") || {}
+              end
             end
-          end
 
-          def recap
-            case outcome["decision"]
-            when "apply" then "Applied — “#{outcome['label']}” is now running."
-            when "save"  then "Saved “#{outcome['label']}” to the library."
-            else "Declined — no workflow created."
+            def recap
+              case outcome["decision"]
+              when "apply" then "Applied — “#{outcome['label']}” is now running."
+              when "save"  then "Saved “#{outcome['label']}” to the library."
+              else "Declined — no workflow created."
+              end
             end
-          end
 
-          def submit_path = helpers.rbrun.workflow_decision_path(tool_use_id)
+            def submit_path = helpers.rbrun.workflow_decision_path(tool_use_id)
         end
       end
     end

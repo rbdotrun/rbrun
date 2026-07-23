@@ -24,9 +24,9 @@ module Rbrun
         { "label" => s["label"].to_s, "description" => s["description"].to_s }
       end
 
-      scenario = Rbrun::SkillScenario.for_tenant(skill.tenant).find_or_initialize_by(skill: skill, label: label)
+      scenario = Rbrun::SkillScenario.for_tenant(skill.tenant).find_or_initialize_by(skill:, label:)
       scenario.update!(description: data["description"], prompt: data["prompt"].to_s,
-                       steps: steps, attachments: Array(data["attachments"]).map(&:to_s))
+                       steps:, attachments: Array(data["attachments"]).map(&:to_s))
       true
     end
 

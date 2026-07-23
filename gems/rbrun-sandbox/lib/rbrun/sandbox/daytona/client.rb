@@ -42,12 +42,28 @@ module Rbrun
         SNAPSHOT_BUILD_TIMEOUT = 900
         SNAPSHOT_POLL_INTERVAL = 5
 
-        # A minimal base for the agent runner: bun (stages + runs client.ts), a shell, git, and a
-        # `daytona` user owning /home/daytona/workspace (the box's working root). Hosts that need more
-        # (python, Office readers, custom tooling) inject their own via config[:dockerfile].
+        # The agent runner's base: bun (stages + runs client.ts), a shell, and the BASELINE DEV
+        # TOOLCHAIN a coding agent needs to do real work in a repo — git, curl, jq, and the GitHub CLI
+        # (`gh`) so it can open PRs the normal way instead of hand-rolling REST calls. Baked into the
+        # snapshot (content-addressed by this Dockerfile's digest), so every box inherits it and an
+        # unchanged image is reused. Hosts that need more (python, Office readers) inject their own via
+        # config[:dockerfile].
+        # The command-line dev tools available in the box (bun from the base image; the rest baked into
+        # DEFAULT_DOCKERFILE below). Kept next to the Dockerfile so the two never drift, and surfaced to
+        # the agent in the system prompt so it knows what it can reach via Bash.
+        TOOLCHAIN = %w[git gh curl jq bun].freeze
+
         DEFAULT_DOCKERFILE = <<~DOCKER
           FROM oven/bun:1-debian
-          RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \\
+          RUN apt-get update \\
+            && apt-get install -y --no-install-recommends git ca-certificates curl gnupg jq \\
+            && install -d -m 0755 /usr/share/keyrings \\
+            && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \\
+            && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \\
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \\
+            && apt-get update && apt-get install -y --no-install-recommends gh \\
+            && git config --system user.name "rbrun agent" \\
+            && git config --system user.email "agent@rb.run" \\
             && useradd -m daytona \\
             && mkdir -p /home/daytona/workspace && chown -R daytona:daytona /home/daytona \\
             && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -264,62 +280,62 @@ module Rbrun
 
         private
 
-        def confirm(id)
-          r = conn.get("#{@api_url}/sandbox/#{id}")
-          return nil if r.status == 404
+          def confirm(id)
+            r = conn.get("#{@api_url}/sandbox/#{id}")
+            return nil if r.status == 404
 
-          ok!(r).body
-        end
+            ok!(r).body
+          end
 
-        def create_sandbox(labels)
-          post(
-            "#{@api_url}/sandbox",
-            body: {
-              "labels" => labels.transform_values(&:to_s),
-              "autoStopInterval" => AUTO_STOP_MINUTES,
-              # Start from the self-built snapshot (config[:dockerfile]), built server-side on first
-              # use. Resources are baked on the snapshot — the API refuses cpu/memory/disk here.
-              "snapshot" => ensure_snapshot
-            },
-            timeout: 120
-          )
-        end
+          def create_sandbox(labels)
+            post(
+              "#{@api_url}/sandbox",
+              body: {
+                "labels" => labels.transform_values(&:to_s),
+                "autoStopInterval" => AUTO_STOP_MINUTES,
+                # Start from the self-built snapshot (config[:dockerfile]), built server-side on first
+                # use. Resources are baked on the snapshot — the API refuses cpu/memory/disk here.
+                "snapshot" => ensure_snapshot
+              },
+              timeout: 120
+            )
+          end
 
-        def get(url, params = {}) = request(:get, url, params: params).body
+          def get(url, params = {}) = request(:get, url, params:).body
 
-        def post(url, body: nil, params: {}, timeout: 60) = request(:post, url, body: body, params: params, timeout: timeout).body
+          def post(url, body: nil, params: {}, timeout: 60) = request(:post, url, body:, params:, timeout:).body
 
-        def request(method, url, params: {}, body: nil, timeout: 60)
-          response = conn.public_send(method, url) do |req|
-            req.options.timeout = timeout
-            req.params.update(params)
-            next if body.nil?
+          def request(method, url, params: {}, body: nil, timeout: 60)
+            response = conn.public_send(method, url) do |req|
+              req.options.timeout = timeout
+              req.params.update(params)
+              next if body.nil?
 
-            if body.is_a?(Hash) && body.values.any? { |v| v.is_a?(Faraday::Multipart::FilePart) }
-              req.body = body
-            else
-              req.headers["Content-Type"] = "application/json"
-              req.body = body.to_json
+              if body.is_a?(Hash) && body.values.any? { |v| v.is_a?(Faraday::Multipart::FilePart) }
+                req.body = body
+              else
+                req.headers["Content-Type"] = "application/json"
+                req.body = body.to_json
+              end
+            end
+            ok!(response)
+          end
+
+          def ok!(response)
+            return response if response.success?
+
+            raise Error, "#{response.env.method.to_s.upcase} #{response.env.url.path} → #{response.status}: #{response.body.to_s[0, 200]}"
+          end
+
+          def conn
+            @conn ||= Faraday.new do |f|
+              f.request :multipart
+              f.response :json, content_type: /\bjson/
+              f.headers["Authorization"] = "Bearer #{@api_key}"
+              f.options.open_timeout = 15
+              f.adapter :async_http
             end
           end
-          ok!(response)
-        end
-
-        def ok!(response)
-          return response if response.success?
-
-          raise Error, "#{response.env.method.to_s.upcase} #{response.env.url.path} → #{response.status}: #{response.body.to_s[0, 200]}"
-        end
-
-        def conn
-          @conn ||= Faraday.new do |f|
-            f.request :multipart
-            f.response :json, content_type: /\bjson/
-            f.headers["Authorization"] = "Bearer #{@api_key}"
-            f.options.open_timeout = 15
-            f.adapter :async_http
-          end
-        end
       end
     end
   end

@@ -9,22 +9,22 @@ module Rbrun
   class << self
     def sandbox(provider = nil, tenant: nil, **opts)
       require "rbrun/sandbox"
-      build(Rbrun::Sandbox, config(tenant).sandbox_provider, provider: provider, **opts)
+      build(Rbrun::Sandbox, config(tenant).sandbox_provider, provider:, **opts)
     end
 
     def runtime(sandbox:, provider: nil, tenant: nil, **opts)
       require "rbrun/runtime"
-      build(Rbrun::Runtime, config(tenant).runtime_provider, provider: provider, sandbox: sandbox, **opts)
+      build(Rbrun::Runtime, config(tenant).runtime_provider, provider:, sandbox:, **opts)
     end
 
     def dns(provider = nil, tenant: nil, **opts)
       require "rbrun/dns"
-      build(Rbrun::Dns, config(tenant).dns_provider, provider: provider, **opts)
+      build(Rbrun::Dns, config(tenant).dns_provider, provider:, **opts)
     end
 
     def server(provider = nil, tenant: nil, **opts)
       require "rbrun/server"
-      build(Rbrun::Server, config(tenant).server_provider, provider: provider, **opts)
+      build(Rbrun::Server, config(tenant).server_provider, provider:, **opts)
     end
 
     # The tool roster: engine built-ins + host-registered tools. ApplicationTool.manifest/find read it.

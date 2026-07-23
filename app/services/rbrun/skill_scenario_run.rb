@@ -17,9 +17,9 @@ module Rbrun
     end
 
     def run
-      worktree = Rbrun::Worktree.create!(tenant: @tenant, repo: "rbrun/scenarios")
+      worktree = Rbrun::Worktree.create!(tenant: @tenant, repo: "rbrun/scenarios", bare: true)
       workflow = seed_workflow
-      session  = worktree.sessions.create!(tenant: @tenant, auto: true, workflow: workflow,
+      session  = worktree.sessions.create!(tenant: @tenant, auto: true, workflow:,
                                            workflow_status: "active", preferred_skills: [ @scenario.skill.slug ])
       begin
         session.run_turn(@scenario.prompt, runtime: @runtime)
@@ -38,40 +38,40 @@ module Rbrun
 
     private
 
-    def seed_workflow
-      workflow = Rbrun::Workflow.create!(tenant: @tenant, label: @scenario.label, goal: @scenario.description)
-      @scenario.step_list.each_with_index do |step, i|
-        workflow.steps.create!(position: i + 1, title: step["label"], description: step["description"])
+      def seed_workflow
+        workflow = Rbrun::Workflow.create!(tenant: @tenant, label: @scenario.label, goal: @scenario.description)
+        @scenario.step_list.each_with_index do |step, i|
+          workflow.steps.create!(position: i + 1, title: step["label"], description: step["description"])
+        end
+        workflow
       end
-      workflow
-    end
 
-    # A workflow is multi-turn: after the opening turn, nudge the next turn (a neutral "continue", never
-    # the plan) while steps remain. Bounded by step count + GUARD, and stopped after TWO turns that
-    # validated nothing new (the run is stuck — nudging again just burns turns).
-    def advance(session)
-      prev = -1
-      idle = 0
-      (@scenario.step_list.size + GUARD).times do
-        run = Rbrun::Workflow::Run.new(session.reload)
-        break if run.all_done?
+      # A workflow is multi-turn: after the opening turn, nudge the next turn (a neutral "continue", never
+      # the plan) while steps remain. Bounded by step count + GUARD, and stopped after TWO turns that
+      # validated nothing new (the run is stuck — nudging again just burns turns).
+      def advance(session)
+        prev = -1
+        idle = 0
+        (@scenario.step_list.size + GUARD).times do
+          run = Rbrun::Workflow::Run.new(session.reload)
+          break if run.all_done?
 
-        idle = run.done_count > prev ? 0 : idle + 1
-        break if idle >= 2
+          idle = run.done_count > prev ? 0 : idle + 1
+          break if idle >= 2
 
-        prev = run.done_count
-        session.run_turn("Continue the workflow: pick up at the next step you have not validated.", runtime: @runtime)
+          prev = run.done_count
+          session.run_turn("Continue the workflow: pick up at the next step you have not validated.", runtime: @runtime)
+        end
       end
-    end
 
-    def record(session, workflow)
-      run = Rbrun::Workflow::Run.new(session)
-      steps = workflow.steps.map do |step|
-        done = session.workflow_step_completions.exists?(workflow_step: step)
-        { label: step.title, description: step.description, done: done }
+      def record(session, workflow)
+        run = Rbrun::Workflow::Run.new(session)
+        steps = workflow.steps.map do |step|
+          done = session.workflow_step_completions.exists?(workflow_step: step)
+          { label: step.title, description: step.description, done: }
+        end
+        { scenario: @scenario, session:, steps:,
+          done: run.done_count, total: run.total, pass: run.all_done? }
       end
-      { scenario: @scenario, session: session, steps: steps,
-        done: run.done_count, total: run.total, pass: run.all_done? }
-    end
   end
 end

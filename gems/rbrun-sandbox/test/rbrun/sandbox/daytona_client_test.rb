@@ -27,4 +27,21 @@ class DaytonaClientTest < Minitest::Test
                  Rbrun::Sandbox::Daytona::Client.new(api_key: "k", api_url: "u",
                                                      dockerfile: "FROM alpine\n", snapshot_name: "mine").snapshot_ref
   end
+
+  def test_default_image_bakes_in_the_agent_toolchain
+    df = Rbrun::Sandbox::Daytona::Client::DEFAULT_DOCKERFILE
+    # A coding agent must be able to do real repo work + open PRs the normal way, out of the box.
+    assert_includes df, "git"
+    assert_includes df, "curl"
+    assert_includes df, "jq"
+    assert_match(/apt-get install[^\n]* gh\b/, df, "the GitHub CLI (gh) must be baked in")
+    assert_includes df, "cli.github.com/packages", "gh needs its apt source added"
+  end
+
+  def test_default_image_bakes_in_a_git_identity
+    df = Rbrun::Sandbox::Daytona::Client::DEFAULT_DOCKERFILE
+    # So commits never fail for lack of a user.name/user.email — the agent shouldn't have to set one.
+    assert_includes df, %(git config --system user.name "rbrun agent")
+    assert_includes df, %(git config --system user.email "agent@rb.run")
+  end
 end

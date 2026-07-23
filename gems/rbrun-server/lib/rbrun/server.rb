@@ -22,7 +22,7 @@ module Rbrun
       const_name = ADAPTERS.fetch(provider.to_sym) do
         raise Error, "unknown server provider #{provider.inspect} (known: #{ADAPTERS.keys.join(", ")})"
       end
-      const_get(const_name).new(config: config, **opts)
+      const_get(const_name).new(config:, **opts)
     end
   end
 end

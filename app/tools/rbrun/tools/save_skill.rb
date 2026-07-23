@@ -27,11 +27,11 @@ module Rbrun
         name   = skill_name(files["SKILL.md"], slug)
         digest = Rbrun::SkillArchive.digest_files(files)
 
-        skill = Rbrun::Skill.for_tenant(tenant).find_or_initialize_by(slug: slug)
+        skill = Rbrun::Skill.for_tenant(tenant).find_or_initialize_by(slug:)
         created = skill.new_record?
         skill.name = name
         skill.save!
-        skill.promote!(digest: digest, archive: Rbrun::SkillArchive.pack_files(files), source: :ui)
+        skill.promote!(digest:, archive: Rbrun::SkillArchive.pack_files(files), source: :ui)
 
         { "data" => { "slug" => slug, "name" => name, "digest" => digest,
                       "files" => files.keys.sort, "created" => created } }
@@ -39,23 +39,23 @@ module Rbrun
 
       private
 
-      # Build the { relative_path => bytes } map from the workspace folder (glob + read per file).
-      def read_folder(folder_path)
-        session.sandbox.glob(folder_path).to_h do |rel|
-          [ rel, session.sandbox.read(File.join(folder_path, rel)) ]
+        # Build the { relative_path => bytes } map from the workspace folder (glob + read per file).
+        def read_folder(folder_path)
+          session.sandbox.glob(folder_path).to_h do |rel|
+            [ rel, session.sandbox.read(File.join(folder_path, rel)) ]
+          end
         end
-      end
 
-      # The skill's display name from SKILL.md frontmatter `name:` (read line-by-line like the SDK, not
-      # strict YAML — a description may carry a colon), falling back to a titleized slug.
-      def skill_name(md, slug)
-        front = md.to_s[/\A---\n(.*?)\n---/m, 1]
-        name  = front&.lines&.filter_map do |line|
-          key, value = line.split(":", 2)
-          value&.strip if key.strip == "name" && value
-        end&.first
-        name.presence || slug.tr("-_", " ").split.map(&:capitalize).join(" ")
-      end
+        # The skill's display name from SKILL.md frontmatter `name:` (read line-by-line like the SDK, not
+        # strict YAML — a description may carry a colon), falling back to a titleized slug.
+        def skill_name(md, slug)
+          front = md.to_s[/\A---\n(.*?)\n---/m, 1]
+          name  = front&.lines&.filter_map do |line|
+            key, value = line.split(":", 2)
+            value&.strip if key.strip == "name" && value
+          end&.first
+          name.presence || slug.tr("-_", " ").split.map(&:capitalize).join(" ")
+        end
     end
   end
 end

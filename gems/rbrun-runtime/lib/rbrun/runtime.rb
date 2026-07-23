@@ -18,7 +18,7 @@ module Rbrun
       const_name = ADAPTERS.fetch(provider.to_sym) do
         raise Error, "unknown runtime provider #{provider.inspect} (known: #{ADAPTERS.keys.join(", ")})"
       end
-      const_get(const_name).new(sandbox: sandbox, config: config)
+      const_get(const_name).new(sandbox:, config:)
     end
   end
 end

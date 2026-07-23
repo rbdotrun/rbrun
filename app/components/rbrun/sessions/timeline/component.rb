@@ -72,15 +72,15 @@ module Rbrun
 
         private
 
-        def rows = @messages.reject { |m| m.role == "user" }
+          def rows = @messages.reject { |m| m.role == "user" }
 
-        def flush(out, run) = (out << [ :tools, run ] if run.any?)
+          def flush(out, run) = (out << [ :tools, run ] if run.any?)
 
-        def pending_gate?(run) = run.any? { |m| m.respond_to?(:approval_pending?) && m.approval_pending? }
+          def pending_gate?(run) = run.any? { |m| m.respond_to?(:approval_pending?) && m.approval_pending? }
 
-        def paired_use(result)
-          rows.find { |m| m.tool_use? && m.tool_use_id == result.tool_use_id }
-        end
+          def paired_use(result)
+            rows.find { |m| m.tool_use? && m.tool_use_id == result.tool_use_id }
+          end
       end
     end
   end

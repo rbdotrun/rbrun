@@ -42,19 +42,19 @@ module Rbrun
 
         private
 
-        def active?
-          return @active unless @active.nil?
+          def active?
+            return @active unless @active.nil?
 
-          @href.present? && @href != "#" && helpers.current_page?(@href)
-        rescue StandardError
-          false
-        end
+            @href.present? && @href != "#" && helpers.current_page?(@href)
+          rescue StandardError
+            false
+          end
 
-        def icon_tag
-          return if @icon.blank?
+          def icon_tag
+            return if @icon.blank?
 
-          lucide_icon(@icon, class: class_names(ICON_BASE, active? ? ICON_ACTIVE : ICON_INACTIVE))
-        end
+            lucide_icon(@icon, class: class_names(ICON_BASE, active? ? ICON_ACTIVE : ICON_INACTIVE))
+          end
       end
     end
   end

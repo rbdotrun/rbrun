@@ -15,7 +15,7 @@ module Rbrun
     # Open a create-skill conversation in the app-wide drawer: a fresh session under the tenant's
     # skills worktree, steered to the create-skill skill via preferred_skills.
     def build
-      worktree = Rbrun::Worktree.for_tenant(current_tenant).find_or_create_by!(repo: SKILLS_REPO)
+      worktree = Rbrun::Worktree.for_tenant(current_tenant).create_with(bare: true).find_or_create_by!(repo: SKILLS_REPO)
       @session = worktree.sessions.create!(preferred_skills: %w[create-skill])
       render :build, layout: false
     end
@@ -29,19 +29,19 @@ module Rbrun
 
     private
 
-    def authored_by_slug
-      Rbrun::SkillSeeder.authored_from_config(Rbrun.config(current_tenant)).index_by { |a| a[:slug] }
-    end
-
-    def apply(skill, authored)
-      digest = Rbrun::SkillArchive.digest_files(authored[:files])
-      case params[:decision]
-      when "reload"
-        skill.promote!(digest: digest, archive: Rbrun::SkillArchive.pack_files(authored[:files]),
-                       source: authored[:source])
-      when "keep"
-        skill.keep_stored!(digest: digest)
+      def authored_by_slug
+        Rbrun::SkillSeeder.authored_from_config(Rbrun.config(current_tenant)).index_by { |a| a[:slug] }
       end
-    end
+
+      def apply(skill, authored)
+        digest = Rbrun::SkillArchive.digest_files(authored[:files])
+        case params[:decision]
+        when "reload"
+          skill.promote!(digest:, archive: Rbrun::SkillArchive.pack_files(authored[:files]),
+                         source: authored[:source])
+        when "keep"
+          skill.keep_stored!(digest:)
+        end
+      end
   end
 end

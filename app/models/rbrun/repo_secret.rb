@@ -9,6 +9,6 @@ module Rbrun
 
     validates :repo, :key, presence: true
 
-    scope :for_repo, ->(repo) { where(repo: repo) }
+    scope :for_repo, ->(repo) { where(repo:) }
   end
 end

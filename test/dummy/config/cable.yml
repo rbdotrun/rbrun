@@ -1,10 +1,17 @@
-development:
-  adapter: async
+default: &default
+  adapter: solid_cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day
 
+# Cross-process Turbo broadcasts: a turn runs in a job worker (or a rake/runner) — a DIFFERENT process
+# from the web server the browser is attached to. The in-process `async` adapter never crosses that
+# boundary (you'd have to reload); solid_cable (DB-backed) does, with no Redis.
+development:
+  <<: *default
+
+# Tests use the in-process test adapter (assert_broadcasts / capture_turbo_stream_broadcasts).
 test:
   adapter: test
 
 production:
-  adapter: redis
-  url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/1" } %>
-  channel_prefix: dummy_production
+  <<: *default

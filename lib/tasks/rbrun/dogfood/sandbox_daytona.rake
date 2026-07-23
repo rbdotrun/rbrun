@@ -22,7 +22,7 @@ namespace :dogfood do
     # that needs more tooling passes config[:dockerfile] with its own image.
     box = Rbrun::Sandbox.new(
       provider: :daytona,
-      config: { api_key: api_key, api_url: api_url },
+      config: { api_key:, api_url: },
       labels: { dogfood: "daytona" }
     )
 

@@ -1,0 +1,14 @@
+<turbo-frame id="modal">
+  <%= component("surface", preset: :dialog, elevation: :lg, size: :md, title: "Report an error",
+                close: true, inset: :padded, css: "w-[30rem] max-w-full") do |s| %>
+    <% s.with_body do %>
+      <%= form_with url: rbrun.report_path(@session.id, @lead.id), method: :post do %>
+        <%= component("textarea", label: "What went wrong with this response?", name: "comment", rows: 4,
+                      placeholder: "Optional — describe the error…") %>
+        <div class="mt-4 flex justify-end">
+          <%= component("button", variant: :primary, type: "submit") do %>Send report<% end %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+</turbo-frame>

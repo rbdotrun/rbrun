@@ -33,12 +33,12 @@ module Rbrun
       def workspace = WORKSPACE
 
       def exec(command, timeout: 60)
-        raw = @client.exec(id, command, timeout: timeout)
+        raw = @client.exec(id, command, timeout:)
         ExecResult.new(exit_code: raw["exitCode"].to_i, stdout: raw["result"].to_s, stderr: "")
       end
 
       def exec!(command, timeout: 60)
-        result = exec(command, timeout: timeout)
+        result = exec(command, timeout:)
         return result if result.success?
 
         raise Error, "#{command.inspect} exited #{result.exit_code}: #{result.stdout.to_s.lines.last(5).join}"
@@ -93,15 +93,15 @@ module Rbrun
       def session_command(session_id, cmd_id) = @client.session_command(id, session_id, cmd_id)
 
       def session_logs_follow(session_id, cmd_id, skip: 0, timeout: nil, &block)
-        @client.session_logs_follow(id, session_id, cmd_id, skip: skip, timeout: timeout, &block)
+        @client.session_logs_follow(id, session_id, cmd_id, skip:, timeout:, &block)
       rescue Async::TimeoutError => e
         raise TimeoutError, "session #{session_id}/#{cmd_id} follow timed out (#{e.message})"
       end
 
       private
 
-      # Resolved once per instance (the caller memoizes the adapter), so one turn is one lookup.
-      def sandbox = @sandbox ||= @client.find_or_create(@labels)
+        # Resolved once per instance (the caller memoizes the adapter), so one turn is one lookup.
+        def sandbox = @sandbox ||= @client.find_or_create(@labels)
     end
   end
 end

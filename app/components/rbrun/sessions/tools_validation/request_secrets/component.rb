@@ -8,18 +8,18 @@ module Rbrun
         class Component < Rbrun::Sessions::ToolsValidation::Base
           private
 
-          def spec = @spec ||= Rbrun::SecretsFormSpec.new(input)
+            def spec = @spec ||= Rbrun::SecretsFormSpec.new(input)
 
-          def answered? = @call.approval_answered?
+            def answered? = @call.approval_answered?
 
-          def stored_keys
-            @stored_keys ||= begin
-              row = @call.session.messages.find_by(event_type: "tool_result", tool_use_id: tool_use_id)
-              Array(row&.payload&.dig("result", "stored_keys"))
+            def stored_keys
+              @stored_keys ||= begin
+                row = @call.session.messages.find_by(event_type: "tool_result", tool_use_id:)
+                Array(row&.payload&.dig("result", "stored_keys"))
+              end
             end
-          end
 
-          def submit_path = helpers.rbrun.secrets_submission_path(tool_use_id)
+            def submit_path = helpers.rbrun.secrets_submission_path(tool_use_id)
         end
       end
     end
