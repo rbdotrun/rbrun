@@ -40,14 +40,14 @@ module Rbrun
       # events: tool_request → tool_handler (run in Ruby, answered on stdin); everything else →
       # on_event; result/error → terminal. Returns the terminal result event. The config.json (with
       # the api_key) is removed in ensure — the key never outlives the turn.
-      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, tool_handler: nil, on_event: nil)
+      def run(prompt:, system:, tools: [], skills: nil, mcp: nil, resume: nil, auto: false, tool_handler: nil, on_event: nil)
         config_path = nil
         begin
           stage_client
           stage_skills(skills)
           prewarm_mcp(mcp)
           stage_settings
-          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp)
+          config_path = write_config_file(prompt: prompt, system: system, tools: tools, resume: resume, mcp: mcp, auto: auto)
           run_over_session(run_command(config_path), tool_handler: tool_handler, on_event: on_event)
         ensure
           @sandbox.exec("rm -f #{config_path}") if config_path
@@ -111,7 +111,7 @@ module Rbrun
 
       # The run config (api_key + prompt + client config), uploaded and deleted when the run ends — the
       # key never outlives the turn. Returns its remote path.
-      def write_config_file(prompt:, system:, tools:, resume:, mcp: nil)
+      def write_config_file(prompt:, system:, tools:, resume:, mcp: nil, auto: false)
         path = File.join(agent_dir, "config.json")
         @sandbox.write(path, {
           api_key: @api_key,
@@ -121,6 +121,7 @@ module Rbrun
           manifest: tools,
           mcp: mcp, # external MCP servers ({servers,tools,permissions}) — secrets live+die with this file
           resume: resume,
+          auto: auto, # autonomous: canUseTool auto-approves every gate (no human), box-scoped
           max_turns: @max_turns
         }.to_json)
         path

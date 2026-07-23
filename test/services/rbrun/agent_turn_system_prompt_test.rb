@@ -4,9 +4,10 @@ module Rbrun
   class AgentTurnSystemPromptTest < ActiveSupport::TestCase
     # A runtime double (injected via the designed `runtime:` seam) that captures the system prompt.
     class SystemCapturingRuntime
-      attr_reader :system
-      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil)
+      attr_reader :system, :auto
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil)
         @system = system
+        @auto = auto
         on_event.call({ "type" => "result", "session_id" => "sdk-1" })
       end
     end
@@ -36,6 +37,17 @@ module Rbrun
       runtime = SystemCapturingRuntime.new
       Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
       assert_equal Rbrun.config(@session.tenant).system_prompt, runtime.system
+    end
+
+    test "the session's auto flag flows to the runtime" do
+      runtime = SystemCapturingRuntime.new
+      Rbrun::AgentTurn.new(session: @session, runtime: runtime).run("go")
+      assert_equal false, runtime.auto
+
+      @session.update!(auto: true)
+      auto_runtime = SystemCapturingRuntime.new
+      Rbrun::AgentTurn.new(session: @session, runtime: auto_runtime).run("go")
+      assert_equal true, auto_runtime.auto
     end
   end
 end

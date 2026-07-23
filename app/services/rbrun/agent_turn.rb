@@ -37,13 +37,43 @@ module Rbrun
     # The host system prompt, plus a per-session steer toward this conversation's `preferred_skills`
     # (every skill still stages — this only TELLS the agent which to reach for). Empty prefs ⇒ untouched.
     def system_prompt
-      base  = Rbrun.config(@session.tenant).system_prompt.to_s
-      prefs = Array(@session.preferred_skills).map(&:to_s).reject(&:blank?)
-      return base if prefs.empty?
+      parts = [ Rbrun.config(@session.tenant).system_prompt.to_s ]
+      parts << preferred_skills_note
+      parts << self_validation_note # autonomous scenario runs only
+      parts.compact.reject(&:blank?).join("\n\n")
+    end
 
-      note = "For this conversation, strongly prefer these skills and use them when they apply: " \
-             "#{prefs.join(', ')}. They are staged in your workspace under .claude/skills/."
-      base.empty? ? note : "#{base}\n\n#{note}"
+    def preferred_skills_note
+      prefs = Array(@session.preferred_skills).map(&:to_s).reject(&:blank?)
+      return nil if prefs.empty?
+
+      "For this conversation, strongly prefer these skills and use them when they apply: " \
+        "#{prefs.join(', ')}. They are staged in your workspace under .claude/skills/."
+    end
+
+    # In an autonomous run WITH a bound workflow (a scenario dogfood), the agent can't see the workflow
+    # otherwise — so inject the steps (the validation checklist) and the self-validation directive. The
+    # steps say WHAT to prove, never which tools to use (the dogfood exists to prove it reaches them).
+    def self_validation_note
+      return nil unless @session.auto?
+
+      run = Rbrun::Workflow::Run.new(@session)
+      return nil unless run.total.positive?
+
+      steps = run.steps.each_with_index.map { |s, i| "#{i + 1}. #{s.title} — #{s.description}" }.join("\n")
+      <<~TXT.strip
+        ── Self-validated run ──
+        You are running a workflow autonomously: do each step yourself AND validate it yourself, with no
+        human to take your word — so your validation is worth only the PROOF behind it.
+
+        Goal: #{@session.workflow&.goal}
+        Steps (do each in order; the text after — is what you must prove, not which tool to use):
+        #{steps}
+
+        After you actually finish a step, call validate_step to mark it complete. Before approving, re-read
+        what you just did — your tool calls and their results — and confirm the step is genuinely done. If
+        nothing you did establishes it, redo it rather than approve it.
+      TXT
     end
 
     def call_client(prompt)
@@ -58,6 +88,7 @@ module Rbrun
         skills: skills_dir,
         mcp: materialize_mcp,
         resume: @session.sdk_session_id,
+        auto: @session.auto?,
         tool_handler: method(:run_tool),
         on_event: method(:ingest)
       )

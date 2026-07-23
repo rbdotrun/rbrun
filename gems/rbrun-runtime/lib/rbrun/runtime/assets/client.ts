@@ -84,6 +84,9 @@ interface Config {
   manifest: ManifestTool[];
   resume?: string | null;
   max_turns?: number | null;
+  // Autonomous run: no human on the gate, so canUseTool AUTO-APPROVES every needs_approval call
+  // (ruby + mcp) instead of parking. Scoped to a disposable, reaped box — the box is the boundary.
+  auto?: boolean;
   attachments?: Attachment[];
   mcp?: {
     servers?: Record<string, unknown>;
@@ -358,6 +361,8 @@ async function main(): Promise<void> {
   // of reaching Rails as "erreur technique" (the original bug that made us hold the process open).
   let gated = false;
   let resultEmitted = false;
+  // Autonomous run: the gate auto-approves instead of parking (see Config.auto).
+  const auto = config.auto ?? false;
 
   const response = query({
     prompt: buildPrompt(config),
@@ -398,6 +403,7 @@ async function main(): Promise<void> {
           const perms: Record<string, string> = (mcp.permissions ?? {})[srv] ?? {};
           const p = perms[rest.join("__")] ?? perms.default ?? "always_allow";
           if (p === "needs_approval") {
+            if (auto) return { behavior: "allow", updatedInput: input }; // autonomous → no human to park for
             gated = true;
             emit({ type: "needs_approval", tool: toolName, arguments: input, tool_use_id: opts.toolUseID, tool_kind: "mcp" });
             return { behavior: "deny", message: "Awaiting user approval.", interrupt: true };
@@ -413,6 +419,8 @@ async function main(): Promise<void> {
           };
         }
         if (needsApproval.has(bare)) {
+          // Autonomous run: no human to park for — approve and let the tool run inline this turn.
+          if (auto) return { behavior: "allow", updatedInput: input };
           // The gate ENDS the run. Emit the pending call — its name and args are frozen here and
           // become the durable row Rails renders and, on approval, executes verbatim — then deny
           // with `interrupt: true` so the SDK tears the turn down and we exit. Nothing waits: no
