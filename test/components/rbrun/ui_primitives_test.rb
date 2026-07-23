@@ -35,7 +35,12 @@ module Rbrun
 
         # Batch 2: drawer family + controller-driven primitives + uploads + native select/date.
         assert_match %(data-controller="overlay"), render_inline(Ui::Drawer::Component.new).to_html
-        assert_match "drawer_body", render_inline(Ui::DrawerPanel::Component.new(title: "T")).to_html
+        dp = Ui::DrawerPanel::Component.new(title: "T")
+        dp.with_actions { "SAVE" }
+        dp_html = render_inline(dp).to_html
+        assert_match %(id="drawer_body"), dp_html
+        assert_match %(id="drawer_actions"), dp_html
+        assert_match "SAVE", dp_html
         assert_match "search-bar", render_inline(Ui::SearchInput::Component.new(id: "s")).to_html
         assert_match "option-filter", render_inline(Ui::MultiSelect::Component.new(label: "L", name: "x[]", options: [ [ "G", [ [ "a", "a" ] ] ] ], grouped: true)).to_html
         assert_match "bulk-select", render_inline(Ui::BulkBar::Component.new(singular: "row", plural: "rows")).to_html
