@@ -33,7 +33,7 @@ Today the same structure — **[header: title (+back|+close|+description) + acti
 cosmetic divergence (header `h-16 text-xl` vs `py-4 text-lg` vs `p-6`; actions in the header seam vs a
 footer; radius `rounded-lg`/`rounded-xl`/`rounded-none`; scroll owned internally vs delegated to a
 `<dialog>` shell). insitix even bridges two of them at runtime (`Custom::Showable` forwards
-title+actions+body to *either* page *or* drawer_panel) — proving they're one thing rendered many ways,
+title+actions+body to _either_ page _or_ drawer_panel) — proving they're one thing rendered many ways,
 but still composing two duplicated implementations. This spec removes the duplication: one primitive,
 many presets.
 
@@ -73,27 +73,27 @@ conversation) simply fills the body at `h-full` and never overflows it — no sp
 
 ### 2.2 Props
 
-| prop | values | effect |
-| --- | --- | --- |
-| `title:` | string / nil | header title |
-| `back:` | href / nil | header back link (`arrow-left`) |
-| `close:` | bool (default false) | header ✕ button, `data-action="overlay#close"` (dialog/drawer) |
-| `description:` | string / nil | muted subline under the title |
-| `preset:` | `:card`* · `:dialog` · `:drawer` · `:bare` | **chrome only** (radius + border) |
-| `inset:` | `:padded`* · `:centered` · `:flush` | body box: `p-6` · `mx-auto max-w-3xl px-6 py-8` · none |
-| `elevation:` | `:none`* · `:sm` · `:md` · `:lg` | shadow (independent of preset) |
-| `body_id:` | string / nil | stable id on the body region (drawer broadcast target `drawer_body`) |
-| `footer_id:` | string / nil | stable id on the footer region (drawer broadcast target `drawer_actions`) |
-| `css:` | string / nil | tailwind-merge override on the outer element |
+| prop           | values                                      | effect                                                                    |
+| -------------- | ------------------------------------------- | ------------------------------------------------------------------------- |
+| `title:`       | string / nil                                | header title                                                              |
+| `back:`        | href / nil                                  | header back link (`arrow-left`)                                           |
+| `close:`       | bool (default false)                        | header ✕ button, `data-action="overlay#close"` (dialog/drawer)            |
+| `description:` | string / nil                                | muted subline under the title                                             |
+| `preset:`      | `:card`\* · `:dialog` · `:drawer` · `:bare` | **chrome only** (radius + border)                                         |
+| `inset:`       | `:padded`\* · `:centered` · `:flush`        | body box: `p-6` · `mx-auto max-w-3xl px-6 py-8` · none                    |
+| `elevation:`   | `:none`\* · `:sm` · `:md` · `:lg`           | shadow (independent of preset)                                            |
+| `body_id:`     | string / nil                                | stable id on the body region (drawer broadcast target `drawer_body`)      |
+| `footer_id:`   | string / nil                                | stable id on the footer region (drawer broadcast target `drawer_actions`) |
+| `css:`         | string / nil                                | tailwind-merge override on the outer element                              |
 
 \* = default. Chrome presets:
 
-| preset | classes | used by |
-| --- | --- | --- |
-| `:card` | `rounded-lg border bg-white` | inline card + the main page |
-| `:dialog` | `rounded-xl border bg-white` | modal content |
+| preset    | classes                          | used by                              |
+| --------- | -------------------------------- | ------------------------------------ |
+| `:card`   | `rounded-lg border bg-white`     | inline card + the main page          |
+| `:dialog` | `rounded-xl border bg-white`     | modal content                        |
 | `:drawer` | `rounded-none border-l bg-white` | right slide-over (radius/edge tweak) |
-| `:bare` | (none) | nested / chromeless |
+| `:bare`   | (none)                           | nested / chromeless                  |
 
 Built with `StyleVariants` (`preset`/`inset`/`elevation` as variants) + `cn(…, css)` so a `css:` override
 wins (mirrors `Ui::Button`). Header height stays **declared** (not padding-derived) so a page header
@@ -126,7 +126,7 @@ The singleton `<dialog>` shells stay (positioning, backdrop, `overlay` controlle
   within `max-h-[90dvh]`; short content shrinks the dialog and doesn't scroll.
 - **Drawer** (`Ui::Drawer`): keep `fixed inset-y-0 right-0 h-dvh w-full max-w-[760px]`, slide animation,
   backdrop; **add `flex flex-col`** (it already implied a column); **remove `rounded-none border-l
-  bg-white shadow-xl`** (→ the `:drawer` surface).
+bg-white shadow-xl`** (→ the `:drawer` surface).
 - **`<main>` / page:** `<main>` (or a thin wrapper) becomes a flex column and the page surface its
   `flex-1 min-h-0` child, so a full-height page scrolls its body while a short one grows.
 - Backdrop-click-to-close is unchanged: the `<dialog>` still wraps the surface, so a click resolving to
@@ -137,15 +137,15 @@ The singleton `<dialog>` shells stay (positioning, backdrop, `overlay` controlle
 
 ## 4. Migrations (everything)
 
-| today | becomes |
-| --- | --- |
-| `custom("page", title:, variant: :centered){actions,body}` | `component("surface", title:, inset: :centered){ with_actions; with_body }` |
-| `custom("page", variant: :bleed){body}` | `component("surface", inset: :flush){ with_body }` (self-scrolling child fills it) |
-| `Rbrun::Page` + `Rbrun::PageHeader` | **deleted** (folder components retired) |
-| `component("dialog_frame", title:, description:){body}` | wrapper: `turbo_frame_tag "modal"` → `component("surface", preset: :dialog, elevation: :lg, title:, description:){ with_body }` — same API |
+| today                                                       | becomes                                                                                                                                                                                 |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `custom("page", title:, variant: :centered){actions,body}`  | `component("surface", title:, inset: :centered){ with_actions; with_body }`                                                                                                             |
+| `custom("page", variant: :bleed){body}`                     | `component("surface", inset: :flush){ with_body }` (self-scrolling child fills it)                                                                                                      |
+| `Rbrun::Page` + `Rbrun::PageHeader`                         | **deleted** (folder components retired)                                                                                                                                                 |
+| `component("dialog_frame", title:, description:){body}`     | wrapper: `turbo_frame_tag "modal"` → `component("surface", preset: :dialog, elevation: :lg, title:, description:){ with_body }` — same API                                              |
 | `component("drawer_panel", title:, padded:){actions; body}` | wrapper: `turbo_frame_tag "drawer"` → `component("surface", preset: :drawer, elevation: :lg, title:, close: true, inset: padded ? :padded : :flush){ with_footer{actions}; with_body }` |
-| `component("confirm_dialog")` inner | `component("surface", preset: :dialog, elevation: :lg, inset: :padded){ with_body{msg}; with_footer{buttons} }` (keep `data-confirm-*` hooks + `#confirm-dialog` shell) |
-| `component("card", title:, subtitle:)` | `component("surface", preset: :card, elevation: :md, title:, description:){ with_body{content} }` |
+| `component("confirm_dialog")` inner                         | `component("surface", preset: :dialog, elevation: :lg, inset: :padded){ with_body{msg}; with_footer{buttons} }` (keep `data-confirm-*` hooks + `#confirm-dialog` shell)                 |
+| `component("card", title:, subtitle:)`                      | `component("surface", preset: :card, elevation: :md, title:, description:){ with_body{content} }`                                                                                       |
 
 - `dialog_frame` / `drawer_panel` keep their names + ergonomic APIs (thin wrappers over `surface`) so
   callers (incl. `repositories/dialog.html.erb`) are untouched or nearly so. `repositories/dialog.html.erb`
@@ -157,7 +157,7 @@ The singleton `<dialog>` shells stay (positioning, backdrop, `overlay` controlle
   discipline the current `DrawerPanel` documents.
 - `card`: the one consumer (`auth/sessions/new`) switches; rbrun's divergent `shadow-md`/`text-gray-500`
   card is normalized to the slate surface (`elevation: :md`).
-- `Ui::Section` / `Ui::FormSection` are **out of scope** (titled *content sections*, not panels) — left
+- `Ui::Section` / `Ui::FormSection` are **out of scope** (titled _content sections_, not panels) — left
   as-is; a later pass may reconcile.
 
 ---

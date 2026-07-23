@@ -20,22 +20,17 @@ module Rbrun
 
         attr_reader :title, :padded
 
+        # The frame + a :drawer Surface. Same title/close header, a scrollable body (padded ↔ flush),
+        # and the OPTIONAL actions footer — all now the Surface's job. The stable BODY_ID/ACTIONS_ID ride
+        # onto the surface's body/footer regions so Turbo streams still swap a REGION, never the frame.
         erb_template <<~ERB
           <%= helpers.turbo_frame_tag "drawer" do %>
-            <div class="flex h-full flex-col">
-              <header class="flex flex-shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
-                <% if title.present? %>
-                  <h2 class="truncate text-lg font-semibold text-slate-800" title="<%= title %>"><%= title %></h2>
-                <% end %>
-                <button type="button" data-action="overlay#close" class="ml-auto text-slate-400 hover:text-slate-600" aria-label="Close">
-                  <%= lucide_icon("x", class: "size-5") %>
-                </button>
-              </header>
-              <div id="<%= BODY_ID %>" class="min-h-0 flex-1 <%= padded ? "overflow-y-auto p-6" : "overflow-hidden" %>"><%= content %></div>
-              <% if actions? %>
-                <footer id="<%= ACTIONS_ID %>" class="flex flex-shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-6 py-4"><%= actions %></footer>
-              <% end %>
-            </div>
+            <%= component("surface", preset: :drawer, elevation: :lg, size: :md, title: title, close: true,
+                          inset: (padded ? :padded : :flush),
+                          body_id: BODY_ID, footer_id: ACTIONS_ID) do |s| %>
+              <% s.with_body do %><%= content %><% end %>
+              <% if actions? %><% s.with_footer do %><%= actions %><% end %><% end %>
+            <% end %>
           <% end %>
         ERB
       end

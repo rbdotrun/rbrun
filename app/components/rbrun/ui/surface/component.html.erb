@@ -1,0 +1,59 @@
+<%= tag.div class: root_class do %>
+  <% if header? %>
+    <header class="<%= header_class %>">
+      <div class="flex min-w-0 items-center gap-3">
+        <% if back.present? %>
+          <%= link_to back, "aria-label": "Back",
+                class: "flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700" do %>
+            <%= lucide_icon("arrow-left", class: "size-4") %>
+          <% end %>
+        <% end %>
+        <% if title.present? || subtitle.present? %>
+          <div class="min-w-0">
+            <% if title.present? %>
+              <%= content_tag(heading, title, class: title_class) %>
+            <% end %>
+            <% if subtitle.present? %>
+              <p class="mt-0.5 truncate text-sm text-slate-500"><%= subtitle %></p>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <% if actions? || close %>
+        <div class="flex flex-shrink-0 items-center gap-2">
+          <%= actions if actions? %>
+          <% if close %>
+            <button type="button" data-action="overlay#close" aria-label="Close"
+                    class="flex size-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <%= lucide_icon("x", class: "size-5") %>
+            </button>
+          <% end %>
+        </div>
+      <% end %>
+    </header>
+  <% end %>
+
+  <% fixed_areas.each do |area| %>
+    <div class="flex-shrink-0 border-b border-slate-200"><%= area %></div>
+  <% end %>
+
+  <%= tag.div id: body_id, class: body_class do %>
+    <% if inset == :centered %>
+      <div class="mx-auto w-full max-w-3xl px-6 py-8"><%= body %></div>
+    <% else %>
+      <%= body %>
+    <% end %>
+  <% end %>
+
+  <% if footer? %>
+    <%= tag.footer id: footer_id,
+          class: "flex flex-shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-6 py-4" do %>
+      <%= footer %>
+    <% end %>
+  <% end %>
+
+  <% if side_panel? %>
+    <%# Reserved for parity (unused today): a second surface sharing this border. %>
+    <%= side_panel %>
+  <% end %>
+<% end %>

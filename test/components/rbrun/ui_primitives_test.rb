@@ -28,11 +28,19 @@ module Rbrun
         assert_match "Item", render_inline(Ui::ListCard::Component.new(title: "Item", icon: "star")).to_html
         assert_match %(role="menuitem"), render_inline(Ui::ListItem::Component.new(title: "o/n", subtitle: "o", avatar: "ON", href: "/x")).to_html
         assert_match "animate-pulse", render_inline(Ui::Skeleton::Component.new(variant: :list_item, rows: 2)).to_html
+        surface = Ui::Surface::Component.new(title: "S", preset: :dialog)
+        surface.with_body { "B" }
+        assert_match "rounded-xl", render_inline(surface).to_html
         assert_match "longtext", render_inline(Ui::Longtext::Component.new.with_content("# Hi")).to_html
 
         # Batch 2: drawer family + controller-driven primitives + uploads + native select/date.
         assert_match %(data-controller="overlay"), render_inline(Ui::Drawer::Component.new).to_html
-        assert_match "drawer_body", render_inline(Ui::DrawerPanel::Component.new(title: "T")).to_html
+        dp = Ui::DrawerPanel::Component.new(title: "T")
+        dp.with_actions { "SAVE" }
+        dp_html = render_inline(dp).to_html
+        assert_match %(id="drawer_body"), dp_html
+        assert_match %(id="drawer_actions"), dp_html
+        assert_match "SAVE", dp_html
         assert_match "search-bar", render_inline(Ui::SearchInput::Component.new(id: "s")).to_html
         assert_match "option-filter", render_inline(Ui::MultiSelect::Component.new(label: "L", name: "x[]", options: [ [ "G", [ [ "a", "a" ] ] ] ], grouped: true)).to_html
         assert_match "bulk-select", render_inline(Ui::BulkBar::Component.new(singular: "row", plural: "rows")).to_html

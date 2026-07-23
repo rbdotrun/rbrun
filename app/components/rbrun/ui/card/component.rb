@@ -1,24 +1,22 @@
 module Rbrun
   module Ui
     module Card
+      # A titled inline surface — a thin wrapper over Ui::Surface (preset :card). Kept as its own name
+      # for the ergonomic component("card", title:, subtitle:) call; all structure lives in Surface, so
+      # a card reads exactly like every other panel (header + body) and shares the natural-scroll model.
       class Component < Rbrun::ApplicationViewComponent
-        option :title, optional: true
-        option :subtitle, optional: true
-        option :css, optional: true
+        def initialize(title: nil, subtitle: nil, css: nil)
+          @title = title
+          @subtitle = subtitle
+          @css = css
+        end
 
-        def classes = cn("rounded-lg shadow-md ring-1 ring-black/5 bg-white p-6", css)
-
-        erb_template <<~ERB
-          <%= content_tag(:div, class: classes) do %>
-            <% if title || subtitle %>
-              <div class="flex flex-col mb-3">
-                <% if title %><h3 class="text-xl font-semibold"><%= title %></h3><% end %>
-                <% if subtitle %><p class="text-sm text-gray-500"><%= subtitle %></p><% end %>
-              </div>
-            <% end %>
-            <%= content %>
-          <% end %>
-        ERB
+        def call
+          component("surface", preset: :card, elevation: :md,
+                    title: @title, subtitle: @subtitle, css: @css) do |s|
+            s.with_body { content }
+          end
+        end
       end
     end
   end

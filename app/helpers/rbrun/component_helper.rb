@@ -1,6 +1,6 @@
 module Rbrun
-  # String-render helpers, so views read `component("spinner")` / `preset("page")` instead of
-  # `render(Rbrun::Ui::Spinner::Component.new(...))`. Included in the base component and the views.
+  # String-render helpers, so views read `component("spinner")` / `custom("sessions/default")` instead
+  # of `render(Rbrun::Ui::Spinner::Component.new(...))`. Included in the base component and the views.
   # Ported from ../insitix's ComponentHelper (same split: `component` = flat UI primitive under
   # Rbrun::Ui::, `custom`/`preset` = a slash path to a folder component under Rbrun::).
   module ComponentHelper
@@ -10,10 +10,9 @@ module Rbrun
       render(klass.new(*args, **kwargs), &block)
     end
 
-    # `custom("page")` -> Rbrun::Page::Component ; `custom("sessions/default")` ->
-    # Rbrun::Sessions::Default::Component (a folder component). `preset` is an alias — "page",
-    # "sessions/default" are preset compositions living in the same namespace as every other
-    # Rbrun component, so the two are the same resolver.
+    # `custom("sessions/default")` -> Rbrun::Sessions::Default::Component (a folder component). `preset`
+    # is an alias — folder/preset compositions live in the same namespace as every other Rbrun
+    # component, so the two are the same resolver. (Titled panels are now the `surface` primitive.)
     def custom(name, *args, **kwargs, &block)
       klass = "Rbrun::#{name.to_s.split("/").map(&:camelize).join("::")}::Component".constantize
       render(klass.new(*args, **kwargs), &block)

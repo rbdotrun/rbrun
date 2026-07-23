@@ -1,9 +1,13 @@
+<%# The bare confirm shell; its message + actions render through a :dialog Surface (message = body,
+    buttons = footer). The data-confirm-* hooks (turbo_confirm.js) are preserved verbatim. %>
 <dialog id="confirm-dialog" class="<%= classes %>">
-  <div class="flex flex-col gap-6 p-6">
-    <p class="text-sm text-slate-700" data-confirm-message></p>
-    <div class="flex justify-end gap-2.5">
-      <%= component("button", variant: :outline, size: :sm, data: { confirm_cancel: "" }) { "Cancel" } %>
-      <%= component("button", variant: :primary, size: :sm, data: { confirm_accept: "" }) { "Confirm" } %>
-    </div>
-  </div>
+  <%= component("surface", preset: :dialog, elevation: :lg) do |s| %>
+    <% s.with_body do %>
+      <p class="text-sm text-slate-700" data-confirm-message></p>
+    <% end %>
+    <% s.with_footer do %>
+      <%= component("button", variant: :outline, size: :sm, data: { confirm_cancel: "" }) do %>Cancel<% end %>
+      <%= component("button", variant: :primary, size: :sm, data: { confirm_accept: "" }) do %>Confirm<% end %>
+    <% end %>
+  <% end %>
 </dialog>
