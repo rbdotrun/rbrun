@@ -25,16 +25,45 @@ soft-hints) lives _inside_ it. So:
   second one that drifts and only reflects `current_version`. (insitix copies frontmatter → columns
   because its data DB is trashed on pull; rbrun's DB is the truth — we do NOT import that shape.)
 
-The only things not in the archive are DB rows in their own right: **`SkillScenario`** (a runnable
-case) and its **produced artifact** (`ArtifactVersion`). Those are their own truth.
+The only things not in the archive are DB rows in their own right: a skill's **`Workflow`s** (each a
+runnable scenario/example — see below) and their **produced artifact** (`ArtifactVersion`). Those are
+their own truth.
+
+## Scenarios are skill-bound workflows (no wrapper model)
+
+A "scenario"/"example" for a skill is **just a `Rbrun::Workflow` that belongs to that skill.** There is
+no separate `SkillScenario` model — it collapses into `Workflow`. The `skill_id` is the whole
+distinction: a workflow with `skill_id` **nil** is a plain conversation workflow (unchanged); a workflow
+**bound to a skill** is that skill's runnable case.
+
+```
+Rbrun::Workflow
+  label · goal · steps → WorkflowStep        (unchanged — conversations still create these)
+  belongs_to :skill (optional)               SET ⇒ a runnable scenario/example for that skill
+  prompt                                     the example prompt to replay (the vague request that
+                                             should make the skill fire on its own)
+  showcase_artifact_version_id → ArtifactVersion   the last run's produced artifact (a curated pointer)
+
+Rbrun::Skill  has_many :workflows            a skill's workflows ARE its scenarios/examples
+```
+
+**Why merge (not a `SkillScenario` wrapping a `Workflow`):** the runtime is already built entirely on
+`Workflow` — a session binds to a `Workflow` (`sessions.workflow_id`), `validate_step` records
+completions against its `WorkflowStep`s, `Workflow::Run` computes progress. The scenario's expected steps
+therefore have to *be* a `Workflow` for the run to bind and self-validate. Once they are, a separate
+wrapper only re-holds `prompt`/`skill`/`showcase` — three columns that sit just as well on the workflow
+they annotate. The cost is that `Workflow` gains three columns meaningful only when `skill_id` is present;
+that mild nullable-subset is the accepted trade for one concept instead of two.
 
 ## What already exists (reuse)
 
 - `Skill` + `SkillVersion` (immutable, digest-addressed, `current_version`, `promote!`).
 - `SkillArchive` (`files`, `pack_files`, `digest_files`) + a line-by-line frontmatter reader pattern.
-- `SkillScenario` (belongs_to skill; `prompt` + `steps` jsonb + `attachments`).
-- `SkillScenarioRun` (auto, self-validating) — seeds a `Rbrun::Workflow` from `scenario.steps`, runs the
-  skill, self-validates each step (auto mode auto-approves `validate_step`).
+- `Rbrun::Workflow` + `Rbrun::WorkflowStep` (label/goal/steps, session binding, `Workflow::Run`
+  progress) — reused directly as a skill's scenarios once `skill_id`/`prompt` are added.
+- `SkillScenarioRun` (auto, self-validating) — binds a **skill-bound `Workflow`** to a
+  `:skill_scenario` session, replays its `prompt`, self-validates each `WorkflowStep` (auto mode
+  auto-approves `validate_step`).
 - `ArtifactVersion` (Plan C) — a scenario run's produced artifact = the showcase.
 - The `table`/`surface`/`empty`/`field`/`input`/`textarea`/`select`/`multi_select` primitives + live broadcast + `solid_cable`.
 
@@ -64,15 +93,26 @@ On **Save**: build the frontmatter from the fields + append the body → one `SK
 `digest_files` → `Skill#promote!(source: :ui)`. A `Rbrun::SkillForm` service does assemble/parse in one
 place (the inverse pair: fields ⇄ `SKILL.md`). Version dropdown loads any version's archive into the form.
 
-### Scenarios (a sub-form)
+### Scenarios (skill-bound workflows) — their own resource
 
-Each scenario row edits a `SkillScenario`: `label`, `prompt`, and **optional** `steps` (repeatable
-`{label, description}` rows saved as the `steps` **jsonb**). Steps are the workflow the skill should
-produce; empty = a pure showcase.
+A scenario is a skill-bound `Workflow`, so it gets **its own nested CRUD** rather than being saved as a
+nested sub-form of the skill form (nested-in-nested jsonb editing is exactly the trap we're avoiding):
 
-- **▶ Run** enqueues `SkillScenarioRun` (auto, self-validating). It seeds a `Rbrun::Workflow` from the
-  jsonb steps, runs the skill in a `kind: :skill_scenario` session, self-validates each step, and
-  captures the produced artifact into the scenario's **showcase**.
+```
+resources :skills, param: :slug do
+  resources :workflows, only: %i[new create edit update destroy]   # a skill's scenarios
+end
+```
+
+Each workflow form edits **one** `Workflow`: `label`, `prompt` (the example request to replay), `goal`,
+and its **steps** — repeatable `{title, description}` rows saved as real `WorkflowStep` records via
+`accepts_nested_attributes_for :steps` (add/remove is standard Rails, no jsonb, no hidden-field JSON).
+Steps are the workflow the skill should produce; no steps = a pure showcase.
+
+- **▶ Run** enqueues `SkillScenarioRun` (auto, self-validating). It binds **this** workflow to a
+  `kind: :skill_scenario` session, replays `workflow.prompt`, self-validates each `WorkflowStep`, and
+  captures the produced artifact into `workflow.showcase_artifact_version_id`. Completions are
+  per-session, so re-runs never collide; the session is reaped after, the workflow persists.
 - After a run: show the verdict (steps done/total) + the produced artifact (versioned — re-run adds a
   version). Runs are user-triggered, one at a time.
 
@@ -83,13 +123,19 @@ produce; empty = a pure showcase.
   self-validating); everything else is `:user`. The **conversation index filters to `:user`** so
   scenario runs don't pollute it. (`kind` is the durable "what is this session"; `auto` stays the
   runtime lever.) Enum kept open for future kinds.
-- **`rbrun_skill_scenarios.showcase_artifact_version_id`** — FK → `rbrun_artifact_versions` (nullable):
-  the artifact the scenario's last run produced. A curated *pointer* (not archive content). Set by
-  `SkillScenarioRun` when the run produced an artifact; artifacts already survive the run's reaping (the
-  completion→message FK nullifies).
-- `SkillScenario.steps` — already jsonb defaulting `[]`; the form treats it as **optional**.
+- **`rbrun_workflows.skill_id`** — FK → `rbrun_skills` (nullable): set ⇒ this workflow is that skill's
+  scenario/example. `Skill has_many :workflows`, `Workflow belongs_to :skill, optional: true`. A nil
+  `skill_id` is a plain conversation workflow (unchanged).
+- **`rbrun_workflows.prompt`** — text (nullable): the example prompt `SkillScenarioRun` replays for a
+  skill-bound workflow.
+- **`rbrun_workflows.showcase_artifact_version_id`** — FK → `rbrun_artifact_versions` (nullable): the
+  artifact the workflow's last run produced. A curated *pointer* (not archive content). Set by
+  `SkillScenarioRun`; artifacts already survive the run's reaping (the completion→message FK nullifies).
+- **Retire `SkillScenario`** — drop the model, table, and `SkillScenarios.ingest`'s jsonb path; scenario
+  data now lives on `Workflow`. `scenarios/*.yml` seeding becomes "find-or-create a skill-bound
+  `Workflow` + its `WorkflowStep`s" (idempotent, per invariant 11).
 
-No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
+No `SkillScenario`, no `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
 
 ## Plans (one spec, two plans, build in order)
 
@@ -97,10 +143,13 @@ No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
   icon/kind/example/description/body + `preferred_skills`/`preferred_tools`); vanilla `new`/`create`/
   `edit`/`update` (create → v1, update → `promote!` a new version); the version dropdown (load a version's
   archive into the form). `rbrun_sessions.kind` enum + index filter. Delivers full skill editing.
-- **Plan 2 — scenarios + run.** The scenarios sub-form (label/prompt/steps jsonb); `save_skill`-style
-  ingestion isn't needed (the form writes `SkillScenario` rows directly); add
-  `showcase_artifact_version_id`; wire **▶ Run** → `SkillScenarioRun` (as `:skill_scenario`) capturing the
-  showcase; render verdict + produced artifact.
+- **Plan 2 — scenarios = skill-bound workflows + run.** Add `workflows.skill_id` / `prompt` /
+  `showcase_artifact_version_id` (+ `Skill has_many :workflows`, `Workflow belongs_to :skill`); retire
+  `SkillScenario` (drop model/table, re-point `SkillScenarioRun` to bind a skill-bound `Workflow` and
+  replay its `prompt`, migrate `SkillScenarios.ingest` to find-or-create workflows). Nested
+  `resources :workflows` under `:skills` with a `Workflow` form (label/prompt/goal + `WorkflowStep`s via
+  `accepts_nested_attributes_for`); wire **▶ Run** → `SkillScenarioRun` (as `:skill_scenario`) capturing
+  the showcase; render verdict + produced artifact.
 
 ## Non-goals (deferred)
 
@@ -113,7 +162,8 @@ No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
 
 - **Archive is the only source of a skill's content** — Save assembles `SKILL.md` → promotes a version;
   Load parses the selected version's archive. Never a card/soft-hint column.
-- **DB is the source of truth** — the form writes `SkillVersion`s and `SkillScenario` rows directly.
+- **DB is the source of truth** — the form writes `SkillVersion`s and skill-bound `Workflow`s (+ their
+  `WorkflowStep`s) directly.
 - **Compose primitives** — the form is built from `field`/`input`/`textarea`/`select`/`multi_select`/
   `button` via `component(...)`, never raw `<input>`/`<form>` controls.
 - **Self-validating runs are tagged** — `kind: :skill_scenario` + `auto: true`; the human is out of the
@@ -127,7 +177,10 @@ No `SkillExample`, no `editing_skill_id`, no card/soft-hint columns.
   promotes a new version whose parsed fields match the submitted form; `?version=` loads that version's
   fields into the edit form.
 - Session: `kind` defaults `:user`; the conversation index excludes `:skill_scenario`.
-- Scenarios: the sub-form writes `SkillScenario` rows (steps jsonb); **▶ Run** produces a
-  `:skill_scenario` session, self-validates, sets `showcase_artifact_version_id`.
-- Dogfood: create a skill via the form, run a scenario with steps → assert the steps self-validated
-  (completions recorded) and a showcase artifact was captured.
+- Scenarios: the nested `workflows` form creates a **skill-bound `Workflow`** with `WorkflowStep`s
+  (nested attributes, no jsonb); `Skill#workflows` returns it; **▶ Run** produces a `:skill_scenario`
+  session, self-validates each step, sets `workflow.showcase_artifact_version_id`.
+- Retirement: `SkillScenario` model/table are gone; `SkillScenarios.ingest` find-or-creates skill-bound
+  workflows from `scenarios/*.yml` idempotently (re-ingest adds no duplicates).
+- Dogfood: create a skill via the form, run a scenario (skill-bound workflow) with steps → assert the
+  steps self-validated (completions recorded) and a showcase artifact was captured.
