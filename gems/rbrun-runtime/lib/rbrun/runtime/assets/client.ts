@@ -98,6 +98,9 @@ interface Config {
     servers?: Record<string, unknown>;
     tools?: Record<string, string[] | null>;
     permissions?: Record<string, Record<string, string>>;
+    // The SDK's schema-deferral ceiling (Rbrun::Mcp::ToolBudget::CEILING). Ruby cannot pre-count a
+    // server declared `tools: null` (= all), so this is where the cap is actually enforced.
+    ceiling?: number | null;
     approved?: string[]; // full mcp__srv__tool names the user approved this session — allowed on resume
   } | null;
 }
@@ -328,12 +331,29 @@ async function main(): Promise<void> {
   //
   // The file tools and the two bun commands are granted by the workspace's own settings.json,
   // which the Runner writes — path-scoped to ./**, which is the session's workspace and nothing else.
-  const allowedTools = [
-    ...config.manifest
-      .filter((m) => !m.needs_approval)
-      .map((m) => `mcp__${SERVER}__${m.name}`),
-    ...externalAllowed,
-  ];
+  const ourAllowed = config.manifest
+    .filter((m) => !m.needs_approval)
+    .map((m) => `mcp__${SERVER}__${m.name}`);
+
+  // THE CEILING, ENFORCED. Past the SDK's schema-deferral line it ships tool NAMES WITHOUT SCHEMAS and
+  // the model calls them blind ("enum_options: received undefined"). Ruby reduces what it can up front,
+  // but a server declared with `tools: nil` means "all of them" — an unknowable count before the server
+  // answers — so this is the only place the cap can actually hold. Ours are never dropped (they are the
+  // agent's own capabilities); external tools are truncated, loudly.
+  let externalKept = externalAllowed;
+  const ceiling = mcp.ceiling ?? null;
+  if (ceiling !== null) {
+    const room = Math.max(ceiling - ourAllowed.length, 0);
+    if (externalAllowed.length > room) {
+      externalKept = externalAllowed.slice(0, room);
+      console.error(
+        `[rbrun] tool ceiling ${ceiling} reached: dropped ${externalAllowed.length - room} external MCP tool(s): ` +
+          externalAllowed.slice(room).join(", "),
+      );
+    }
+  }
+
+  const allowedTools = [...ourAllowed, ...externalKept];
 
   // The tools that EXIST for this agent. Without this the SDK exposes its whole built-in surface,
   // and two of them break us outright:

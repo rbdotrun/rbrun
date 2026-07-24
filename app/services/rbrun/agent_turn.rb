@@ -141,7 +141,10 @@ module Rbrun
           "servers"     => Rbrun::Mcp::Materializer.call(capped)["mcpServers"],
           "tools"       => capped.to_h { |s| [ s.name.to_s, s.tools ] },
           "permissions" => capped.to_h { |s| [ s.name.to_s, stringify_perms(s.tool_permissions) ] },
-          "approved"    => approved_mcp_tools # full mcp__srv__tool names the user approved — allow on resume
+          "approved"    => approved_mcp_tools, # full mcp__srv__tool names the user approved — allow on resume
+          # Ruby cannot pre-count a server declared `tools: nil` ("all of them"), so the cap can only
+          # truly be enforced where the real count exists — client.ts truncates the allowed list to this.
+          "ceiling"     => Rbrun::Mcp::ToolBudget::CEILING
         }
       end
 
