@@ -12,7 +12,12 @@ module Rbrun
   # Workflows themselves are fully modelled (Workflow + WorkflowStep rows). This is strictly the
   # JSON → models boundary, and it exists only because the source really is a JSON tool call.
   class WorkflowPlan
-    def self.from(input) = new(input.is_a?(Hash) ? input : {})
+    # Takes the GATE ROW, not a hash: the request only ever carries the tool_use_id and the decision,
+    # and the proposal is already on the row. Nothing hands the payload around.
+    def self.for(gate)
+      input = gate.payload["input"]
+      new(input.is_a?(Hash) ? input : {})
+    end
 
     def initialize(raw)
       @raw = raw

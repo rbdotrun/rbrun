@@ -19,7 +19,7 @@ module Rbrun
       # a workflow they never saw, and — with no steps — left the session workflow_status:"active"
       # forever, since Run#all_done? is false while total is zero. Cancel is always allowed: you must be
       # able to dismiss a broken gate.
-      plan = Rbrun::WorkflowPlan.from(row.payload["input"])
+      plan = Rbrun::WorkflowPlan.for(row)
       return head(:unprocessable_entity) if decision != "cancel" && !plan.usable?
 
       return head :no_content unless claim_gate!(row, status: (decision == "cancel" ? "rejected" : "approved"))
