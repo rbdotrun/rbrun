@@ -11,13 +11,18 @@ module Rbrun
             def decided? = !@call.approval_pending?
             def approved? = @call.approval_approved?
 
-            def result
-              @result ||= @call.session.messages.find_by(event_type: "tool_result", tool_use_id:)
-                               &.payload&.dig("result") || {}
-            end
+            # The tool's own data, via the model that owns the envelope shape — not a hand-dug payload.
+            def result = @result ||= @call.tool_result_data
 
-            # After approval current_step has advanced, so read the completed step's title from the result.
-            def step_title = result["step"].presence || Rbrun::Workflow::Run.new(@call.session).current_step&.title
+            # Which step this card is about. Once decided, it is whatever validate_step actually recorded
+            # (current_step has since ADVANCED, so reading it then names the wrong step); while pending,
+            # the step awaiting confirmation. Two distinct states, answered from the right source each
+            # time — not one read with a fallback papering over the other.
+            def step_title
+              return Rbrun::Workflow::Run.new(@call.session).current_step&.title unless decided?
+
+              result["step"]
+            end
         end
       end
     end

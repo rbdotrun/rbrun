@@ -25,6 +25,11 @@ module Rbrun
         end
 
         budget = [ ceiling - builtin_count - rbrun_count, 0 ].max
+        # `tools: nil` means ALL of that server's tools — an UNKNOWABLE count until the server answers,
+        # so it is deliberately not summed here (it is not zero; it is unknown). That is only safe
+        # because the ceiling is now genuinely enforced at the one place the real count exists:
+        # AgentTurn hands CEILING to the runtime and client.ts truncates the allowed-tool list to it.
+        # Without that backstop this sum silently under-counts and the cap never fires.
         known = reduced.sum { |spec| spec.tools&.size || 0 }
         return reduced if known <= budget
 

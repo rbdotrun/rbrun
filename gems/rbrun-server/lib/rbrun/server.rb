@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rbrun/server/version"
+require "rbrun/server/requires"
 require "rbrun/server/node"
 require "rbrun/server/deploy_result"
 require "rbrun/server/base"

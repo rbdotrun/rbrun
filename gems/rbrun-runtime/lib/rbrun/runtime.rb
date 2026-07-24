@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rbrun/runtime/version"
+require "rbrun/runtime/requires"
 require "rbrun/runtime/claude_sdk"
 
 module Rbrun

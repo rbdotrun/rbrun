@@ -6,6 +6,11 @@ module Rbrun
     include Rbrun::ResolvesGate
 
     def update
+      # Whitelist at the edge — the gate fails CLOSED. An unrecognized decision (typo, renamed button,
+      # hand-crafted POST, missing param) must never resolve to consent for a needs_approval! tool.
+      return head(:unprocessable_entity) unless
+        Rbrun::SessionMessage::APPROVAL_DECISIONS.include?(params[:decision].to_s)
+
       message = pending_gate
       nudge = message.decide_approval!(params[:decision])
 

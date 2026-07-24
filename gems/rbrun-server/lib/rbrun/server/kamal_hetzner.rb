@@ -25,12 +25,20 @@ module Rbrun
       # as `deploy`, never root. root login + password auth are disabled.
       SSH_USER = "deploy"
 
-      def initialize(config: {}, poll_interval: 2, poll_attempts: 60)
+      extend Rbrun::Server::Requires
+      # Provisioning needs the API token. Registry credentials are NOT required to construct — they
+      # gate `deploy` only (see REGISTRY_KEYS), so a box can still be provisioned/destroyed without one.
+      requires :hcloud_token
+
+      # `conn:` is an injection seam so tests drive the adapter with Faraday's test adapter (same shape
+      # as Rbrun::GithubRepos) — no network, no mocks.
+      def initialize(config: {}, poll_interval: 2, poll_attempts: 60, conn: nil)
+        self.class.validate_config!(config)
         @token    = config[:hcloud_token]
         @registry = config[:registry] || {}
         @poll_interval = poll_interval
         @poll_attempts = poll_attempts
-        raise Error, "kamal_hetzner: hcloud_token missing" if @token.to_s.empty?
+        @conn = conn
       end
 
       def find_server(name:)
@@ -75,7 +83,19 @@ module Rbrun
 
       # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
       # the server IP + registry creds from the child env; the ssh private key authenticates the deploy.
+      # Registry credentials are required to DEPLOY (kamal pushes an image), but not to provision or
+      # destroy a box — so the capability is gated here rather than in the constructor. Without this,
+      # a missing registry block shipped three BLANK env vars to kamal, which then failed at `docker
+      # login`/push and reported a wall of kamal output that never says "you didn't configure a registry".
+      REGISTRY_KEYS = %i[server username password].freeze
+
       def deploy(work_dir:, host:, server_ip:, ssh_private_key:, env: {})
+        missing = REGISTRY_KEYS.select { |k| @registry[k].to_s.strip.empty? }
+        if missing.any?
+          raise Error, "kamal_hetzner: deploy needs registry #{missing.join(', ')} — " \
+                       "set c.server_provider[:kamal_hetzner][:registry] = { server:, username:, password: }"
+        end
+
         forget_host_key(server_ip)
         with_key_file(ssh_private_key) do |key_path|
           child = kamal_env(server_ip:, key_path:, host:).merge(env.transform_keys(&:to_s))
@@ -204,10 +224,19 @@ module Rbrun
             req.headers["Content-Type"] = "application/json"
             req.body = JSON.generate(body)
           end
-          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue {})
-          return parsed if response.success?
+          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue nil)
 
-          msg = parsed.dig("error", "message") || response.status
+          # NEVER let "I couldn't read the answer" become "it doesn't exist". Swallowing an unreadable
+          # 2xx to {} made find_server return nil, so create_server's find-or-create guard missed and
+          # provisioned a SECOND billable box under the same name — the exact opposite of the
+          # idempotency this adapter promises (invariant #11). Unreadable success is a failure.
+          if response.success?
+            return parsed if parsed
+
+            raise Error, "kamal_hetzner: unparseable #{response.status} body from #{method.to_s.upcase} #{path}"
+          end
+
+          msg = (parsed || {}).dig("error", "message") || response.status
           raise Error, "kamal_hetzner: #{method.to_s.upcase} #{path} → #{response.status} #{msg}"
         end
 

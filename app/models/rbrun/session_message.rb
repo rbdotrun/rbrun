@@ -29,10 +29,36 @@ module Rbrun
 
     def visible? = event_type.in?(RENDERED_EVENTS) || (event_type.nil? && role.in?(%w[user assistant]))
 
+    # The ONLY decisions a human can render on a frozen call. The vocabulary lives here so the endpoint
+    # can't drift from it.
+    APPROVAL_DECISIONS = %w[approve refuse].freeze
+
+    # The DATA a tool returned, for this frozen call. Every tool answers with the envelope
+    # { "data" => {…} } (or { "error" => … }), stored verbatim under the result row's payload["result"].
+    #
+    # This is the ONE place that knows that shape. Reading payload["result"]["x"] by hand silently
+    # misses by a level and returns nil forever — which is exactly what happened on the validate_step
+    # card: `result["step"]` was ALWAYS nil, so its fallback ran on every render and showed the title of
+    # the NEXT, not-yet-done step as the one just validated (and an empty title on the last step).
+    # Returns {} while the call is still pending, so callers can read keys safely.
+    def tool_result_data
+      row = event_type == "tool_result" ? self : session.messages.find_by(event_type: "tool_result", tool_use_id:)
+      row&.payload&.dig("result", "data") || {}
+    end
+
     # Take the owner's decision on this frozen call and carry it out. Returns the nudge to resume with,
     # or nil when the claim lost (already decided elsewhere). The claim is the UPDATE's own WHERE.
+    #
+    # FAILS CLOSED, deliberately: approval must be stated explicitly. Anything that is not exactly
+    # "approve"/"refuse" raises rather than resolving to a status — a gate that treats an unrecognized
+    # decision as consent would run a needs_approval! tool (share_public, deploy…) that no human
+    # authorized. This is why the status is derived from "approve", never from "not refuse".
     def decide_approval!(decision)
-      status = decision.to_s == "refuse" ? "rejected" : "approved"
+      unless APPROVAL_DECISIONS.include?(decision.to_s)
+        raise ArgumentError, "unknown approval decision: #{decision.inspect}"
+      end
+
+      status = decision.to_s == "approve" ? "approved" : "rejected"
       claimed = self.class.where(id:, approval_status: "pending")
                     .update_all(approval_status: status, updated_at: Time.current)
       return nil if claimed.zero?

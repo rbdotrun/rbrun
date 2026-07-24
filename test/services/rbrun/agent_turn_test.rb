@@ -17,7 +17,7 @@ module Rbrun
     class GatingRuntime
       def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
         on_event.call({ type: "session", session_id: "sess-2" })
-        on_event.call({ type: "needs_approval", tool: "dangerous", arguments: { "x" => 1 }, tool_use_id: "g1" })
+        on_event.call({ type: "needs_approval", tool: "dangerous", arguments: { "x" => 1 }, tool_use_id: "g1", tool_kind: "ruby" })
         { type: "result", stop_reason: "awaiting_approval" }
       end
     end
@@ -163,6 +163,29 @@ module Rbrun
       assert_equal "dangerous", frozen.payload["name"]
       assert_equal({ "x" => 1 }, frozen.payload["input"])
       assert @session.messages.where(event_type: "tool_result", tool_use_id: "g1").none?
+    end
+
+    # tool_kind is the routing switch on approval. An mcp call frozen as "ruby" sends run_frozen_call!
+    # hunting a Ruby tool that does not exist, and the resume never adds it to approved_mcp_tools — so
+    # the user approves an action that then silently never happens. Unstated is unresolvable.
+    class GateWithoutKindRuntime
+      def run(prompt:, system:, tools:, resume:, tool_handler:, on_event:, skills: nil, mcp: nil, auto: nil, cwd: nil)
+        on_event.call({ type: "needs_approval", tool: "x", arguments: {}, tool_use_id: "gk" })
+        { type: "result" }
+      end
+    end
+
+    test "a needs_approval event that does not state tool_kind is refused, not assumed to be ruby" do
+      session = rbrun_session(tenant: "acme")
+      assert_raises(KeyError) do
+        Rbrun::AgentTurn.new(session:, runtime: GateWithoutKindRuntime.new).run("go")
+      end
+    ensure
+      begin
+        session&.worktree&.sandbox&.destroy!
+      rescue StandardError
+        nil
+      end
     end
   end
 end

@@ -72,4 +72,22 @@ class TenantConfigTest < ActiveSupport::TestCase
     Rbrun.github_repos_resolver = ->(t) { "LISTER:#{t}" }
     assert_equal "LISTER:acme", Rbrun.github_repos("acme")   # resolver takes precedence
   end
+
+  # A resolver's nil means "THIS TENANT HAS NO GITHUB" — the opposite of "no resolver installed".
+  # The old `||` chain conflated them and walked on to the static override / the operator's own PAT,
+  # showing tenant B the operator's repositories. Which seam is INSTALLED decides, never what it returned.
+  test "a resolver's nil is the answer — it never falls through to another account's lister" do
+    Rbrun.config.github_pat = "ghp_operator"
+    Rbrun.github_repos = :operators_own_lister
+    Rbrun.github_repos_resolver = ->(_t) { nil } # this tenant has no GitHub App installation
+
+    assert_nil Rbrun.github_repos("tenant-b"),
+               "must NOT fall through to the static override or the operator's PAT"
+  end
+
+  # No seam installed and no token configured is a missing capability, not a degraded one.
+  test "no github_pat and no seam installed RAISES rather than building a broken lister" do
+    Rbrun.config.github_pat = nil
+    assert_raises(ArgumentError) { Rbrun.github_repos("acme") }
+  end
 end

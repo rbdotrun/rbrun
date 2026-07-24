@@ -47,6 +47,32 @@ module Rbrun
       assert_includes data["deploy_yml_ssh"], "user: deploy"
     end
 
+    # The tool's whole purpose is "hand the agent the EXACT infra values so it never guesses" — so it
+    # must not guess either. It used to report docker.io for a missing registry, and the agent wrote
+    # that literally into deploy.yml: kamal then pushed to Docker Hub with (say) GHCR credentials and
+    # failed deep in the build. A missing image ref also degraded to "/rbrun-w7" (leading slash).
+    test "deploy_config REFUSES when no registry is configured — it never reports docker.io" do
+      Rbrun.config.server_provider = { default: :kamal_hetzner, kamal_hetzner: {} }
+      out = Rbrun::Tools::DeployConfig.in_session(@session).execute
+      assert_match(/registry/i, out["error"].to_s)
+      refute_includes out.to_s, "docker.io"
+      assert_nil out["data"]
+    end
+
+    test "deploy_config REFUSES when no server provider is configured at all" do
+      Rbrun.config.server_provider = {}
+      out = Rbrun::Tools::DeployConfig.in_session(@session).execute
+      assert_match(/server provider/i, out["error"].to_s)
+    end
+
+    test "deploy_config refuses a registry with no username (image would be a bare /service)" do
+      Rbrun.config.server_provider = { default: :kamal_hetzner,
+                                       kamal_hetzner: { registry: { server: "ghcr.io" } } }
+      out = Rbrun::Tools::DeployConfig.in_session(@session).execute
+      assert_match(/registry/i, out["error"].to_s)
+      refute_match(%r{"/rbrun-w}, out.to_s)
+    end
+
     test "list_deploy_secrets returns stored NAMES (never values) + the infra env the engine injects" do
       Rbrun::RepoSecret.create!(tenant: "acme", repo: "acme/webapp", key: "RAILS_MASTER_KEY", value: "topsecret")
       Rbrun::RepoSecret.create!(tenant: "acme", repo: "acme/webapp", key: "POSTGRES_PASSWORD", value: "pw")
@@ -69,6 +95,7 @@ module Rbrun
     end
 
     test "provision_server creates the box and records the ip on the target" do
+      Rbrun.config.preview_domain = "rb.run" # the deploy host is built on it — provisioning is gated on it
       srv = fake(:create_server) { |**| Rbrun::Server::Node.new(id: 7, name: "n", ip: "5.5.5.5", status: "running", region: "fsn1") }
       with_rbrun(:server, srv) do
         data = Rbrun::Tools::ProvisionServer.in_session(@session).execute["data"]

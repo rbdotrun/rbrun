@@ -141,7 +141,10 @@ module Rbrun
           "servers"     => Rbrun::Mcp::Materializer.call(capped)["mcpServers"],
           "tools"       => capped.to_h { |s| [ s.name.to_s, s.tools ] },
           "permissions" => capped.to_h { |s| [ s.name.to_s, stringify_perms(s.tool_permissions) ] },
-          "approved"    => approved_mcp_tools # full mcp__srv__tool names the user approved — allow on resume
+          "approved"    => approved_mcp_tools, # full mcp__srv__tool names the user approved — allow on resume
+          # Ruby cannot pre-count a server declared `tools: nil` ("all of them"), so the cap can only
+          # truly be enforced where the real count exists — client.ts truncates the allowed list to this.
+          "ceiling"     => Rbrun::Mcp::ToolBudget::CEILING
         }
       end
 
@@ -277,7 +280,12 @@ module Rbrun
         @gated = true
         row("assistant", "tool_use", tool_use_id: event[:tool_use_id], approval_status: "pending",
             payload: { "id" => event[:tool_use_id], "name" => event[:tool].to_s, "input" => event[:arguments] || {},
-                       "tool_kind" => (event[:tool_kind] || "ruby").to_s })
+                       # HOW the approved call will be executed. Both client.ts emit sites state it
+                       # ("ruby" | "mcp"), and it is the routing switch on approval: an mcp call frozen
+                       # as "ruby" sends run_frozen_call! looking for a Ruby tool that does not exist,
+                       # while the resume never adds it to approved_mcp_tools — so the user approves an
+                       # action that then silently never happens. Unstated is unresolvable, not "ruby".
+                       "tool_kind" => event.fetch(:tool_kind).to_s })
       end
   end
 end

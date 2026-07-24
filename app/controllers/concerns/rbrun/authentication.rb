@@ -11,9 +11,22 @@ module Rbrun
 
     private
 
+      # ONE authority per deployment, decided by which seam is installed — never an `||` across both.
+      #
+      # Rbrun.current_user_from returns nil in two OPPOSITE situations: no host resolver is configured,
+      # and the host resolver says "this person is not signed in". OR-ing past it treated a rejection as
+      # an absence and fell through to rbrun's own password form + session[:rbrun_user_id] cookie — so
+      # in a host-auth deployment, someone the host had logged out (or never authorized) could still get
+      # in through the built-in login, carrying their own tenant into every for_tenant query.
       def current_user
-        @current_user ||= Rbrun.current_user_from(session) ||
-                          (session[:rbrun_user_id] && Rbrun::User.find_by(id: session[:rbrun_user_id]))
+        return @current_user if defined?(@current_user)
+
+        @current_user =
+          if Rbrun.host_auth?
+            Rbrun.current_user_from(session) # the host owns identity, verdict included
+          else
+            session[:rbrun_user_id] && Rbrun::User.find_by(id: session[:rbrun_user_id])
+          end
       end
 
       def current_tenant = current_user&.tenant

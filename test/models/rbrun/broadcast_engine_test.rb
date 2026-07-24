@@ -74,7 +74,7 @@ module Rbrun
 
     class GateRuntime
       def run(on_event:, **)
-        on_event.call({ type: "needs_approval", tool: "x", arguments: {}, tool_use_id: "gg" })
+        on_event.call({ type: "needs_approval", tool: "x", arguments: {}, tool_use_id: "gg", tool_kind: "ruby" })
         { type: "result", stop_reason: "awaiting_approval" }
       end
     end
