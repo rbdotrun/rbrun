@@ -25,15 +25,22 @@ module Rbrun
 
       CLIENT_TS = File.expand_path("assets/client.ts", __dir__)
 
+      extend Rbrun::Runtime::Requires
+      # What this provider genuinely cannot run without. `model` decides what answers (and "sonnet" is a
+      # MOVING alias — the same config silently changes model, cost and behaviour after an SDK bump);
+      # `max_turns` is a per-deployment cost/latency budget (the dogfoods alone pick 12/16/20/24/60);
+      # `subprocess_timeout` is the flat Config knob Rbrun.runtime merges in.
+      requires :anthropic_api_key, :model, :max_turns, :subprocess_timeout
+
       def initialize(sandbox:, config: {})
+        self.class.validate_config!(config)
         @sandbox   = sandbox
         @api_key   = config[:anthropic_api_key]
-        @model     = config[:model] || "sonnet"
-        @max_turns = config[:max_turns] || 60
-        @github_pat = config[:github_pat]
-        @timeout   = Integer(config[:subprocess_timeout] || 900)
+        @model     = config[:model]
+        @max_turns = config[:max_turns]
+        @timeout   = Integer(config[:subprocess_timeout])
+        @github_pat = config[:github_pat] # optional: only injects GH_TOKEN into the agent's shell
         @logger    = config[:logger]
-        raise Error, "anthropic_api_key missing" if @api_key.nil? || @api_key.to_s.empty?
       end
 
       # One turn. Stages everything, runs the client in a detached sandbox session, and streams its

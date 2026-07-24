@@ -25,15 +25,20 @@ module Rbrun
       # as `deploy`, never root. root login + password auth are disabled.
       SSH_USER = "deploy"
 
+      extend Rbrun::Server::Requires
+      # Provisioning needs the API token. Registry credentials are NOT required to construct — they
+      # gate `deploy` only (see REGISTRY_KEYS), so a box can still be provisioned/destroyed without one.
+      requires :hcloud_token
+
       # `conn:` is an injection seam so tests drive the adapter with Faraday's test adapter (same shape
       # as Rbrun::GithubRepos) — no network, no mocks.
       def initialize(config: {}, poll_interval: 2, poll_attempts: 60, conn: nil)
+        self.class.validate_config!(config)
         @token    = config[:hcloud_token]
         @registry = config[:registry] || {}
         @poll_interval = poll_interval
         @poll_attempts = poll_attempts
         @conn = conn
-        raise Error, "kamal_hetzner: hcloud_token missing" if @token.to_s.empty?
       end
 
       def find_server(name:)

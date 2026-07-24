@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rbrun/dns/version"
+require "rbrun/dns/requires"
 require "rbrun/dns/record"
 require "rbrun/dns/base"
 require "rbrun/dns/cloudflare"

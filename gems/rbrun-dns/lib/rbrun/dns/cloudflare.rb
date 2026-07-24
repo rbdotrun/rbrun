@@ -14,14 +14,16 @@ module Rbrun
     class Cloudflare < Base
       API = "https://api.cloudflare.com/client/v4"
 
+      extend Rbrun::Dns::Requires
+      requires :api_token, :zone_id
+
       # `conn:` is an injection seam so tests drive the adapter with Faraday's test adapter (same shape
       # as Rbrun::GithubRepos) — no network, no mocks.
       def initialize(config: {}, conn: nil)
+        self.class.validate_config!(config)
         @token   = config[:api_token]
         @zone_id = config[:zone_id]
         @conn    = conn
-        raise Error, "cloudflare dns: api_token missing" if @token.to_s.empty?
-        raise Error, "cloudflare dns: zone_id missing"   if @zone_id.to_s.empty?
       end
 
       # The record with this name (and type, if given), or nil.

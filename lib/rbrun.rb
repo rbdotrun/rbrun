@@ -12,9 +12,21 @@ module Rbrun
       build(Rbrun::Sandbox, config(tenant).sandbox_provider, provider:, **opts)
     end
 
+    # Flat engine knobs the runtime adapter needs, merged into each provider's own config hash.
+    #
+    # Without this they were SILENTLY DISCARDED: `c.subprocess_timeout` and `c.github_pat` are flat
+    # Config attributes (invariant #3), but only `runtime_provider` was passed here, so the adapter's
+    # `config[:subprocess_timeout]` always missed and its `|| 900` made a dead knob look alive — every
+    # host ran 900 regardless of what it set. `config[:github_pat]` missed the same way, so the agent's
+    # shell never got GH_TOKEN. A provider's own hash still wins, being the more specific setting.
     def runtime(sandbox:, provider: nil, tenant: nil, **opts)
       require "rbrun/runtime"
-      build(Rbrun::Runtime, config(tenant).runtime_provider, provider:, sandbox:, **opts)
+      cfg  = config(tenant)
+      flat = { subprocess_timeout: cfg.subprocess_timeout, github_pat: cfg.github_pat }
+      providers = cfg.runtime_provider.to_h do |name, provider_config|
+        [ name, provider_config.is_a?(Hash) ? flat.merge(provider_config) : provider_config ]
+      end
+      build(Rbrun::Runtime, providers, provider:, sandbox:, **opts)
     end
 
     def dns(provider = nil, tenant: nil, **opts)

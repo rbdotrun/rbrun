@@ -13,7 +13,14 @@ module Rbrun
       ROOT = "/home/daytona"
       WORKSPACE = File.join(ROOT, "workspace")
 
+      extend Rbrun::Sandbox::Requires
+      # api_url was previously accepted unvalidated: a missing one produced RELATIVE urls ("/sandbox")
+      # and a Faraday error nowhere near the cause. Both are declared, and validated at construction —
+      # only `client:` (the test seam) bypasses it, since it replaces the wire entirely.
+      requires :api_key, :api_url
+
       def initialize(config: {}, labels: {}, client: nil)
+        self.class.validate_config!(config) unless client
         @labels = labels
         @client = client || Client.new(
           api_key:       config[:api_key],

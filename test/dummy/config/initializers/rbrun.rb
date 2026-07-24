@@ -19,13 +19,23 @@ Rbrun.configure do |c|
     }
   end
 
-  # Runtime: the Claude Agent SDK. Real OAuth token in the deploy; a dummy key keeps tests fully offline.
-  c.runtime_provider = {
-    default: :claude_sdk,
-    claude_sdk: {
-      anthropic_api_key: ENV["ANTHROPIC_OAUTH_TOKEN"].presence || "sk-test-dummy"
+  # Runtime: the Claude Agent SDK — configured ONLY when its credential is really present, exactly like
+  # the DNS/server capabilities below. The config is valid, or it raises, or the capability is absent;
+  # there is no third state. A placeholder key ("sk-test-dummy") was the worst of all worlds: it made an
+  # INVALID config look valid, so claude_sdk's own fail-fast on a missing key could never fire, and an
+  # unconfigured host silently got a runtime that would only fail on the first real API call.
+  # model + max_turns are declared explicitly — the adapter no longer guesses them ("sonnet" is a moving
+  # alias; max_turns is a real cost/latency budget).
+  if ENV["ANTHROPIC_OAUTH_TOKEN"].present?
+    c.runtime_provider = {
+      default: :claude_sdk,
+      claude_sdk: {
+        anthropic_api_key: ENV["ANTHROPIC_OAUTH_TOKEN"],
+        model: ENV.fetch("RBRUN_MODEL", "sonnet"),
+        max_turns: Integer(ENV.fetch("RBRUN_MAX_TURNS", 60))
+      }
     }
-  }
+  end
 
   # GitHub: the agent clones + pushes worktree branches and the repo switcher lists repos via this PAT.
   # Generated on the host with `gh auth token`.

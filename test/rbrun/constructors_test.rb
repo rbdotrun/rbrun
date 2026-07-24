@@ -23,7 +23,10 @@ class ConstructorsTest < ActiveSupport::TestCase
   test "Rbrun.runtime resolves claude_sdk with an injected sandbox" do
     Rbrun.configure do |c|
       c.sandbox_provider = { default: :local, local: {} }
-      c.runtime_provider = { default: :claude_sdk, claude_sdk: { anthropic_api_key: "sk-test" } }
+      # claude_sdk HAS ITS OWN REQUIREMENTS — a construction test must satisfy them, not be handed a
+      # config the adapter would (rightly) refuse.
+      c.runtime_provider = { default: :claude_sdk,
+                             claude_sdk: { anthropic_api_key: "sk-test", model: "sonnet", max_turns: 12 } }
     end
     box = Rbrun.sandbox(labels: { session: "ctor3" })
     rt = Rbrun.runtime(sandbox: box)

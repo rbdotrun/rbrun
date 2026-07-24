@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rbrun/sandbox/version"
+require "rbrun/sandbox/requires"
 require "rbrun/sandbox/exec_result"
 require "rbrun/sandbox/file_upload"
 require "rbrun/sandbox/line_buffer"
