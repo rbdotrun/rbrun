@@ -1,19 +1,16 @@
-<%# The repo rows — a role="menu" list of two-line list_items (Menu controller drives keyboard nav).
-    title = owner/name, subtitle = owner (the org), avatar = repo-name initials. Each row POSTs to
-    switch_repo and full-navigates (data-turbo-frame="_top"), the current repo marked active.
-    Rendered inside the #repo_results Turbo frame. Locals: repos ([GithubRepos::Repo]), current (str). %>
+<%# Result rows — client-side picks: each dispatches its repo/base to the composer badge (repo-choices),
+    no POST, no global scope. A row with no `href` renders as a clickable menuitem div. Rendered inside
+    the #repo_results Turbo frame. Locals: repos ([GithubRepos::Repo]). %>
 <% if repos.any? %>
   <%# p-1.5 (6px) + list_item's own px-2.5 (10px) = 16px, matching the surface's px-4 edge (header + search). %>
-  <div role="menu" class="p-1.5" data-controller="menu" data-action="keydown->menu#navigate">
+  <div role="menu" class="p-1.5" data-controller="menu repo-choices" data-action="keydown->menu#navigate">
     <% repos.each do |repo| %>
       <% org, name = repo.full_name.split("/", 2) %>
       <%= component("list_item",
             title: repo.full_name,
             subtitle: org,
             avatar: name.to_s[0, 2].upcase,
-            href: rbrun.switch_repo_path(repo: repo.full_name, base: repo.default_branch),
-            active: (repo.full_name == current),
-            data: { turbo_method: :post, turbo_frame: "_top" }) %>
+            data: { action: "repo-choices#pick", repo: repo.full_name, base: repo.default_branch }) %>
     <% end %>
   </div>
 <% else %>

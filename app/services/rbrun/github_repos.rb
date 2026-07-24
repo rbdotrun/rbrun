@@ -37,10 +37,18 @@ module Rbrun
       list(per_page: 100).select { |r| r.full_name.downcase.include?(q) }.first(per_page)
     end
 
+    # The repo's ACTUAL default branch, straight from the API — the authoritative source when a caller
+    # needs to branch off it. Fails loud if the repo can't be read or the API omits it; NEVER guesses a
+    # literal like "main" (a repo's default may be master/develop/… — a wrong base breaks provisioning).
+    def default_branch(full_name)
+      body = get("/repos/#{full_name}")
+      body["default_branch"].presence or raise Error, "no default_branch for #{full_name}"
+    end
+
     private
 
       def to_repo(hash)
-        Repo.new(full_name: hash["full_name"], default_branch: hash["default_branch"] || "main",
+        Repo.new(full_name: hash["full_name"], default_branch: hash["default_branch"],
                  private: hash["private"] || false)
       end
 

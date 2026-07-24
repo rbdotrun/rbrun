@@ -25,18 +25,20 @@ module Rbrun
 
     teardown { Rbrun.github_repos = nil }
 
-    test "index renders the results frame with the searched repos" do
+    test "the result rows are client-side picks — no switch href, each carries repo + base" do
       get "/rbrun/repos", params: { q: "rb" }
       assert_response :success
       assert_equal "rb", @fake.last_query
       assert_select "turbo-frame#repo_results"
-      assert_select "a", text: /rbdotrun\/rbrun/
-      assert_select "a", text: /acme\/api/
-      assert_select "div[role=menu]"
-      assert_select "a[role=menuitem]", minimum: 2
-      # The subtitle line carries the org (owner) segment.
-      assert_select "a[role=menuitem] span", text: "rbdotrun"
-      assert_select "a[role=menuitem] span", text: "acme"
+      assert_select "div[role=menu][data-controller~=?]", "repo-choices"
+      assert_select "[role=menuitem]", minimum: 2
+      assert_select "[role=menuitem][data-action*=?][data-repo=?][data-base=?]",
+                    "repo-choices#pick", "rbdotrun/rbrun", "main"
+      assert_select "[role=menuitem][data-repo=?][data-base=?]", "acme/api", "develop"
+      # subtitle line carries the org (owner) segment
+      assert_select "[role=menuitem] span", text: "rbdotrun"
+      # the global switch path is gone
+      assert_select "a[href*=?]", "repos/switch", count: 0
     end
 
     test "a request from the #modal frame renders the dialog shell without hitting GitHub" do
@@ -54,29 +56,6 @@ module Rbrun
       assert_response :success
       assert_equal "rb", @fake.last_query
       assert_select "turbo-frame#repo_results"
-    end
-
-    test "switch sets the session repo and redirects to the conversation index" do
-      post "/rbrun/repos/switch", params: { repo: "acme/api" }
-      assert_redirected_to "/rbrun/c"
-
-      # The session now carries the repo — it's the active one in the results frame.
-      get "/rbrun/repos"
-      assert_select "a[aria-current=?]", "true", text: /acme\/api/
-    end
-
-    test "the current repo is marked active in the results" do
-      post "/rbrun/repos/switch", params: { repo: "rbdotrun/rbrun" }
-      get "/rbrun/repos"
-      assert_select "a[aria-current=?]", "true", text: /rbdotrun\/rbrun/
-    end
-
-    test "switching with a blank repo clears the workspace" do
-      post "/rbrun/repos/switch", params: { repo: "acme/api" }
-      post "/rbrun/repos/switch", params: { repo: "" }
-      get "/rbrun/repos"
-      # Nothing is active — the workspace is cleared.
-      assert_select "a[aria-current=?]", "true", count: 0
     end
   end
 end

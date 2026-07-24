@@ -18,6 +18,8 @@ import DropzoneController from "./controllers/dropzone_controller";
 import SingleUploadController from "./controllers/single_upload_controller";
 import RichTextAreaController from "./controllers/rich_text_area_controller";
 import NestedForm from "@stimulus-components/rails-nested-form";
+import RepoBadgeController from "./controllers/repo_badge_controller";
+import RepoChoicesController from "./controllers/repo_choices_controller";
 
 const application = Application.start();
 application.register("autoscroll", AutoscrollController);
@@ -37,4 +39,6 @@ application.register("dropzone", DropzoneController);
 application.register("single-upload", SingleUploadController);
 application.register("rich-text-area", RichTextAreaController);
 application.register("nested-form", NestedForm);
+application.register("repo-badge", RepoBadgeController);
+application.register("repo-choices", RepoChoicesController);
 window.RbrunStimulus = application;

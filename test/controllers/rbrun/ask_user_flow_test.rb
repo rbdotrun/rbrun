@@ -14,7 +14,6 @@ module Rbrun
       post "/rbrun/login", params: { email: "dev@rbrun.test", password: "password" }
       @worktree = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
       @session = @worktree.sessions.create!
-      post "/rbrun/repos/switch", params: { repo: "a/b", base: "main" }
       @session.messages.create!(role: "user", event_type: "text", content: "help me pick")
       @gate = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "au1",
         approval_status: "pending", payload: { "name" => "ask_user", "input" => { "form_spec" => FORM } })

@@ -9,7 +9,10 @@ module Rbrun
           @session = session
         end
 
-        def editable? = @session.nil? || @session.messages.none?
+        # Only the root composer (no session yet) picks a repo. In a chat the repo is fixed — the badge
+        # is a read-only chip. (A just-created session whose first turn is still enqueuing is already a
+        # chat, so `session.nil?` — not `messages.none?` — is the right test; it never flickers editable.)
+        def editable? = @session.nil?
         def repo = @session&.worktree&.repo.presence
         def base = @session&.worktree&.base.presence
       end

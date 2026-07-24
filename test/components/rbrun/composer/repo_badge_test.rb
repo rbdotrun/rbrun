@@ -17,19 +17,9 @@ module Rbrun
       assert_match(/data-action="repo-badge#clear"[^>]*class="[^"]*\bhidden\b/, html)
     end
 
-    test "a session with no turns is still editable and prefills its repo" do
+    test "in a chat (session present) → locked chip, no picker, no ✕ — even before the first turn lands" do
       wt = Rbrun::Worktree.create!(tenant: "acme", repo: "acme/web")
-      s  = wt.sessions.create!
-      html = badge_html(session: s)
-      assert_match %(data-controller="repo-badge"), html
-      assert_match %(data-turbo-frame="modal"), html
-      assert_match "acme/web", html
-    end
-
-    test "a session with a turn → locked chip, no picker, no ✕" do
-      wt = Rbrun::Worktree.create!(tenant: "acme", repo: "acme/web")
-      s  = wt.sessions.create!
-      s.messages.create!(role: "user", event_type: "text", content: "go")
+      s  = wt.sessions.create! # no turns yet — still a chat, so locked
       html = badge_html(session: s)
       refute_match %(data-controller="repo-badge"), html
       refute_match %(data-turbo-frame="modal"), html

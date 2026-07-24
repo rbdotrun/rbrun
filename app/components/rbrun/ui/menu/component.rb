@@ -7,7 +7,7 @@ module Rbrun
       #
       #   <%= component("menu") do |m| %>
       #     <% m.current "rbdotrun/rbrun", avatar: "RB" %>
-      #     <% m.link "rbdotrun/scratch", href: switch_repo_path, avatar: "RB", data: { turbo_method: :post } %>
+      #     <% m.link "rbdotrun/scratch", href: "#", avatar: "RB" %>
       #     <% m.separator %>
       #   <% end %>
       #

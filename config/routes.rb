@@ -4,6 +4,8 @@ Rbrun::Engine.routes.draw do
   delete "logout", to: "auth/sessions#destroy", as: :logout
 
   resources :sessions, path: "c", only: %i[index create show]
+  # A worktree groups conversations for one (repo, branch); open it to see its sessions.
+  resources :worktrees, only: :show
   post "c/:id",       to: "messages#create", as: :session_message
   post "c/:id/retry", to: "sessions#retry",  as: :session_retry
   # Per-turn "report an error": the footer link opens the dialog (new), the form files it (create).
@@ -17,9 +19,8 @@ Rbrun::Engine.routes.draw do
   # Custom gate: request_secrets submits the secure form here (values → encrypted store, never the LLM).
   post "secrets/:tool_use_id", to: "secrets#create", as: :secrets_submission
 
-  # Repo workspace switcher: the searchable result frame + the switch action.
-  get  "repos",        to: "repositories#index",  as: :repos
-  post "repos/switch", to: "repositories#switch", as: :switch_repo
+  # Repo picker: the searchable result frame (rows are client-side picks into the composer badge).
+  get "repos", to: "repositories#index", as: :repos
 
   # Skills panel: list + the authoring form (new/create/edit/update) + reconcile a divergence (keep|reload).
   resources :skills, param: :slug, only: %i[index new create edit update] do
