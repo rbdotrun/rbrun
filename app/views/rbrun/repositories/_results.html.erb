@@ -6,11 +6,13 @@
   <div role="menu" class="p-1.5" data-controller="menu repo-choices" data-action="keydown->menu#navigate">
     <% repos.each do |repo| %>
       <% org, name = repo.full_name.split("/", 2) %>
+      <%# `click->` is REQUIRED: the row is a <div> (list_item with no href) and Stimulus infers no
+          default event for a div — a bare "repo-choices#pick" would never bind. %>
       <%= component("list_item",
             title: repo.full_name,
             subtitle: org,
             avatar: name.to_s[0, 2].upcase,
-            data: { action: "repo-choices#pick", repo: repo.full_name, base: repo.default_branch }) %>
+            data: { action: "click->repo-choices#pick", repo: repo.full_name, base: repo.default_branch }) %>
     <% end %>
   </div>
 <% else %>
