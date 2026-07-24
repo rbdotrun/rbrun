@@ -59,6 +59,11 @@ module Rbrun
 
     def current_user_from(session) = @current_user_resolver&.call(session)
 
+    # Is a HOST auth resolver installed? Auth ownership is a config-time fact, not a per-request guess.
+    # Callers must branch on THIS, never on whether the resolver happened to return a user: a resolver
+    # answering nil means "this person is not signed in", which is the opposite of "no resolver here".
+    def host_auth? = !@current_user_resolver.nil?
+
     # The repo directory behind the sidebar switcher, tenant-aware. Precedence:
     #   1. github_repos_resolver — a host proc taking the tenant (e.g. a GitHub-App-installation-scoped
     #      lister per tenant). The multi-tenant seam.
