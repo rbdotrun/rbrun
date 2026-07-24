@@ -52,5 +52,17 @@ module Rbrun
       error = assert_raises(Rbrun::Server::Error) { client.find_server(name: "x") }
       assert_match(/502/, error.message)
     end
+
+    # Registry creds are needed to DEPLOY (kamal pushes an image), not to provision — so the capability
+    # is gated at deploy. Blank creds used to be shipped to kamal, which failed at docker login with a
+    # wall of output that never says "you didn't configure a registry".
+    test "hetzner: deploy refuses without registry credentials, naming what is missing" do
+      client = Rbrun::Server::KamalHetzner.new(config: { hcloud_token: "tok" })
+      error = assert_raises(Rbrun::Server::Error) do
+        client.deploy(work_dir: "/tmp", host: "w.rb.run", server_ip: "1.2.3.4", ssh_private_key: "k")
+      end
+      assert_match(/registry/, error.message)
+      assert_match(/server|username|password/, error.message)
+    end
   end
 end

@@ -78,7 +78,19 @@ module Rbrun
 
       # Deploy the app in work_dir onto the server via Kamal's LOCAL builder. The generated deploy.yml reads
       # the server IP + registry creds from the child env; the ssh private key authenticates the deploy.
+      # Registry credentials are required to DEPLOY (kamal pushes an image), but not to provision or
+      # destroy a box — so the capability is gated here rather than in the constructor. Without this,
+      # a missing registry block shipped three BLANK env vars to kamal, which then failed at `docker
+      # login`/push and reported a wall of kamal output that never says "you didn't configure a registry".
+      REGISTRY_KEYS = %i[server username password].freeze
+
       def deploy(work_dir:, host:, server_ip:, ssh_private_key:, env: {})
+        missing = REGISTRY_KEYS.select { |k| @registry[k].to_s.strip.empty? }
+        if missing.any?
+          raise Error, "kamal_hetzner: deploy needs registry #{missing.join(', ')} — " \
+                       "set c.server_provider[:kamal_hetzner][:registry] = { server:, username:, password: }"
+        end
+
         forget_host_key(server_ip)
         with_key_file(ssh_private_key) do |key_path|
           child = kamal_env(server_ip:, key_path:, host:).merge(env.transform_keys(&:to_s))
