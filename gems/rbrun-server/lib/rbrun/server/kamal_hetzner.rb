@@ -25,11 +25,14 @@ module Rbrun
       # as `deploy`, never root. root login + password auth are disabled.
       SSH_USER = "deploy"
 
-      def initialize(config: {}, poll_interval: 2, poll_attempts: 60)
+      # `conn:` is an injection seam so tests drive the adapter with Faraday's test adapter (same shape
+      # as Rbrun::GithubRepos) — no network, no mocks.
+      def initialize(config: {}, poll_interval: 2, poll_attempts: 60, conn: nil)
         @token    = config[:hcloud_token]
         @registry = config[:registry] || {}
         @poll_interval = poll_interval
         @poll_attempts = poll_attempts
+        @conn = conn
         raise Error, "kamal_hetzner: hcloud_token missing" if @token.to_s.empty?
       end
 
@@ -204,10 +207,19 @@ module Rbrun
             req.headers["Content-Type"] = "application/json"
             req.body = JSON.generate(body)
           end
-          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue {})
-          return parsed if response.success?
+          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue nil)
 
-          msg = parsed.dig("error", "message") || response.status
+          # NEVER let "I couldn't read the answer" become "it doesn't exist". Swallowing an unreadable
+          # 2xx to {} made find_server return nil, so create_server's find-or-create guard missed and
+          # provisioned a SECOND billable box under the same name — the exact opposite of the
+          # idempotency this adapter promises (invariant #11). Unreadable success is a failure.
+          if response.success?
+            return parsed if parsed
+
+            raise Error, "kamal_hetzner: unparseable #{response.status} body from #{method.to_s.upcase} #{path}"
+          end
+
+          msg = (parsed || {}).dig("error", "message") || response.status
           raise Error, "kamal_hetzner: #{method.to_s.upcase} #{path} → #{response.status} #{msg}"
         end
 

@@ -14,9 +14,12 @@ module Rbrun
     class Cloudflare < Base
       API = "https://api.cloudflare.com/client/v4"
 
-      def initialize(config: {})
+      # `conn:` is an injection seam so tests drive the adapter with Faraday's test adapter (same shape
+      # as Rbrun::GithubRepos) — no network, no mocks.
+      def initialize(config: {}, conn: nil)
         @token   = config[:api_token]
         @zone_id = config[:zone_id]
+        @conn    = conn
         raise Error, "cloudflare dns: api_token missing" if @token.to_s.empty?
         raise Error, "cloudflare dns: zone_id missing"   if @zone_id.to_s.empty?
       end
@@ -94,10 +97,17 @@ module Rbrun
             req.headers["Content-Type"] = "application/json"
             req.body = JSON.generate(body)
           end
-          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue {})
+          parsed = response.body.is_a?(Hash) ? response.body : (JSON.parse(response.body.to_s) rescue nil)
+
+          # NEVER let "I couldn't read the answer" become "it doesn't exist". Swallowing an unreadable
+          # 2xx to {} made find return nil, so upsert took the create branch and POSTed a DUPLICATE
+          # record — in the adapter whose docstring promises upsert never duplicates (invariant #11).
+          if response.success? && parsed.nil?
+            raise Error, "cloudflare dns: unparseable #{response.status} body from #{method.to_s.upcase} #{path}"
+          end
           return parsed if response.success? && parsed["success"] != false
 
-          errors = Array(parsed["errors"]).map { |e| e["message"] }.join("; ")
+          errors = Array((parsed || {})["errors"]).map { |e| e["message"] }.join("; ")
           raise Error, "cloudflare dns: #{method.to_s.upcase} #{path} → #{response.status} #{errors}"
         end
 
