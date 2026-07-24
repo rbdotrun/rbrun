@@ -16,9 +16,6 @@
          id="navbar" data-controller="sidebar" <%= "data-collapsed" if cookies[:sidebar_collapsed] == "1" %>>
       <%= render "layouts/rbrun/sidebar_header", home_path: rbrun.sessions_path %>
 
-      <%# Repo switcher — the searchable command-menu (filled in T5). %>
-      <%= render "layouts/rbrun/repo_switcher" %>
-
       <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden" id="sidebar-nav">
         <%= component("nav_item", label: "Conversations", href: rbrun.sessions_path, icon: "messages-square") %>
       </nav>

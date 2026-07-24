@@ -1,0 +1,16 @@
+<%= component("surface", title: (@worktree.repo.presence || "Scratch"), subtitle: @worktree.branch, heading: :h1, inset: :centered) do |s| %>
+  <% s.with_body do %>
+    <div class="flex flex-col gap-2">
+      <% @sessions.each do |session| %>
+        <%= link_to rbrun.session_path(session),
+              class: "rounded-lg border border-slate-200 p-4 transition-colors hover:border-default-300 hover:bg-slate-50" do %>
+          <p class="font-medium text-slate-800"><%= session.display_title %></p>
+          <p class="text-xs text-slate-400"><%= session.status %> · <%= session.created_at.strftime("%d/%m/%Y") %></p>
+        <% end %>
+      <% end %>
+      <% if @sessions.empty? %>
+        <p class="text-sm text-slate-400">No conversations in this worktree yet.</p>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

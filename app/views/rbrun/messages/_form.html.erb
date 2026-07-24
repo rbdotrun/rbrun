@@ -19,7 +19,11 @@
         data: { composer_target: "input", action: "input->composer#input keydown->composer#keydown" },
         class: "max-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400" %>
 
-  <div class="flex items-center justify-end">
+  <div class="flex items-center justify-between">
+    <%# The chat's repo, read-only (session present → RepoBadge renders locked). Rendered directly (not
+        via `custom`) because this partial is re-rendered by Turbo broadcasts, outside the controller
+        where the component helpers live — same reason the Spinner below is a direct render. %>
+    <%= render(Rbrun::Composer::RepoBadge::Component.new(session: session)) %>
     <% if working %>
       <span class="flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-label="The agent is working">
         <%= render(Rbrun::Ui::Spinner::Component.new(size: :sm)) %>

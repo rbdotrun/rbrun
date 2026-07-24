@@ -8,9 +8,7 @@ module Rbrun
       Rbrun.register_tool(Rbrun::Tools::Identity)
       post "/rbrun/login", params: { email: "dev@rbrun.test", password: "password" }
       @worktree = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
-      @session = @worktree.sessions.create!
-      # Act inside repo a/b (the switcher sets this; conversations are scoped to it).
-      post "/rbrun/repos/switch", params: { repo: "a/b", base: "main" }
+      @session  = @worktree.sessions.create!
     end
 
     test "index and show render for a signed-in user" do
@@ -22,22 +20,14 @@ module Rbrun
       assert_select "#composer"
     end
 
-    test "the collapsible sidebar rail renders with its regions" do
+    test "the collapsible sidebar rail renders with its regions (no repo switcher)" do
       get "/rbrun/c"
       assert_response :success
       assert_select "#navbar[data-controller=?]", "sidebar"
       assert_select "#sidebar-header"
-      assert_select "#repo_switcher"
       assert_select "#sidebar-nav", text: /Conversations/
       assert_select "#sidebar-footer", text: /dev@rbrun.test/
-      refute_match(/data-collapsed/, @response.body)
-    end
-
-    test "the repo switcher trigger opens the modal and shows the current repo" do
-      get "/rbrun/c"
-      assert_response :success
-      assert_select "#repo_switcher a[href$=?][data-turbo-frame=?]", "/repos", "modal"
-      assert_select "#repo_label", text: "a/b"
+      assert_select "#repo_switcher", count: 0
     end
 
     test "the sidebar_collapsed cookie makes the server render the collapsed rail" do
@@ -47,35 +37,41 @@ module Rbrun
       assert_select "#navbar[data-collapsed]"
     end
 
-    test "creating a conversation redirects to its show page" do
-      assert_difference("Rbrun::Session.count", 1) { post "/rbrun/c" }
-      assert_response :redirect
+    test "composing from root creates a NEW worktree + session + first turn" do
+      assert_difference([ "Rbrun::Worktree.count", "Rbrun::Session.count" ], 1) do
+        assert_enqueued_with(job: Rbrun::AgentTurnJob) do
+          post "/rbrun/c", params: { repo: "acme/web", base: "main", message: { content: "hello" } }
+        end
+      end
+      s = Rbrun::Session.order(:id).last
+      assert_equal "acme/web", s.worktree.repo
+      assert_redirected_to "/rbrun/c/#{s.id}"
     end
 
-    test "create finds-or-creates the worktree for the current repo (no duplicate)" do
-      assert_no_difference("Rbrun::Worktree.count") { post "/rbrun/c" }
-      assert_equal "a/b", Rbrun::Session.order(:id).last.worktree.repo
+    test "composing again on the same repo makes a SECOND worktree (new every time)" do
+      post "/rbrun/c", params: { repo: "acme/web", base: "main", message: { content: "a" } }
+      assert_difference("Rbrun::Worktree.count", 1) do
+        post "/rbrun/c", params: { repo: "acme/web", base: "main", message: { content: "b" } }
+      end
     end
 
-    test "the index is scoped to the current repo" do
-      other = Rbrun::Worktree.create!(tenant: "rbrun", repo: "c/d")
-      other_session = other.sessions.create!
+    test "composing with no repo creates a bare worktree" do
+      post "/rbrun/c", params: { message: { content: "no repo" } }
+      assert Rbrun::Session.order(:id).last.worktree.bare?
+    end
+
+    test "composing without content is rejected" do
+      assert_no_difference("Rbrun::Session.count") do
+        post "/rbrun/c", params: { repo: "acme/web", message: { content: "" } }
+      end
+      assert_response :bad_request
+    end
+
+    test "the index lists worktrees grouped by repo" do
       get "/rbrun/c"
-      assert_select "a[href$=?]", "/c/#{@session.id}"
-      assert_select "a[href$=?]", "/c/#{other_session.id}", count: 0
-    end
-
-    test "the index excludes skill_scenario sessions" do
-      machine = @worktree.sessions.create!(kind: :skill_scenario)
-      get "/rbrun/c"
-      assert_select "a[href$=?]", "/c/#{@session.id}"
-      assert_select "a[href$=?]", "/c/#{machine.id}", count: 0
-    end
-
-    test "with no current repo, create makes nothing and redirects" do
-      post "/rbrun/repos/switch", params: { repo: "" }
-      assert_no_difference("Rbrun::Session.count") { post "/rbrun/c" }
-      assert_redirected_to "/rbrun/c"
+      assert_response :success
+      assert_select "a[href=?]", "/rbrun/worktrees/#{@worktree.id}"
+      assert_includes @response.body, "a/b"
     end
 
     test "posting a message enqueues the turn and resets the composer" do

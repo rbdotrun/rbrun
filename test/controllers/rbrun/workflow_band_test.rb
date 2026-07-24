@@ -6,7 +6,6 @@ module Rbrun
       post "/rbrun/login", params: { email: "dev@rbrun.test", password: "password" }
       @worktree = Rbrun::Worktree.create!(tenant: "rbrun", repo: "a/b")
       @session  = @worktree.sessions.create!
-      post "/rbrun/repos/switch", params: { repo: "a/b", base: "main" }
       @workflow = Rbrun::Workflow.new(label: "Ship")
       @workflow[Rbrun.config.tenancy_key] = "rbrun"
       @workflow.save!

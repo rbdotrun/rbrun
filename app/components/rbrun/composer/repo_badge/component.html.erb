@@ -1,0 +1,20 @@
+<% if editable? %>
+  <div class="inline-flex items-center gap-1" data-controller="repo-badge">
+    <input type="hidden" name="repo" value="<%= repo %>" data-repo-badge-target="repo">
+    <input type="hidden" name="base" value="<%= base %>" data-repo-badge-target="base">
+    <%= link_to helpers.rbrun.repos_path, data: { turbo_frame: "modal" },
+          class: "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50" do %>
+      <%= lucide_icon("github", class: "size-3.5 text-slate-400") %>
+      <span data-repo-badge-target="label"><%= repo || "Select a repository" %></span>
+    <% end %>
+    <button type="button" data-action="repo-badge#clear" data-repo-badge-target="clear"
+            class="text-slate-400 hover:text-slate-600 <%= "hidden" unless repo %>" aria-label="Clear repository">
+      <%= lucide_icon("x", class: "size-3.5") %>
+    </button>
+  </div>
+<% else %>
+  <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+    <%= lucide_icon("github", class: "size-3.5 text-slate-400") %>
+    <%= repo || "No repository" %>
+  </span>
+<% end %>

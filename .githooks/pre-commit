@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Pre-commit gate — mirrors CI (.github/workflows/ci.yml) so a red build never reaches the remote.
+# Install once per clone:  git config core.hooksPath .githooks
+#
+# DO NOT BYPASS. There is no WIP commit here: if this gate is red, the code is broken — fix the code.
+# `--no-verify` is not an option we use; reaching for it turns a caught failure into a shipped one, and
+# the failure then surfaces in CI (or, worse, in main) where it costs far more to trace.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+fail() { printf '\n\033[31m✗ pre-commit: %s\033[0m\n' "$1" >&2; exit 1; }
+
+# 1. Gemfile.lock must carry the platforms CI installs on. A lockfile written on an arm64 Mac only
+#    lists arm64-darwin, and `bundle install --deployment` on the x86_64-linux runner then dies with
+#    exit 16 — the build breaks before a single test runs. Guard it here, where it's cheap to fix.
+for platform in x86_64-linux aarch64-linux; do
+  grep -q "^  ${platform}$" Gemfile.lock \
+    || fail "Gemfile.lock is missing the ${platform} platform — run: bundle lock --add-platform ${platform}"
+done
+
+# 2. Lint (CI: bin/rubocop -f github)
+printf '→ rubocop\n'
+bin/rubocop -f quiet || fail "rubocop found offenses — run: bin/rubocop -a"
+
+# 3. Tests (CI: bin/rails db:test:prepare test)
+printf '→ tests\n'
+bin/rails test || fail "the test suite is red"
+
+printf '\n\033[32m✓ pre-commit: lint + tests + lockfile platforms OK\033[0m\n'

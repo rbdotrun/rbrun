@@ -1,21 +1,38 @@
 <%= component("surface", title: "Conversations", heading: :h1, inset: :centered) do |s| %>
-  <% s.with_actions do %>
-    <%= button_to "New conversation", rbrun.sessions_path, method: :post,
-          class: "rounded-md bg-default-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-default-500 cursor-pointer" %>
-  <% end %>
-
   <% s.with_body do %>
-    <div class="flex flex-col gap-2">
-      <% @sessions.each do |session| %>
-        <%= link_to rbrun.session_path(session),
-              class: "rounded-lg border border-slate-200 p-4 transition-colors hover:border-default-300 hover:bg-slate-50" do %>
-          <p class="font-medium text-slate-800"><%= session.display_title %></p>
-          <p class="text-xs text-slate-400"><%= session.status %> · <%= session.created_at.strftime("%d/%m/%Y") %></p>
+    <%# Compose a new chat: pick a repo (or none → bare), type the first message. Starting mints a NEW worktree. %>
+    <%= form_with url: rbrun.sessions_path, method: :post, class: "mb-6 flex flex-col gap-2 rounded-xl border border-slate-200 p-3" do %>
+      <%= component("textarea", label: nil, name: "message[content]", rows: 3, placeholder: "Start a new conversation…") %>
+      <div class="flex items-center justify-between">
+        <%= custom("composer/repo_badge", session: nil) %>
+        <%= component("button", type: "submit", variant: :primary, size: :sm) { "Start" } %>
+      </div>
+    <% end %>
+
+    <%# Resume: worktrees grouped by repo. Open one to see its sessions. %>
+    <% grouped = @worktrees.group_by { |wt| wt.repo.presence } %>
+    <% if grouped.empty? %>
+      <p class="text-sm text-slate-400">No conversations yet.</p>
+    <% else %>
+      <div class="flex flex-col gap-5">
+        <% grouped.each do |repo, worktrees| %>
+          <div>
+            <p class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <%= lucide_icon("github", class: "size-3.5") %>
+              <%= repo || "Scratch" %>
+            </p>
+            <div class="flex flex-col gap-2">
+              <% worktrees.each do |worktree| %>
+                <%= link_to rbrun.worktree_path(worktree),
+                      class: "rounded-lg border border-slate-200 p-3 transition-colors hover:border-default-300 hover:bg-slate-50" do %>
+                  <p class="font-medium text-slate-700"><%= worktree.branch %></p>
+                  <p class="text-xs text-slate-400"><%= pluralize(worktree.sessions.where(kind: "user").count, "conversation") %></p>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
         <% end %>
-      <% end %>
-      <% if @sessions.empty? %>
-        <p class="text-sm text-slate-400">No conversations yet.</p>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
   <% end %>
 <% end %>

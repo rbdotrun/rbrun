@@ -1,18 +1,10 @@
 module Rbrun
-  # Conversation index/create/show/retry. A Session lives under a Worktree, and a Worktree belongs to
-  # the acting workspace (current_repo). The index is scoped to that repo; creating a conversation
-  # finds-or-creates the repo's Worktree. No repo chosen → nothing to show / create.
+  # Conversations. The index is the tenant's worktrees grouped by repo (open one → its sessions).
+  # Composing from root creates a NEW worktree for the chosen repo (bare when none) + a session + the
+  # first turn. Repo is a per-chat choice from the composer, never a global scope.
   class SessionsController < Rbrun::ApplicationController
     def index
-      @sessions =
-        if current_repo
-          Rbrun::Session.for_tenant(current_tenant)
-                        .joins(:worktree).where(rbrun_worktrees: { repo: current_repo })
-                        .where(kind: "user")
-                        .order(created_at: :desc)
-        else
-          Rbrun::Session.none
-        end
+      @worktrees = Rbrun::Worktree.for_tenant(current_tenant).order(:repo, created_at: :desc)
     end
 
     def show
@@ -20,9 +12,18 @@ module Rbrun
     end
 
     def create
-      return redirect_to rbrun.sessions_path unless current_repo
+      content = params.dig(:message, :content).to_s
+      return head(:bad_request) if content.blank?
 
-      session = worktree_for(current_repo).sessions.create!
+      repo = params[:repo].to_s.strip.presence
+      # `repo` is NOT NULL — a bare (no-repo) worktree carries repo "" (same shape SkillScenarioRun uses).
+      worktree = if repo
+        Rbrun::Worktree.create!(tenant: current_tenant, repo:, base: base_for(repo))
+      else
+        Rbrun::Worktree.create!(tenant: current_tenant, repo: "", bare: true)
+      end
+      session = worktree.sessions.create!
+      AgentTurnJob.perform_later(session.id, content)
       redirect_to rbrun.session_path(session)
     end
 
@@ -34,12 +35,11 @@ module Rbrun
 
     private
 
-      # The Worktree for the acting repo, created on first use. Base is the repo's default branch,
-      # captured when the repo was picked (from the GitHub result); falls back to "main".
-      def worktree_for(repo)
-        Rbrun::Worktree.for_tenant(current_tenant)
-                       .create_with(base: current_repo_base || "main")
-                       .find_or_create_by!(repo:)
+      # The repo's default branch. The picker supplies it (already API-sourced from GithubRepos); if a
+      # request arrives without it, we ask the API — both paths are authoritative. NEVER a literal guess
+      # (a wrong base spins the worktree off a branch that may not exist).
+      def base_for(repo)
+        params[:base].to_s.strip.presence || Rbrun.github_repos(current_tenant).default_branch(repo)
       end
   end
 end
