@@ -64,5 +64,22 @@ module Rbrun
       assert_match(/registry/, error.message)
       assert_match(/server|username|password/, error.message)
     end
+
+    # The cmd-id probe chain had no terminus: all three key names absent yielded nil, and nil was
+    # returned as a good command id. Every later call then built ".../command//logs" and 404'd, so the
+    # error read like a transport/permissions problem instead of an unrecognised exec response.
+    test "daytona: an exec response with no recognisable command id raises here, not as a 404 later" do
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(/exec/) { [ 200, { "Content-Type" => "application/json" }, { "unexpected" => "shape" } ] }
+        end
+      end
+      client = Rbrun::Sandbox::Daytona::Client.new(api_key: "k", api_url: "https://example.test")
+      client.instance_variable_set(:@conn, conn)
+      error = assert_raises(Rbrun::Sandbox::Daytona::Client::Error) do
+        client.send(:session_exec, "box", "sess", "echo hi")
+      end
+      assert_match(/no command id/, error.message)
+    end
   end
 end

@@ -205,7 +205,14 @@ module Rbrun
         def session_exec(id, session_id, command)
           body = post("#{TOOLBOX}/#{id}/process/session/#{session_id}/exec",
                       body: { "command" => command, "runAsync" => true }, timeout: 30)
-          body.is_a?(Hash) ? (body["cmdId"] || body["commandId"] || body["id"]) : body
+          # Probing the key names is deliberate (API-version tolerance), but the chain needs a TERMINUS:
+          # with all three absent it used to yield nil, and nil was returned as a perfectly good command
+          # id. Every later call then built ".../command//logs", got a 404, and reported a transport
+          # error — when the real cause was an exec response shape we did not recognise, here.
+          return body unless body.is_a?(Hash)
+
+          body["cmdId"] || body["commandId"] || body["id"] ||
+            raise(Error, "daytona: session exec returned no command id: #{body.inspect}")
         end
 
         def session_input(id, session_id, command_id, data)
