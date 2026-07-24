@@ -99,5 +99,32 @@ module Rbrun
       post "/rbrun/c/#{@session.id}", params: { message: { content: "" } }
       assert_response :bad_request
     end
+
+    # The gate must FAIL CLOSED. Only an explicit "approve" may run a frozen needs_approval call —
+    # a typo, a renamed button, or a hand-crafted POST must never resolve to "approved".
+    test "an unknown approval decision is refused and the gate stays pending" do
+      @session.messages.create!(role: "user", event_type: "text", content: "go")
+      frozen = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "g2",
+        approval_status: "pending", payload: { "name" => "identity", "input" => {} })
+
+      [ "reject", "deny", "cancel", "" ].each do |bogus|
+        patch "/rbrun/approvals/g2", params: { decision: bogus }
+        assert_response :unprocessable_entity, "#{bogus.inspect} must not be accepted"
+        assert frozen.reload.approval_pending?, "#{bogus.inspect} must leave the gate pending"
+      end
+
+      patch "/rbrun/approvals/g2" # no decision at all
+      assert_response :unprocessable_entity
+      assert frozen.reload.approval_pending?
+    end
+
+    test "an explicit refuse rejects the gate" do
+      @session.messages.create!(role: "user", event_type: "text", content: "go")
+      frozen = @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: "g3",
+        approval_status: "pending", payload: { "name" => "identity", "input" => {} })
+
+      patch "/rbrun/approvals/g3", params: { decision: "refuse" }
+      assert frozen.reload.approval_rejected?
+    end
   end
 end

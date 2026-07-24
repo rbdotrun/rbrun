@@ -29,10 +29,23 @@ module Rbrun
 
     def visible? = event_type.in?(RENDERED_EVENTS) || (event_type.nil? && role.in?(%w[user assistant]))
 
+    # The ONLY decisions a human can render on a frozen call. The vocabulary lives here so the endpoint
+    # can't drift from it.
+    APPROVAL_DECISIONS = %w[approve refuse].freeze
+
     # Take the owner's decision on this frozen call and carry it out. Returns the nudge to resume with,
     # or nil when the claim lost (already decided elsewhere). The claim is the UPDATE's own WHERE.
+    #
+    # FAILS CLOSED, deliberately: approval must be stated explicitly. Anything that is not exactly
+    # "approve"/"refuse" raises rather than resolving to a status — a gate that treats an unrecognized
+    # decision as consent would run a needs_approval! tool (share_public, deploy…) that no human
+    # authorized. This is why the status is derived from "approve", never from "not refuse".
     def decide_approval!(decision)
-      status = decision.to_s == "refuse" ? "rejected" : "approved"
+      unless APPROVAL_DECISIONS.include?(decision.to_s)
+        raise ArgumentError, "unknown approval decision: #{decision.inspect}"
+      end
+
+      status = decision.to_s == "approve" ? "approved" : "rejected"
       claimed = self.class.where(id:, approval_status: "pending")
                     .update_all(approval_status: status, updated_at: Time.current)
       return nil if claimed.zero?
