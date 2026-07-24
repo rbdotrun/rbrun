@@ -33,6 +33,19 @@ module Rbrun
     # can't drift from it.
     APPROVAL_DECISIONS = %w[approve refuse].freeze
 
+    # The DATA a tool returned, for this frozen call. Every tool answers with the envelope
+    # { "data" => {…} } (or { "error" => … }), stored verbatim under the result row's payload["result"].
+    #
+    # This is the ONE place that knows that shape. Reading payload["result"]["x"] by hand silently
+    # misses by a level and returns nil forever — which is exactly what happened on the validate_step
+    # card: `result["step"]` was ALWAYS nil, so its fallback ran on every render and showed the title of
+    # the NEXT, not-yet-done step as the one just validated (and an empty title on the last step).
+    # Returns {} while the call is still pending, so callers can read keys safely.
+    def tool_result_data
+      row = event_type == "tool_result" ? self : session.messages.find_by(event_type: "tool_result", tool_use_id:)
+      row&.payload&.dig("result", "data") || {}
+    end
+
     # Take the owner's decision on this frozen call and carry it out. Returns the nudge to resume with,
     # or nil when the claim lost (already decided elsewhere). The claim is the UPDATE's own WHERE.
     #

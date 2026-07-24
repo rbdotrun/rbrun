@@ -12,7 +12,10 @@ module Rbrun
       return render(:dialog, layout: false) if turbo_frame_id == "modal"
 
       # Every other request is the results frame itself (the lazy load + each debounced search).
-      @repos = Rbrun.github_repos(current_tenant).search(query: params[:q].to_s)
+      # A resolver answering nil means THIS TENANT HAS NO GITHUB — a real, designed empty state, not a
+      # cue to borrow another account's lister. (No seam and no configured PAT raises in GithubRepos.)
+      lister = Rbrun.github_repos(current_tenant)
+      @repos = lister ? lister.search(query: params[:q].to_s) : []
       render :index, layout: !turbo_frame_request?
     end
   end

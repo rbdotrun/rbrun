@@ -56,10 +56,20 @@ module Rbrun
     # All DI seams, no registry — same idiom as the resolvers above.
     attr_writer :github_repos, :github_repos_resolver
 
+    # Which seam is INSTALLED decides — never what a seam happened to return. Same shape as
+    # mcp_servers_for below.
+    #
+    # This was an `||` chain, and that conflated two opposite facts: a resolver returning nil means
+    # "THIS TENANT HAS NO GITHUB", not "ask someone else". The chain walked on to the static override
+    # and then to the operator's own PAT, so a tenant with no GitHub App installation was shown — and
+    # could act in — the operator's repositories. Cross-tenant exposure, and it looked perfectly normal.
+    # A resolver, once installed, is the sole authority for every tenant; nil is its answer, and callers
+    # render the "no GitHub" empty state.
     def github_repos(tenant = nil)
-      @github_repos_resolver&.call(tenant) ||
-        @github_repos ||
-        Rbrun::GithubRepos.new(pat: config(tenant).github_pat)
+      return @github_repos_resolver.call(tenant) if @github_repos_resolver
+      return @github_repos if @github_repos
+
+      Rbrun::GithubRepos.new(pat: config(tenant).github_pat)
     end
 
     # The external MCP servers to materialize for a turn, scoped to (tenant, repo). Defaults to the

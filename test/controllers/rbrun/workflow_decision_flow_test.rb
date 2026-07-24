@@ -18,6 +18,47 @@ module Rbrun
 
     def result_row = @session.messages.find_by(event_type: "tool_result", tool_use_id: "wf1")
 
+    # A frozen call with a blank label or no steps is a CORRUPT gate. Inventing "Untitled workflow" /
+    # zero steps satisfied the model's own validation, filed an unnamed row in the library, told the
+    # agent the user applied something they never saw, and stranded the session active forever.
+    def gate_with(input, id:)
+      @session.messages.create!(role: "assistant", event_type: "tool_use", tool_use_id: id,
+        approval_status: "pending", payload: { "name" => "workflow_create", "input" => input })
+    end
+
+    test "apply on a plan with a blank label is refused — no workflow is invented" do
+      gate = gate_with({ "label" => "  ", "steps" => [ "A" ] }, id: "wf-bad-label")
+      assert_no_difference("Rbrun::Workflow.count") do
+        post "/rbrun/workflow_decision/wf-bad-label", params: { decision: "apply" }
+      end
+      assert_response :unprocessable_entity
+      assert gate.reload.approval_pending?, "the gate stays pending"
+    end
+
+    test "apply on a plan with no steps is refused — it would strand the session active forever" do
+      gate = gate_with({ "label" => "Ship it", "steps" => [] }, id: "wf-no-steps")
+      assert_no_difference("Rbrun::Workflow.count") do
+        post "/rbrun/workflow_decision/wf-no-steps", params: { decision: "apply" }
+      end
+      assert_response :unprocessable_entity
+      assert gate.reload.approval_pending?
+    end
+
+    test "apply on a gate with no input at all is refused" do
+      gate = gate_with(nil, id: "wf-no-input")
+      assert_no_difference("Rbrun::Workflow.count") do
+        post "/rbrun/workflow_decision/wf-no-input", params: { decision: "apply" }
+      end
+      assert_response :unprocessable_entity
+      assert gate.reload.approval_pending?
+    end
+
+    test "cancel still works on a corrupt gate — a broken gate must be dismissable" do
+      gate = gate_with({ "label" => "" }, id: "wf-cancel-bad")
+      post "/rbrun/workflow_decision/wf-cancel-bad", params: { decision: "cancel" }
+      assert gate.reload.approval_rejected?
+    end
+
     test "the card renders the plan + decision buttons (resolved by convention)" do
       get "/rbrun/c/#{@session.id}"
       assert_response :success
