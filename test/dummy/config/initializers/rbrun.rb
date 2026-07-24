@@ -41,7 +41,9 @@ Rbrun.configure do |c|
         zone_id: ENV["CLOUDFLARE_ZONE_ID"]
       }
     }
-    c.preview_domain = ENV.fetch("RBRUN_PREVIEW_DOMAIN", "rb.run")
+    # No fallback domain — a distributed engine has no universal one. Absent ⇒ preview/deploy hosting is
+    # blocked (provision_server fails loud), never silently pointed at someone else's domain.
+    c.preview_domain = ENV["RBRUN_PREVIEW_DOMAIN"].presence
   end
 
   # Server (deploy) capability: Hetzner provisioning + Kamal deploy, when creds are present. The SSH

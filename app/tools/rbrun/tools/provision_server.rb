@@ -25,7 +25,10 @@ module Rbrun
           cfg = Rbrun.config(session.tenant).server_provider
           prov = (cfg[:default] || :kamal_hetzner)
           pc = cfg[prov] || {}
-          domain = Rbrun.config.preview_domain.presence || "preview.local"
+          # The deploy host must be built on a REAL domain — never a guessed placeholder that won't
+          # resolve. Fail loud if the host app didn't configure one (invariant 2: validate config, fail-fast).
+          domain = Rbrun.config.preview_domain.presence or
+            raise Rbrun::ConfigError, "provision_server needs c.preview_domain to build the deploy host"
           { provider: prov.to_s, server_type: pc[:server_type] || "cx23", region: pc[:region] || "fsn1",
             image: pc[:image] || "ubuntu-24.04", host: "#{server_name(wt)}.#{domain}", status: "pending" }
         end

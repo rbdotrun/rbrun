@@ -69,6 +69,7 @@ module Rbrun
     end
 
     test "provision_server creates the box and records the ip on the target" do
+      Rbrun.config.preview_domain = "rb.run" # the deploy host is built on it — provisioning is gated on it
       srv = fake(:create_server) { |**| Rbrun::Server::Node.new(id: 7, name: "n", ip: "5.5.5.5", status: "running", region: "fsn1") }
       with_rbrun(:server, srv) do
         data = Rbrun::Tools::ProvisionServer.in_session(@session).execute["data"]
