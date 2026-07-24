@@ -1,0 +1,9 @@
+<%# locals: skill. A GET to edit with ?version= reloads the form from that version. Plain form + Load — no JS. %>
+<%= form_with url: rbrun.edit_skill_path(skill.slug), method: :get, class: "flex items-end gap-2" do %>
+  <%= component("select", label: "Version", name: "version", include_blank: false,
+        value: (params[:version].presence || skill.current_version_id),
+        options: skill.versions.order(created_at: :desc).map { |v|
+          [ "#{v.created_at.to_fs(:short)} · #{v.source} · #{v.digest.first(7)}", v.id ]
+        }) %>
+  <%= component("button", type: "submit", variant: :white, size: :sm) { "Load" } %>
+<% end %>

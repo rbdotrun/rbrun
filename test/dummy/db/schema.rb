@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_24_110000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -151,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
     t.datetime "archived_at"
     t.boolean "auto", default: false, null: false
     t.datetime "created_at", null: false
+    t.string "kind", default: "user", null: false
     t.json "preferred_skills", default: [], null: false
     t.string "sdk_session_id"
     t.string "status", default: "idle", null: false
@@ -159,23 +160,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
     t.integer "workflow_id"
     t.string "workflow_status"
     t.integer "worktree_id", null: false
+    t.index ["kind"], name: "index_rbrun_sessions_on_kind"
     t.index ["tenant"], name: "index_rbrun_sessions_on_tenant"
     t.index ["workflow_id"], name: "index_rbrun_sessions_on_workflow_id"
     t.index ["worktree_id"], name: "index_rbrun_sessions_on_worktree_id"
-  end
-
-  create_table "rbrun_skill_scenarios", force: :cascade do |t|
-    t.json "attachments", default: [], null: false
-    t.datetime "created_at", null: false
-    t.text "description"
-    t.string "label", null: false
-    t.text "prompt", null: false
-    t.integer "skill_id", null: false
-    t.json "steps", default: [], null: false
-    t.string "tenant", null: false
-    t.datetime "updated_at", null: false
-    t.index ["skill_id"], name: "index_rbrun_skill_scenarios_on_skill_id"
-    t.index ["tenant", "skill_id", "label"], name: "idx_rbrun_skill_scenarios_unique", unique: true
   end
 
   create_table "rbrun_skill_versions", force: :cascade do |t|
@@ -249,8 +237,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
     t.text "description"
     t.text "goal"
     t.string "label", null: false
+    t.text "prompt"
+    t.integer "showcase_artifact_version_id"
+    t.integer "skill_id"
     t.string "tenant", null: false
     t.datetime "updated_at", null: false
+    t.index ["showcase_artifact_version_id"], name: "index_rbrun_workflows_on_showcase_artifact_version_id"
+    t.index ["skill_id"], name: "index_rbrun_workflows_on_skill_id"
     t.index ["tenant"], name: "index_rbrun_workflows_on_tenant"
   end
 
@@ -288,7 +281,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
   add_foreign_key "rbrun_session_snapshots", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_sessions", "rbrun_workflows", column: "workflow_id"
   add_foreign_key "rbrun_sessions", "rbrun_worktrees", column: "worktree_id"
-  add_foreign_key "rbrun_skill_scenarios", "rbrun_skills", column: "skill_id"
   add_foreign_key "rbrun_skill_versions", "rbrun_skills", column: "skill_id"
   add_foreign_key "rbrun_turn_reports", "rbrun_session_messages", column: "user_message_id"
   add_foreign_key "rbrun_turn_reports", "rbrun_sessions", column: "session_id"
@@ -296,4 +288,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_sessions", column: "session_id"
   add_foreign_key "rbrun_workflow_step_completions", "rbrun_workflow_steps", column: "workflow_step_id"
   add_foreign_key "rbrun_workflow_steps", "rbrun_workflows", column: "workflow_id"
+  add_foreign_key "rbrun_workflows", "rbrun_artifact_versions", column: "showcase_artifact_version_id"
+  add_foreign_key "rbrun_workflows", "rbrun_skills", column: "skill_id"
 end

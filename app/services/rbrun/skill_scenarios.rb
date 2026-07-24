@@ -1,10 +1,10 @@
 require "yaml"
 
 module Rbrun
-  # Reads a skill folder's hand-authored `scenarios/*.yml` and upserts them into SkillScenario rows —
-  # the DB seed the dogfood board replays. Autoloaded + testable (not buried in a rake). The
-  # `scenarios/` folder is excluded from the staged archive (Rbrun::SkillArchive) — these drive eval,
-  # they never reach the agent's workspace.
+  # Reads a skill folder's hand-authored `scenarios/*.yml` and upserts each into a skill-bound
+  # Rbrun::Workflow (the scenario) — the DB seed the dogfood board replays. Autoloaded + testable (not
+  # buried in a rake). The `scenarios/` folder is excluded from the staged archive (Rbrun::SkillArchive)
+  # — these drive eval, they never reach the agent's workspace.
   module SkillScenarios
     module_function
 
@@ -14,19 +14,22 @@ module Rbrun
       Dir.glob(File.join(dir, "scenarios", "*.yml")).sort.count { |path| upsert(skill, path) }
     end
 
-    # One scenario YAML → a SkillScenario row. Blank label ⇒ skipped (false).
+    # One scenario YAML → one skill-bound Workflow (the scenario). Blank label ⇒ skipped (false).
+    # Find-or-create by [skill, label]; the steps are rebuilt so re-ingest converges (idempotent).
     def upsert(skill, path)
       data  = YAML.safe_load(File.read(path)) || {}
       label = data["label"].to_s.strip
       return false if label.blank?
 
-      steps = Array(data["steps"]).map do |s|
-        { "label" => s["label"].to_s, "description" => s["description"].to_s }
+      steps = Array(data["steps"]).each_with_index.map do |s, i|
+        { position: i + 1, title: s["label"].to_s, description: s["description"].to_s }
       end
 
-      scenario = Rbrun::SkillScenario.for_tenant(skill.tenant).find_or_initialize_by(skill:, label:)
-      scenario.update!(description: data["description"], prompt: data["prompt"].to_s,
-                       steps:, attachments: Array(data["attachments"]).map(&:to_s))
+      workflow = skill.workflows.for_tenant(skill.tenant).find_or_initialize_by(label:)
+      workflow.assign_attributes(prompt: data["prompt"].to_s, goal: data["description"].to_s)
+      workflow.steps.destroy_all if workflow.persisted? # idempotent rebuild
+      workflow.steps.build(steps)
+      workflow.save!
       true
     end
 

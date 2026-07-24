@@ -65,6 +65,13 @@ module Rbrun
       assert_select "a[href$=?]", "/c/#{other_session.id}", count: 0
     end
 
+    test "the index excludes skill_scenario sessions" do
+      machine = @worktree.sessions.create!(kind: :skill_scenario)
+      get "/rbrun/c"
+      assert_select "a[href$=?]", "/c/#{@session.id}"
+      assert_select "a[href$=?]", "/c/#{machine.id}", count: 0
+    end
+
     test "with no current repo, create makes nothing and redirects" do
       post "/rbrun/repos/switch", params: { repo: "" }
       assert_no_difference("Rbrun::Session.count") { post "/rbrun/c" }

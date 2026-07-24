@@ -25,6 +25,10 @@ module Rbrun
          { active: "active", completed: "completed", cancelled: "cancelled" },
          prefix: :workflow_status, validate: { allow_nil: true }
 
+    # Durable "what is this session": a person's conversation vs a machine-driven run. The conversation
+    # index shows only :user; :skill_scenario is a self-validating run (Plan 2). Kept open for more kinds.
+    enum :kind, { user: "user", skill_scenario: "skill_scenario" }, default: "user"
+
     after_update_commit :broadcast_status, if: :saved_change_to_status?
 
     # The Worktree's sandbox — one branch checkout shared by all Sessions under it.

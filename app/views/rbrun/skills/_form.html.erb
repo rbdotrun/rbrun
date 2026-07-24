@@ -1,0 +1,73 @@
+<%# locals: skill (nil for new), form (Rbrun::SkillForm), skill_options, tool_options %>
+<%= component("surface", title: skill ? "Edit skill" : "New skill", heading: :h1, inset: :centered) do |s| %>
+  <% if skill && skill.versions.many? %>
+    <% s.with_actions do %>
+      <%= render "rbrun/skills/version_picker", skill: skill %>
+    <% end %>
+  <% end %>
+
+  <% s.with_body do %>
+    <% if flash[:alert] %>
+      <div class="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700"><%= flash[:alert] %></div>
+    <% end %>
+
+    <%= form_with url: (skill ? rbrun.skill_path(skill.slug) : rbrun.skills_path),
+                  method: (skill ? :patch : :post), class: "flex flex-col gap-8" do %>
+
+      <%= component("form_section", title: "Identity", columns: 2) do %>
+        <%= component("field", label: "Name",        name: "skill[name]",    value: form.name) %>
+        <%= component("field", label: "Label",       name: "skill[label]",   value: form.label,   required: false) %>
+        <%= component("field", label: "Tagline",     name: "skill[tagline]", value: form.tagline, required: false) %>
+        <%= component("field", label: "Icon",        name: "skill[icon]",    value: form.icon,    required: false) %>
+        <%= component("field", label: "Kind",        name: "skill[kind]",    value: form.kind,    required: false) %>
+        <%= component("field", label: "Example ask", name: "skill[example]", value: form.example, required: false) %>
+      <% end %>
+
+      <%= component("form_section", title: "Description") do %>
+        <%= component("textarea", label: "Description", name: "skill[description]", value: form.description, rows: 3) %>
+      <% end %>
+
+      <%= component("form_section", title: "Instructions") do %>
+        <%= component("textarea", label: "SKILL.md body", name: "skill[body]", value: form.body, rows: 16) %>
+      <% end %>
+
+      <%= component("form_section", title: "Soft hints", description: "Author-only nudges — display, not runtime injection.", columns: 2) do %>
+        <%= component("multi_select", label: "Preferred skills", name: "skill[preferred_skills]",
+              options: skill_options, selected: form.preferred_skills) %>
+        <%= component("multi_select", label: "Preferred tools", name: "skill[preferred_tools]",
+              options: tool_options, selected: form.preferred_tools) %>
+      <% end %>
+
+      <div class="flex justify-end">
+        <%= component("button", type: "submit", variant: :primary) do %>
+          <%= skill ? "Save new version" : "Create skill" %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if skill %>
+      <div class="mt-8">
+        <%= component("form_section", title: "Scenarios", description: "Runnable examples that self-validate this skill.") do %>
+          <div class="flex flex-col gap-2">
+            <% skill.workflows.order(:label).each do |wf| %>
+              <div class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium text-slate-800"><%= wf.label %></p>
+                  <p class="text-xs text-slate-500"><%= pluralize(wf.steps.size, "step") %><%= " · showcase ✓" if wf.showcase_artifact_version_id %></p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <%= button_to "▶ Run", rbrun.run_skill_workflow_path(skill.slug, wf), method: :post,
+                        class: "text-xs rounded-md px-2 py-1 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer" %>
+                  <%= link_to "Edit", rbrun.edit_skill_workflow_path(skill.slug, wf), class: "text-xs text-default-600 hover:underline" %>
+                </div>
+              </div>
+            <% end %>
+            <%= component("button", href: rbrun.new_skill_workflow_path(skill.slug), variant: :white, size: :sm, css: "self-start") do %>
+              + New scenario
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>
