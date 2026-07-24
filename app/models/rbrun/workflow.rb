@@ -16,6 +16,15 @@ module Rbrun
     accepts_nested_attributes_for :steps, allow_destroy: true,
       reject_if: ->(a) { a[:title].blank? && a[:description].blank? }
 
+    # Step order IS the order the rows were submitted in — never a number a form guessed. A nested form
+    # cannot know the ordinal of a row the browser just cloned, and `position` is the only thing defining
+    # the sequence the agent works (Run#current_step, the task band), so it is assigned here.
+    before_validation :renumber_steps
+
+    def renumber_steps
+      steps.reject(&:marked_for_destruction?).each_with_index { |step, i| step.position = i + 1 }
+    end
+
     scope :scenarios, -> { where.not(skill_id: nil) }
 
     validates :label, presence: true

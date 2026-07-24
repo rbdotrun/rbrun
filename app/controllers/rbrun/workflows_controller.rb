@@ -46,9 +46,11 @@ module Rbrun
       def set_skill = @skill = Rbrun::Skill.for_tenant(current_tenant).find_by!(slug: params[:skill_slug])
       def find_workflow = @skill.workflows.find(params[:id])
 
+      # `position` is deliberately NOT permitted: order comes from the submitted row order
+      # (Workflow#renumber_steps), so a client can't dictate — or mis-guess — the sequence.
       def workflow_params
         params.require(:workflow).permit(:label, :prompt, :goal,
-          steps_attributes: %i[id position title description _destroy])
+          steps_attributes: %i[id title description _destroy])
       end
   end
 end

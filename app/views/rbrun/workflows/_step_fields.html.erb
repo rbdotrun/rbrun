@@ -5,7 +5,9 @@
   <% if step&.persisted? %>
     <input type="hidden" name="workflow[steps_attributes][<%= index %>][id]" value="<%= step.id %>">
   <% end %>
-  <input type="hidden" name="workflow[steps_attributes][<%= index %>][position]" value="<%= step&.position || (index.to_i + 1) %>">
+<%# No position field: the view cannot know a row's ordinal. A cloned template row's index is the literal
+    "NEW_RECORD" (so `.to_i + 1` collapsed every added step to 1). Position is assigned server-side from
+    the order the rows were actually submitted — see Workflow#renumber_steps. %>
   <div class="flex-1 flex flex-col gap-2">
     <%= component("field", label: "Step title", name: "workflow[steps_attributes][#{index}][title]",
           value: step&.title, required: false, error: step&.errors&.[](:title)&.first) %>
