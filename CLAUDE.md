@@ -63,7 +63,8 @@ Ruby 3.4.4, Rails `>= 8.1.3`. This is an engine, so `bin/rails` runs against `te
 - **Pre-commit hook (install once per clone):** `git config core.hooksPath .githooks` — runs lint +
   tests and guards the `Gemfile.lock` platforms CI installs on (`x86_64-linux`/`aarch64-linux`; a
   lockfile written on an arm64 Mac breaks the runner at `bundle install` before any test runs).
-  `git commit --no-verify` bypasses it for a genuine WIP commit.
+  **NEVER `--no-verify`.** There are no WIP commits: a red hook means the code is broken — fix the
+  code. Bypassing turns a caught failure into a shipped one.
 - **Dogfood (engine repo):** `bin/rails app:dogfood:config` — the `app:` prefix is required here because the engine runner wraps the dummy app's tasks. (In a mounted host app it's the un-prefixed `bin/rails dogfood:config`.)
 
 ## Non-negotiable invariants

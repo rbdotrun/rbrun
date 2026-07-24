@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Pre-commit gate — mirrors CI (.github/workflows/ci.yml) so a red build never reaches the remote.
 # Install once per clone:  git config core.hooksPath .githooks
-# Bypass for a genuine WIP commit:  git commit --no-verify
+#
+# DO NOT BYPASS. There is no WIP commit here: if this gate is red, the code is broken — fix the code.
+# `--no-verify` is not an option we use; reaching for it turns a caught failure into a shipped one, and
+# the failure then surfaces in CI (or, worse, in main) where it costs far more to trace.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
